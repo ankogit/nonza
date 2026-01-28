@@ -61,7 +61,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
   const localParticipant = computed(() => {
     return state.value.livekitRoom?.localParticipant || null;
-  });
+  }) as ComputedRef<LocalParticipant | null>;
 
   const remoteParticipants = computed(() => {
     const version = state.value.participantsVersion;
@@ -72,7 +72,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     ) as RemoteParticipant[];
     void version;
     return result;
-  });
+  }) as ComputedRef<RemoteParticipant[]>;
 
   /** Display name for UI: uses reactive participantNames so other clients see name updates */
   const getDisplayName = (participant: RemoteParticipant | LocalParticipant): string => {
@@ -338,12 +338,14 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     disconnect();
   });
 
+  const stateComputed = computed(() => state.value) as unknown as ComputedRef<RoomConnectionState>;
+
   return {
-    state: computed(() => state.value),
+    state: stateComputed,
     localParticipant,
     remoteParticipants,
     getDisplayName,
     connect,
     disconnect,
-  } as UseRoomConnectionReturn;
+  };
 }
