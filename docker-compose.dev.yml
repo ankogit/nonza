@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: nonza-postgres-dev
+    environment:
+      POSTGRES_USER: nonza
+      POSTGRES_PASSWORD: nonza_password
+      POSTGRES_DB: nonza
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nonza"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nonza-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: nonza-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nonza-network
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: nonza-livekit-dev
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "50000-50100:50000-50100/udp"
+    volumes:
+      - ./deploy/livekit-config.yaml:/etc/livekit.yaml
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: --config /etc/livekit.yaml
+    networks:
+      - nonza-network
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+
+networks:
+  nonza-network:
+    driver: bridge

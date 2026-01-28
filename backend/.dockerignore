@@ -1,0 +1,6 @@
+app
+*.md
+.git
+.gitignore
+.env
+.env.local

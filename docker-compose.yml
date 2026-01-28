@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: nonza-postgres
+    environment:
+      POSTGRES_USER: nonza
+      POSTGRES_PASSWORD: nonza_password
+      POSTGRES_DB: nonza
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nonza"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nonza-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: nonza-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nonza-network
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: nonza-livekit
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "50000-60000:50000-60000/udp"
+    environment:
+      - LIVEKIT_KEYS=devkey:devsecret
+    volumes:
+      - ./deploy/livekit-config.yaml:/etc/livekit.yaml
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: --config /etc/livekit.yaml
+    networks:
+      - nonza-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nonza-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HTTP_PORT=8000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=nonza
+      - DB_PASSWORD=nonza_password
+      - DB_DATABASE=nonza
+      - DB_SSL_MODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+      - WEBRTC_URL=wss://livekit:7880
+      - WEBRTC_API_KEY=devkey
+      - WEBRTC_API_SECRET=devsecret
+      - JWT_SECRET=dev_jwt_secret_change_in_production_min_32_chars
+      - ENV=local
+      - DEBUG=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    networks:
+      - nonza-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  nonza-network:
+    driver: bridge
