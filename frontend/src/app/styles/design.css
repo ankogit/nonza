@@ -1,0 +1,278 @@
+/* Design system: dashboard, room, call grid, player, menu, indicators */
+
+@font-face {
+  font-family: "Bebas Neue";
+  src: url("/fonts/bebasneuecyrillic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-bebas {
+  font-family: "Bebas Neue", sans-serif;
+}
+
+.bg-dark {
+  background: #1f1f1f;
+}
+
+.bg-dark-20 {
+  background: #00000020;
+}
+
+.bg-dark-40 {
+  background: #00000040;
+}
+
+.color-white {
+  color: #bab1a8;
+}
+
+.bg-dark-blur-90 {
+  background: #14141490;
+  backdrop-filter: blur(2.5px);
+}
+
+.dashboard {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.room-info {
+  display: block;
+  padding: 20px;
+}
+
+.room-indicators {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Menu (нижняя панель): слева — микро/видео/трансляция, центр — закончить, справа — настройки */
+.menu {
+  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.menu .left,
+.menu .right,
+.menu .center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+}
+
+.menu .center {
+  flex: 0 0 auto;
+}
+
+/* Buttons — стили перенесены в компонент Button.vue */
+
+/* Indicators (mic/status dots) */
+.indicator {
+  position: relative;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #457fb3;
+  border: 3px solid rgba(0, 0, 0, 0.125);
+}
+
+.indicator.danger {
+  background: #e2534b;
+}
+
+.indicator.warning {
+  background: #ffbe53;
+}
+
+.indicator.default {
+  background: #333333;
+}
+
+.indicator.success {
+  background: #0ead61;
+}
+
+/* Call grid — как в примере: flex row wrap, gap 20px, justify-content center */
+.call-grid {
+  padding-top: 20px;
+  padding-bottom: 100px;
+  /* место под нижнее меню */
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  align-content: flex-start;
+}
+
+/* Player card */
+.player {
+  width: 256px;
+  height: 256px;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0px 5px 10px 2px rgb(0 0 0 / 12%);
+  transition: all 0.5s ease;
+}
+
+.player-avatar {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-menu {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.player-menu-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.player-menu .left,
+.player-menu .right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-name {
+  font-family: "Bebas Neue", sans-serif;
+  color: #bab1a8;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Full-size button on player (expand) */
+.button-full-size {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  fill: #fff;
+  filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.25));
+  opacity: 0.4;
+  transition: all 0.01s;
+}
+
+.button-full-size:hover {
+  opacity: 0.7;
+  scale: 1.1;
+}
+
+/* Кнопка-индикатор: кликабельная, выглядит как .indicator */
+.indicator--trigger {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 3px solid rgba(0, 0, 0, 0.125);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+}
+
+.indicator--trigger:hover {
+  opacity: 0.9;
+}
+
+.volume-slider {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+}
+
+.indicator-trigger {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.indicator-trigger:hover {
+  opacity: 0.9;
+}
+
+/* Notes area (below grid, above menu) */
+.notes {
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+/* Horizontal rule */
+.HR {
+  background-color: var(--mc-core-grey-4, #444);
+  box-shadow: 0 -0.125rem #00000040;
+  height: 0.125rem;
+  width: 100%;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border: none;
+}

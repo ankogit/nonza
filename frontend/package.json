@@ -1,0 +1,51 @@
+{
+  "name": "@nonza/video-widget",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Nonza Video Call Widget - Vue 3 library for embedding video calls",
+  "main": "./dist/nonza-widget.umd.js",
+  "module": "./dist/nonza-widget.es.js",
+  "types": "./dist/nonza-widget.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/nonza-widget.es.js",
+      "require": "./dist/nonza-widget.umd.js",
+      "types": "./dist/nonza-widget.d.ts"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit",
+    "lint": "eslint . --fix"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.18.0",
+    "@tiptap/extension-collaboration": "^3.18.0",
+    "@tiptap/extension-collaboration-caret": "^3.18.0",
+    "@tiptap/extension-link": "^3.18.0",
+    "@tiptap/markdown": "^3.18.0",
+    "@tiptap/starter-kit": "^3.18.0",
+    "@tiptap/vue-3": "^3.18.0",
+    "livekit-client": "^2.17.0",
+    "vue": "^3.5.26",
+    "y-prosemirror": "^1.3.7",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.29"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.3.0",
+    "vue-tsc": "^2.1.27"
+  }
+}

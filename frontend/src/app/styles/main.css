@@ -1,0 +1,28 @@
+@import './design.css';
+
+:root {
+  --color-primary: #e74c3c;
+  --color-secondary: #2980B9;
+  --color-accent: #FFBE53;
+  --color-background: #1a1a1a;
+  --color-surface: #2a2a2a;
+  --color-text: #ffffff;
+  --color-text-secondary: #cccccc;
+  --border-width: 2px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-background);
+  color: var(--color-text);
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}

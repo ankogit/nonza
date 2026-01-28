@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nonza Video Call Widget - Dev</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/app/main.ts"></script>
+    <script>
+      // Автоматически включаем режим превью если нет бэкенда
+      if (
+        !window.location.search.includes("preview") &&
+        !window.location.search.includes("mode")
+      ) {
+        // Можно добавить проверку доступности API, но для простоты используем параметр
+        // Для включения превью: ?preview=true или ?mode=preview
+      }
+    </script>
+  </body>
+</html>
