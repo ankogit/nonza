@@ -60,9 +60,14 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		return
 	}
 
+	// Клиенту отдаём публичный URL (wss://), иначе браузер не достучится до ws://livekit:7880
+	livekitURL := h.Config.WebRTCPublicURL
+	if livekitURL == "" {
+		livekitURL = h.Config.WebRTCURL
+	}
 	response := tokenDto.TokenResponse{
 		Token:         token,
-		URL:           h.Config.WebRTCURL,
+		URL:           livekitURL,
 		RoomName:      room.LiveKitRoomName,
 		ParticipantID: participantID,
 	}

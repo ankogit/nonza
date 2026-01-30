@@ -12,6 +12,8 @@ type Config struct {
 
 	WebRTCPlatform  string `envconfig:"WEBRTC_PLATFORM" default:"livekit"`
 	WebRTCURL       string `envconfig:"WEBRTC_URL"`
+	// URL, который отдаётся клиенту (браузеру). Должен быть публичный wss://. Если пусто — используется WebRTCURL.
+	WebRTCPublicURL string `envconfig:"WEBRTC_PUBLIC_URL"`
 	WebRTCAPIKey    string `envconfig:"WEBRTC_API_KEY"`
 	WebRTCAPISecret string `envconfig:"WEBRTC_API_SECRET"`
 
