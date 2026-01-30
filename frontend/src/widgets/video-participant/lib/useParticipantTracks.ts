@@ -5,9 +5,7 @@ import { applyStoredOutputDevice } from "@shared/lib";
 
 type ParticipantLike = RemoteParticipant | LocalParticipant | null;
 
-function isRemoteParticipant(
-  p: ParticipantLike,
-): p is RemoteParticipant {
+function isRemoteParticipant(p: ParticipantLike): p is RemoteParticipant {
   return p !== null && !(p instanceof LocalParticipant);
 }
 
@@ -17,9 +15,15 @@ function checkIsLocal(participant: ParticipantLike): boolean {
     if (LocalParticipant && typeof LocalParticipant === "function") {
       return participant instanceof LocalParticipant;
     }
-    return typeof (participant as { publishTrack?: unknown }).publishTrack === "function";
+    return (
+      typeof (participant as { publishTrack?: unknown }).publishTrack ===
+      "function"
+    );
   } catch {
-    return typeof (participant as { publishTrack?: unknown }).publishTrack === "function";
+    return (
+      typeof (participant as { publishTrack?: unknown }).publishTrack ===
+      "function"
+    );
   }
 }
 
@@ -86,11 +90,15 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
         isMuted?: boolean;
       };
       const vmap = participant.videoTrackPublications;
-      const videoPubs: VideoPub[] = Array.from(vmap.values() as unknown as Iterable<VideoPub>);
+      const videoPubs: VideoPub[] = Array.from(
+        vmap.values() as unknown as Iterable<VideoPub>,
+      );
       const videoPub =
-        videoPubs.find((p) => p.source === Track.Source.ScreenShare && p.track) ??
-        videoPubs.find((p) => p.source === Track.Source.Camera);
-      const videoTrackEnded = videoPub?.track?.mediaStreamTrack?.readyState === "ended";
+        videoPubs.find(
+          (p) => p.source === Track.Source.ScreenShare && p.track,
+        ) ?? videoPubs.find((p) => p.source === Track.Source.Camera);
+      const videoTrackEnded =
+        videoPub?.track?.mediaStreamTrack?.readyState === "ended";
       const videoPubEffective = videoTrackEnded ? undefined : videoPub;
 
       type AudioPubLike = {
@@ -102,11 +110,11 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
       const audioPubs = Array.from(
         participant.audioTrackPublications.values() as unknown as Iterable<AudioPubLike>,
       ) as AudioPubLike[];
-      const audioPubBySource =
-        participant.getTrackPublication?.(Track.Source.Microphone) as AudioPubLike | undefined;
+      const audioPubBySource = participant.getTrackPublication?.(
+        Track.Source.Microphone,
+      ) as AudioPubLike | undefined;
       const audioPub =
-        audioPubBySource ??
-        (audioPubs.length > 0 ? audioPubs[0] : undefined);
+        audioPubBySource ?? (audioPubs.length > 0 ? audioPubs[0] : undefined);
 
       const isLocal = checkIsLocal(participant);
 
@@ -167,8 +175,17 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     };
     const onTrackSubscribed = onTrackEvent;
     const onTrackUnsubscribed = onTrackEvent;
-    const onTrackPublished = (publication: { trackSid?: string; isSubscribed?: boolean; setSubscribed?(v: boolean): void }) => {
-      if (!checkIsLocal(participant) && isRemoteParticipant(participant) && publication.trackSid && !publication.isSubscribed) {
+    const onTrackPublished = (publication: {
+      trackSid?: string;
+      isSubscribed?: boolean;
+      setSubscribed?(v: boolean): void;
+    }) => {
+      if (
+        !checkIsLocal(participant) &&
+        isRemoteParticipant(participant) &&
+        publication.trackSid &&
+        !publication.isSubscribed
+      ) {
         publication.setSubscribed?.(true);
       }
       onTrackEvent();
@@ -187,8 +204,14 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     const onLocalTrackPublished = onTrackEvent;
     const onLocalTrackUnpublished = onTrackEvent;
     if (checkIsLocal(participant)) {
-      participant.on(ParticipantEvent.LocalTrackPublished, onLocalTrackPublished);
-      participant.on(ParticipantEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+      participant.on(
+        ParticipantEvent.LocalTrackPublished,
+        onLocalTrackPublished,
+      );
+      participant.on(
+        ParticipantEvent.LocalTrackUnpublished,
+        onLocalTrackUnpublished,
+      );
     }
 
     return () => {
@@ -199,8 +222,14 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
       participant.off(ParticipantEvent.TrackMuted, onMuted);
       participant.off(ParticipantEvent.TrackUnmuted, onUnmuted);
       if (checkIsLocal(participant)) {
-        participant.off(ParticipantEvent.LocalTrackPublished, onLocalTrackPublished);
-        participant.off(ParticipantEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+        participant.off(
+          ParticipantEvent.LocalTrackPublished,
+          onLocalTrackPublished,
+        );
+        participant.off(
+          ParticipantEvent.LocalTrackUnpublished,
+          onLocalTrackUnpublished,
+        );
       }
     };
   }
@@ -242,7 +271,13 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
   );
 
   watch(
-    () => [audioElement.value, audioTrack.value, isLocalParticipant.value, remoteLiveKitAudioTrack.value] as const,
+    () =>
+      [
+        audioElement.value,
+        audioTrack.value,
+        isLocalParticipant.value,
+        remoteLiveKitAudioTrack.value,
+      ] as const,
     async ([el, track, isLocal, remote]) => {
       if (!el || (props.previewMode ?? false) || isLocal) return;
       if (remote) {

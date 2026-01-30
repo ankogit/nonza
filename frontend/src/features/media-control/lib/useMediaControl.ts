@@ -1,168 +1,195 @@
-import { ref, computed, watch, nextTick, type ComputedRef } from 'vue'
-import type { LocalParticipant, LocalTrackPublication } from 'livekit-client'
-import { Track, ParticipantEvent } from 'livekit-client'
-import { getStoredAudioInputDevice, getDefaultAudioConstraints } from '@shared/lib'
+import { ref, computed, watch, nextTick, type ComputedRef } from "vue";
+import type { LocalParticipant, LocalTrackPublication } from "livekit-client";
+import { Track, ParticipantEvent } from "livekit-client";
+import {
+  getStoredAudioInputDevice,
+  getDefaultAudioConstraints,
+} from "@shared/lib";
 
 export interface MediaControlState {
-  isVideoEnabled: boolean
-  isAudioEnabled: boolean
-  isScreenSharing: boolean
-  videoDeviceId: string | null
-  audioDeviceId: string | null
+  isVideoEnabled: boolean;
+  isAudioEnabled: boolean;
+  isScreenSharing: boolean;
+  videoDeviceId: string | null;
+  audioDeviceId: string | null;
 }
 
-export function useMediaControl(participant: ComputedRef<LocalParticipant | null>) {
+export function useMediaControl(
+  participant: ComputedRef<LocalParticipant | null>,
+) {
   const state = ref<MediaControlState>({
     isVideoEnabled: false,
     isAudioEnabled: false,
     isScreenSharing: false,
     videoDeviceId: null,
-    audioDeviceId: null
-  })
+    audioDeviceId: null,
+  });
 
   const updateState = () => {
     if (!participant.value) {
-      state.value.isVideoEnabled = false
-      state.value.isAudioEnabled = false
-      state.value.isScreenSharing = false
-      return
+      state.value.isVideoEnabled = false;
+      state.value.isAudioEnabled = false;
+      state.value.isScreenSharing = false;
+      return;
     }
 
-    const p = participant.value
-    const videoPubs = Array.from(p.videoTrackPublications.values())
-    const cameraPub = videoPubs.find((pub) => pub.source === Track.Source.Camera)
-    const audioPub = Array.from(p.audioTrackPublications.values())[0]
+    const p = participant.value;
+    const videoPubs = Array.from(p.videoTrackPublications.values());
+    const cameraPub = videoPubs.find(
+      (pub) => pub.source === Track.Source.Camera,
+    );
+    const audioPub = Array.from(p.audioTrackPublications.values())[0];
     const screenPub = Array.from(p.trackPublications.values()).find(
-      (pub) => pub.source === Track.Source.ScreenShare
-    )
+      (pub) => pub.source === Track.Source.ScreenShare,
+    );
 
-    state.value.isVideoEnabled = (cameraPub?.isMuted === false && !!cameraPub?.track) === true
-    state.value.isAudioEnabled = (audioPub?.isMuted === false && !!audioPub?.track) === true
-    state.value.isScreenSharing = !!screenPub?.track
-  }
+    state.value.isVideoEnabled =
+      (cameraPub?.isMuted === false && !!cameraPub?.track) === true;
+    state.value.isAudioEnabled =
+      (audioPub?.isMuted === false && !!audioPub?.track) === true;
+    state.value.isScreenSharing = !!screenPub?.track;
+  };
 
-  let cleanup: (() => void) | null = null
+  let cleanup: (() => void) | null = null;
   watch(
     participant,
     (p) => {
       if (cleanup) {
-        cleanup()
-        cleanup = null
+        cleanup();
+        cleanup = null;
       }
-      updateState()
-      if (!p) return
-      const onTrackChange = () => nextTick(updateState)
-      p.on(ParticipantEvent.LocalTrackPublished, onTrackChange)
-      p.on(ParticipantEvent.LocalTrackUnpublished, onTrackChange)
+      updateState();
+      if (!p) return;
+      const onTrackChange = () => nextTick(updateState);
+      p.on(ParticipantEvent.LocalTrackPublished, onTrackChange);
+      p.on(ParticipantEvent.LocalTrackUnpublished, onTrackChange);
       cleanup = () => {
-        p.off(ParticipantEvent.LocalTrackPublished, onTrackChange)
-        p.off(ParticipantEvent.LocalTrackUnpublished, onTrackChange)
-      }
+        p.off(ParticipantEvent.LocalTrackPublished, onTrackChange);
+        p.off(ParticipantEvent.LocalTrackUnpublished, onTrackChange);
+      };
     },
-    { immediate: true }
-  )
+    { immediate: true },
+  );
 
   const toggleVideo = async (): Promise<void> => {
-    if (!participant.value) return
+    if (!participant.value) return;
 
-    const cameraPub = Array.from(participant.value.videoTrackPublications.values()).find(
-      (pub) => pub.source === Track.Source.Camera
-    ) as LocalTrackPublication | undefined
+    const cameraPub = Array.from(
+      participant.value.videoTrackPublications.values(),
+    ).find((pub) => pub.source === Track.Source.Camera) as
+      | LocalTrackPublication
+      | undefined;
 
     if (cameraPub?.track) {
       if (state.value.isVideoEnabled) {
-        await cameraPub.track.stop()
-        await participant.value.unpublishTrack(cameraPub.track)
+        await cameraPub.track.stop();
+        await participant.value.unpublishTrack(cameraPub.track);
       } else {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-        const videoTracks = stream.getVideoTracks()
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        const videoTracks = stream.getVideoTracks();
         if (videoTracks.length > 0) {
-          await participant.value.publishTrack(videoTracks[0], { source: Track.Source.Camera })
+          await participant.value.publishTrack(videoTracks[0], {
+            source: Track.Source.Camera,
+          });
         }
       }
-      nextTick(updateState)
+      nextTick(updateState);
     } else {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      const videoTracks = stream.getVideoTracks()
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTracks = stream.getVideoTracks();
       if (videoTracks.length > 0) {
-        await participant.value.publishTrack(videoTracks[0], { source: Track.Source.Camera })
-        nextTick(updateState)
+        await participant.value.publishTrack(videoTracks[0], {
+          source: Track.Source.Camera,
+        });
+        nextTick(updateState);
       }
     }
-  }
+  };
 
   const toggleAudio = async (): Promise<void> => {
-    if (!participant.value) return
+    if (!participant.value) return;
 
-    const audioTrack = participant.value.audioTrackPublications.values().next().value as LocalTrackPublication | undefined
+    const audioTrack = participant.value.audioTrackPublications.values().next()
+      .value as LocalTrackPublication | undefined;
 
     if (audioTrack?.track) {
       if (state.value.isAudioEnabled) {
-        await audioTrack.track.stop()
-        await participant.value.unpublishTrack(audioTrack.track)
+        await audioTrack.track.stop();
+        await participant.value.unpublishTrack(audioTrack.track);
       } else {
-        const storedDeviceId = getStoredAudioInputDevice()
+        const storedDeviceId = getStoredAudioInputDevice();
         const constraints: MediaStreamConstraints = {
           audio: getDefaultAudioConstraints(storedDeviceId ?? undefined),
-        }
-        const track = await navigator.mediaDevices.getUserMedia(constraints)
-        const audioTracks = track.getAudioTracks()
+        };
+        const track = await navigator.mediaDevices.getUserMedia(constraints);
+        const audioTracks = track.getAudioTracks();
         if (audioTracks.length > 0) {
-          await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone })
+          await participant.value.publishTrack(audioTracks[0], {
+            source: Track.Source.Microphone,
+          });
         }
       }
-      nextTick(updateState)
+      nextTick(updateState);
     } else {
       // Enable audio
-      const storedDeviceId = getStoredAudioInputDevice()
+      const storedDeviceId = getStoredAudioInputDevice();
       const constraints: MediaStreamConstraints = {
         audio: getDefaultAudioConstraints(storedDeviceId ?? undefined),
-      }
-      const track = await navigator.mediaDevices.getUserMedia(constraints)
-      const audioTracks = track.getAudioTracks()
+      };
+      const track = await navigator.mediaDevices.getUserMedia(constraints);
+      const audioTracks = track.getAudioTracks();
       if (audioTracks.length > 0) {
-        await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone })
-        nextTick(updateState)
+        await participant.value.publishTrack(audioTracks[0], {
+          source: Track.Source.Microphone,
+        });
+        nextTick(updateState);
       }
     }
-  }
+  };
 
   const toggleScreenShare = async (): Promise<void> => {
-    if (!participant.value) return
+    if (!participant.value) return;
 
     if (state.value.isScreenSharing) {
       // Stop screen sharing
-      const screenTrack = Array.from(participant.value.trackPublications.values())
-        .find((pub) => pub.source === Track.Source.ScreenShare) as LocalTrackPublication | undefined
+      const screenTrack = Array.from(
+        participant.value.trackPublications.values(),
+      ).find((pub) => pub.source === Track.Source.ScreenShare) as
+        | LocalTrackPublication
+        | undefined;
 
       if (screenTrack?.track) {
-        await screenTrack.track.stop()
-        await participant.value.unpublishTrack(screenTrack.track)
-        nextTick(updateState)
+        await screenTrack.track.stop();
+        await participant.value.unpublishTrack(screenTrack.track);
+        nextTick(updateState);
       }
     } else {
       // Start screen sharing
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: true
-        })
+          audio: true,
+        });
 
-        const videoTracks = stream.getVideoTracks()
+        const videoTracks = stream.getVideoTracks();
         if (videoTracks.length > 0) {
-          await participant.value.publishTrack(videoTracks[0], { source: Track.Source.ScreenShare })
-          nextTick(updateState)
+          await participant.value.publishTrack(videoTracks[0], {
+            source: Track.Source.ScreenShare,
+          });
+          nextTick(updateState);
 
           // Stop screen sharing when user stops it
           videoTracks[0].onended = () => {
-            toggleScreenShare()
-          }
+            toggleScreenShare();
+          };
         }
       } catch (error) {
-        console.error('Failed to start screen sharing:', error)
+        console.error("Failed to start screen sharing:", error);
       }
     }
-  }
+  };
 
   /**
    * Переключает устройство ввода для активного микрофона
@@ -173,8 +200,9 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       return;
     }
 
-    const audioTrack = participant.value.audioTrackPublications.values().next().value as LocalTrackPublication | undefined;
-    
+    const audioTrack = participant.value.audioTrackPublications.values().next()
+      .value as LocalTrackPublication | undefined;
+
     if (!audioTrack?.track) {
       return;
     }
@@ -193,9 +221,11 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       // Создаем новый трек с новым устройством
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const audioTracks = stream.getAudioTracks();
-      
+
       if (audioTracks.length > 0) {
-        await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone });
+        await participant.value.publishTrack(audioTracks[0], {
+          source: Track.Source.Microphone,
+        });
         nextTick(updateState);
       }
     } catch (error) {
@@ -208,7 +238,9 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         const audioTracks = stream.getAudioTracks();
         if (audioTracks.length > 0) {
-          await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone });
+          await participant.value.publishTrack(audioTracks[0], {
+            source: Track.Source.Microphone,
+          });
           nextTick(updateState);
         }
       } catch (recoveryError) {
@@ -222,6 +254,6 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
     toggleVideo,
     toggleAudio,
     toggleScreenShare,
-    switchAudioInputDevice
-  }
+    switchAudioInputDevice,
+  };
 }

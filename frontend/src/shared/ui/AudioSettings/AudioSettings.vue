@@ -2,7 +2,7 @@
   <div class="audio-settings">
     <div class="settings-section">
       <h3 class="settings-section-title">Устройство ввода (микрофон)</h3>
-      
+
       <div class="settings-item">
         <label class="settings-label">Выберите микрофон</label>
         <div class="settings-select-wrap">
@@ -60,7 +60,7 @@
 
     <div class="settings-section">
       <h3 class="settings-section-title">Устройство вывода (динамики)</h3>
-      
+
       <div class="settings-item">
         <label class="settings-label">Выберите устройство вывода</label>
         <PixelSelect
@@ -68,12 +68,20 @@
           class="settings-select"
           placeholder="По умолчанию"
           :options="outputDeviceOptions"
-          :disabled="isLoadingDevices || audioOutputDevices.length === 0 || !isOutputSupported"
+          :disabled="
+            isLoadingDevices ||
+            audioOutputDevices.length === 0 ||
+            !isOutputSupported
+          "
           aria-label="Выберите устройство вывода"
           @update:model-value="handleOutputDeviceChange"
         />
-        <p v-if="!isOutputSupported" class="settings-hint settings-hint--warning">
-          ⚠️ Выбор устройства вывода не поддерживается в этом браузере (требуется Chrome/Edge)
+        <p
+          v-if="!isOutputSupported"
+          class="settings-hint settings-hint--warning"
+        >
+          ⚠️ Выбор устройства вывода не поддерживается в этом браузере
+          (требуется Chrome/Edge)
         </p>
         <p v-else-if="audioOutputDevices.length === 0" class="settings-hint">
           Устройства вывода не обнаружены (может потребоваться разрешение)
@@ -108,7 +116,12 @@ const {
   refreshDevices,
 } = useAudioDevices();
 
-const { isTesting: isTestingInput, audioLevel: audioInputLevel, startTest: startInputTest, stopTest: stopInputTest } = useAudioInputTest();
+const {
+  isTesting: isTestingInput,
+  audioLevel: audioInputLevel,
+  startTest: startInputTest,
+  stopTest: stopInputTest,
+} = useAudioInputTest();
 
 // Загружаем сохраненные значения как начальные
 const initialInputDevice = getStoredAudioInputDevice() || "";
@@ -119,19 +132,26 @@ const selectedOutputDevice = ref<string>(initialOutputDevice);
 
 const inputDeviceOptions = computed(() => [
   { value: "", label: "По умолчанию" },
-  ...audioInputDevices.value.map((d) => ({ value: d.deviceId, label: d.label })),
+  ...audioInputDevices.value.map((d) => ({
+    value: d.deviceId,
+    label: d.label,
+  })),
 ]);
 
 const outputDeviceOptions = computed(() => [
   { value: "", label: "По умолчанию" },
-  ...audioOutputDevices.value.map((d) => ({ value: d.deviceId, label: d.label })),
+  ...audioOutputDevices.value.map((d) => ({
+    value: d.deviceId,
+    label: d.label,
+  })),
 ]);
 
 // Проверяем поддержку setSinkId для выбора устройства вывода
 const isOutputSupported = ref(false);
 if (typeof HTMLAudioElement !== "undefined") {
   const testAudio = document.createElement("audio");
-  isOutputSupported.value = "setSinkId" in testAudio && typeof testAudio.setSinkId === "function";
+  isOutputSupported.value =
+    "setSinkId" in testAudio && typeof testAudio.setSinkId === "function";
 }
 
 // Отслеживаем изменения для уведомления родителя
@@ -183,7 +203,10 @@ const saveSettings = async () => {
   const audioElements = document.querySelectorAll("audio");
   for (const audio of audioElements) {
     try {
-      await applyOutputDevice(audio as HTMLAudioElement, selectedOutputDevice.value);
+      await applyOutputDevice(
+        audio as HTMLAudioElement,
+        selectedOutputDevice.value,
+      );
     } catch (err) {
       console.warn("Failed to set sink ID:", err);
     }
