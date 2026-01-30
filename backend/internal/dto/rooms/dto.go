@@ -10,6 +10,7 @@ type CreateRoomRequest struct {
 	RoomType    string `json:"room_type" binding:"required,oneof=conference_hall round_table"`
 	IsTemporary bool   `json:"is_temporary"`
 	ExpiresIn   string `json:"expires_in"`
+	E2EEEnabled bool   `json:"e2ee_enabled"`
 }
 
 type RoomResponse struct {
@@ -21,11 +22,18 @@ type RoomResponse struct {
 	IsTemporary     bool       `json:"is_temporary"`
 	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
 	LiveKitRoomName string     `json:"livekit_room_name"`
+	E2EEEnabled     bool       `json:"e2ee_enabled"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 func ToRoomResponse(room *models.Room) RoomResponse {
+	e2ee := false
+	if room.Settings != nil {
+		if v, ok := room.Settings["e2ee_enabled"].(bool); ok {
+			e2ee = v
+		}
+	}
 	return RoomResponse{
 		ID:              room.ID.String(),
 		OrganizationID:  room.OrganizationID.String(),
@@ -35,6 +43,7 @@ func ToRoomResponse(room *models.Room) RoomResponse {
 		IsTemporary:     room.IsTemporary,
 		ExpiresAt:       room.ExpiresAt,
 		LiveKitRoomName: room.LiveKitRoomName,
+		E2EEEnabled:     e2ee,
 		CreatedAt:       room.CreatedAt,
 		UpdatedAt:       room.UpdatedAt,
 	}

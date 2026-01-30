@@ -1,6 +1,8 @@
 package rooms
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"nonza/backend/internal/models"
 	"nonza/backend/internal/repository"
@@ -10,12 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
+const e2eeKeySize = 32
+
 type roomsService struct {
 	repo    repository.Rooms
 	orgRepo repository.Organizations
 }
 
-func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration) (*models.Room, error) {
+func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool) (*models.Room, error) {
 	if _, err := s.orgRepo.GetByID(orgID); err != nil {
 		return nil, fmt.Errorf("organization not found: %w", err)
 	}
@@ -36,6 +40,16 @@ func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.Room
 		expiresAt = &exp
 	}
 
+	settings := make(models.JSONB)
+	if e2eeEnabled {
+		keyBytes := make([]byte, e2eeKeySize)
+		if _, err := rand.Read(keyBytes); err != nil {
+			return nil, fmt.Errorf("generate E2EE key: %w", err)
+		}
+		settings["e2ee_enabled"] = true
+		settings["encryption_key"] = base64.StdEncoding.EncodeToString(keyBytes)
+	}
+
 	newRoom := &models.Room{
 		OrganizationID:  orgID,
 		Name:            name,
@@ -44,7 +58,7 @@ func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.Room
 		IsTemporary:     isTemporary,
 		ExpiresAt:       expiresAt,
 		LiveKitRoomName: livekitRoomName,
-		Settings:        make(models.JSONB),
+		Settings:        settings,
 	}
 
 	if err := s.repo.Create(newRoom); err != nil {

@@ -11,4 +11,6 @@ type TokenResponse struct {
 	URL           string `json:"url"`
 	RoomName      string `json:"room_name"`
 	ParticipantID string `json:"participant_id"`
+	// EncryptionKey is set only for E2EE-enabled rooms (base64 key material).
+	EncryptionKey string `json:"encryption_key,omitempty"`
 }

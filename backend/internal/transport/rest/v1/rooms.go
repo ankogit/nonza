@@ -41,7 +41,7 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 		}
 	}
 
-	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn)
+	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn, req.E2EEEnabled)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

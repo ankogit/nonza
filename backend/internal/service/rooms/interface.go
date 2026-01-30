@@ -8,7 +8,7 @@ import (
 )
 
 type Rooms interface {
-	Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration) (*models.Room, error)
+	Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool) (*models.Room, error)
 	GetByID(id uuid.UUID) (*models.Room, error)
 	GetByShortCode(shortCode string) (*models.Room, error)
 	GetByOrganizationID(orgID uuid.UUID) ([]models.Room, error)

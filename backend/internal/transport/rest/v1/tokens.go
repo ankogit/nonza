@@ -66,6 +66,13 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		RoomName:      room.LiveKitRoomName,
 		ParticipantID: participantID,
 	}
+	if room.Settings != nil {
+		if e2ee, _ := room.Settings["e2ee_enabled"].(bool); e2ee {
+			if key, _ := room.Settings["encryption_key"].(string); key != "" {
+				response.EncryptionKey = key
+			}
+		}
+	}
 
 	// Optionally broadcast event about new participant joining
 	if h.WSHub != nil {

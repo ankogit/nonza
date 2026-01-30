@@ -270,7 +270,7 @@ func (c *Client) handlePing() {
 // handleYjsUpdate handles Y.js update messages wrapped in JSON
 func (c *Client) handleYjsUpdate(message Message) {
 	log.Printf("Received Y.js update from client %s in room %s", c.userID, c.roomID)
-	
+
 	// Extract base64 encoded update from payload
 	payload, ok := message.Payload.(map[string]interface{})
 	if !ok {
@@ -336,7 +336,7 @@ func getFirstChars(s string, n int) string {
 // handleYjsSync handles Y.js sync requests
 func (c *Client) handleYjsSync(message Message) {
 	log.Printf("Received Y.js sync request from client %s in room %s", c.userID, c.roomID)
-	
+
 	// Check if room has expired
 	if c.hub.isRoomExpired(c.roomID) {
 		log.Printf("Room %s has expired, not syncing document", c.roomID)
@@ -344,7 +344,7 @@ func (c *Client) handleYjsSync(message Message) {
 		c.sendSyncAck(false)
 		return
 	}
-	
+
 	// Get document state from Redis
 	docState, err := c.hub.redisClient.GetDocumentState(c.roomID)
 	if err != nil {
@@ -352,7 +352,7 @@ func (c *Client) handleYjsSync(message Message) {
 		c.sendSyncAck(false)
 		return
 	}
-	
+
 	hasState := docState != nil && len(docState) > 0
 	if hasState {
 		select {
@@ -362,7 +362,7 @@ func (c *Client) handleYjsSync(message Message) {
 			log.Printf("Failed to send document state to client %s: channel full", c.userID)
 		}
 	}
-	
+
 	c.sendSyncAck(hasState)
 }
 
@@ -408,7 +408,7 @@ func (c *Client) handleYjsFullState(message Message) {
 func (c *Client) handleYjsAwareness(message Message) {
 	log.Printf("[handleYjsAwareness] Received yjs_awareness from client %s in room %s", c.userID, c.roomID)
 	log.Printf("[handleYjsAwareness] Message payload type: %T", message.Payload)
-	
+
 	// Extract base64 encoded awareness update
 	var updateBase64 string
 	if updateStr, ok := message.Payload.(string); ok {
