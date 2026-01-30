@@ -38,8 +38,8 @@ const roomApi = new RoomApi(apiClient);
 const organizationApi = new OrganizationApi(apiClient);
 
 const defaultOrgId = ref<string | null>(null);
+// Preview только по явному ?preview=true (на проде без этого параметра идём в реальный API)
 const isPreviewMode =
-  !apiBaseURL.includes("localhost:8000") ||
   new URLSearchParams(window.location.search).get("preview") === "true";
 
 // Get or create default organization
