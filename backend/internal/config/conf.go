@@ -68,6 +68,9 @@ type Config struct {
 
 	Env   string `envconfig:"ENV" default:"local"`
 	Debug bool   `envconfig:"DEBUG" default:"false"`
+
+	// CORS: через запятую, например https://meet.nonza.ru,https://www.nonza.ru
+	CORSAllowedOrigins string `envconfig:"CORS_ALLOWED_ORIGINS"`
 }
 
 func Init() (*Config, error) {

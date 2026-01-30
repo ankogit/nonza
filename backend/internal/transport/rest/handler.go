@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"strings"
+
 	"nonza/backend/internal/config"
 	"nonza/backend/internal/repository"
 	"nonza/backend/internal/repository/redis"
@@ -51,13 +53,21 @@ func (h *Handler) InitRoutes(cfg *config.Config) *gin.Engine {
 			return true
 		}
 	} else {
-		// In production, allow specific origins
-		corsConfig.AllowOrigins = []string{
+		// In production: CORS_ALLOWED_ORIGINS (через запятую) или localhost по умолчанию
+		origins := []string{
 			"http://localhost:3000",
 			"http://localhost:3001",
 			"http://127.0.0.1:3000",
 			"http://127.0.0.1:3001",
 		}
+		if cfg.CORSAllowedOrigins != "" {
+			for _, o := range strings.Split(cfg.CORSAllowedOrigins, ",") {
+				if trimmed := strings.TrimSpace(o); trimmed != "" {
+					origins = append(origins, trimmed)
+				}
+			}
+		}
+		corsConfig.AllowOrigins = origins
 	}
 
 	router.Use(cors.New(corsConfig))
