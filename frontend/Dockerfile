@@ -19,7 +19,7 @@ RUN set -a && [ -f .env ] && . ./.env; set +a && npm run build:app
 FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-RUN echo 'server { listen 80; root /usr/share/nginx/html; index index.html; location / { try_files $uri $uri/ /index.html; } }' > /etc/nginx/conf.d/default.conf
+COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
