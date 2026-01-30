@@ -70,13 +70,17 @@ services:
       - nonza-network
     restart: unless-stopped
 
+  # Переменные VITE_* подставляются при сборке из окружения.
+  # Чтобы использовать frontend/.env: docker-compose --env-file ./frontend/.env up --build
+  # На сервере в frontend/.env укажите URL, с которых браузер достучится до API/LiveKit
+  # (не localhost, например http://ВАШ_IP:8000 и ws://ВАШ_IP:7880).
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
     container_name: nonza-frontend
     ports:
       - "3000:80"
