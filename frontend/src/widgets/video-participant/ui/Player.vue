@@ -34,6 +34,17 @@
       </div>
       <FullscreenIcon v-if="showFullSize" @click="emit('full-size')" />
     </template>
+    <!-- List mode: hidden audio for remote participants so we subscribe and hear them -->
+    <audio
+      v-if="
+        mode === 'list' && !isLocalParticipant && !previewMode && participant
+      "
+      :ref="tracks.audioElement"
+      autoplay
+      playsinline
+      class="player-audio-list-hidden"
+      aria-hidden="true"
+    />
 
     <!-- Menu: same structure for grid and list -->
     <div class="player-menu bg-dark-blur-90">
@@ -42,9 +53,16 @@
           <div class="player-name color-white font-bebas">
             {{ participantName }}
           </div>
+          <div v-if="replicaText?.trim()" class="player-replica-wrap">
+            <SpeechBubble :text="replicaText" />
+          </div>
           <span v-if="isLeader" class="indicator default" title="Лидер">
             👑
           </span>
+        </div>
+        <div class="right">
+          <!-- List: actions slot (grant/revoke speaking, etc.) -->
+          <slot v-if="mode === 'list'" name="actions" />
           <span
             v-if="hasRaisedHand"
             class="indicator warning"
@@ -52,67 +70,82 @@
           >
             ✋
           </span>
-          <span
-            v-if="hasSpeakingPermission"
-            class="indicator success"
-            title="Право говорить"
+          <!-- Список: индикатор микрофона для всех; громкость только у удалённых -->
+          <div
+            v-if="mode === 'list' && !previewMode && participant"
+            ref="volumeWrapRef"
+            class="volume-indicator-wrap"
+            :class="{ 'volume-indicator-wrap--open': isVolumeMenuOpen }"
           >
-            🎤
-          </span>
-        </div>
-        <div class="right">
-          <!-- Grid: volume (remote) or mic indicator (local) -->
-          <template v-if="mode === 'grid'">
-            <div
-              v-if="!isLocalParticipant && !previewMode && participant"
-              ref="volumeWrapRef"
-              class="volume-indicator-wrap"
-              :class="{ 'volume-indicator-wrap--open': isVolumeMenuOpen }"
-            >
-              <div class="volume-menu">
-                <input
-                  type="range"
-                  class="volume-slider"
-                  :min="VOLUME_MIN"
-                  :max="VOLUME_MAX"
-                  step="5"
-                  :value="volume"
-                  :title="`${volume}%`"
-                  @input="onVolumeInput"
-                />
-              </div>
-              <button
-                type="button"
-                class="indicator indicator--trigger"
-                :class="isAudioEnabled ? 'success' : 'danger'"
-                :title="isVolumeMenuOpen ? 'Скрыть громкость' : 'Громкость'"
-                aria-label="Громкость"
-                @click="onVolumeButtonClick"
-              >
-                🔊
-              </button>
+            <div v-if="!isLocalParticipant" class="volume-menu">
+              <input
+                type="range"
+                class="volume-slider"
+                :min="VOLUME_MIN"
+                :max="VOLUME_MAX"
+                step="5"
+                :value="volume"
+                :title="`${volume}%`"
+                @input="onVolumeInput"
+              />
             </div>
-            <div
-              v-else
+            <button
+              type="button"
               class="indicator"
-              :class="isAudioEnabled ? 'success' : 'danger'"
-              :title="isAudioEnabled ? 'Микрофон включен' : 'Микрофон выключен'"
+              :class="[
+                isAudioEnabled ? 'success' : 'danger',
+                { 'indicator--trigger': !isLocalParticipant },
+              ]"
+              :title="
+                isLocalParticipant
+                  ? isAudioEnabled
+                    ? 'Микрофон вкл'
+                    : 'Микрофон выкл'
+                  : isVolumeMenuOpen
+                    ? 'Скрыть громкость'
+                    : 'Громкость'
+              "
+              aria-label="Микрофон"
+              @click="onListIndicatorClick"
             >
-              {{ isAudioEnabled ? "🎤" : "🔇" }}
+              {{ isAudioEnabled ? "🔊" : "🔇" }}
+            </button>
+          </div>
+          <!-- Grid: громкость только у удалённых -->
+          <div
+            v-if="
+              mode === 'grid' &&
+              !isLocalParticipant &&
+              !previewMode &&
+              participant
+            "
+            ref="volumeWrapRef"
+            class="volume-indicator-wrap"
+            :class="{ 'volume-indicator-wrap--open': isVolumeMenuOpen }"
+          >
+            <div class="volume-menu">
+              <input
+                type="range"
+                class="volume-slider"
+                :min="VOLUME_MIN"
+                :max="VOLUME_MAX"
+                step="5"
+                :value="volume"
+                :title="`${volume}%`"
+                @input="onVolumeInput"
+              />
             </div>
-          </template>
-          <!-- List: optional mic indicator or slot -->
-          <template v-else>
-            <div
-              v-if="isAudioEnabled !== undefined"
-              class="indicator"
+            <button
+              type="button"
+              class="indicator indicator--trigger"
               :class="isAudioEnabled ? 'success' : 'danger'"
-              :title="isAudioEnabled ? 'Микрофон включен' : 'Микрофон выключен'"
+              :title="isVolumeMenuOpen ? 'Скрыть громкость' : 'Громкость'"
+              aria-label="Громкость"
+              @click="onVolumeButtonClick"
             >
-              {{ isAudioEnabled ? "🎤" : "🔇" }}
-            </div>
-            <slot name="actions" />
-          </template>
+              🔊
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -127,6 +160,7 @@ import type {
   RemoteAudioTrack,
 } from "livekit-client";
 import FullscreenIcon from "./FullscreenIcon.vue";
+import SpeechBubble from "./SpeechBubble.vue";
 import {
   useParticipantTracks,
   type UseParticipantTracksProps,
@@ -146,6 +180,8 @@ const props = withDefaults(
     showFullSize?: boolean;
     /** Only for list mode: show mic indicator when participant has no tracks in this component */
     isAudioEnabled?: boolean;
+    /** Short message/replica shown under the participant name (e.g. when they can't speak) */
+    replicaText?: string;
   }>(),
   {
     participant: null,
@@ -181,9 +217,10 @@ watch(
       tracksProps.participantName = participantName;
       tracksProps.previewMode = previewMode ?? false;
     } else {
-      tracksProps.participant = null;
+      // List mode: still pass remote participant so we subscribe and play their audio
+      tracksProps.participant = participant ?? null;
       tracksProps.participantName = participantName;
-      tracksProps.previewMode = true;
+      tracksProps.previewMode = previewMode ?? false;
     }
   },
   { immediate: true },
@@ -194,11 +231,9 @@ const volumeApi = useRemoteAudioVolume({
   remoteLiveKitAudioTrack:
     tracks.remoteLiveKitAudioTrack as Ref<RemoteAudioTrack | null>,
   audioElement: tracks.audioElement,
-  previewMode: computed(() => props.previewMode || props.mode === "list"),
+  previewMode: computed(() => props.previewMode ?? false),
   participantIdentity:
-    props.mode === "grid" &&
-    props.participant &&
-    !tracks.isLocalParticipant.value
+    props.participant && !tracks.isLocalParticipant.value
       ? (props.participant as { identity: string }).identity
       : undefined,
 });
@@ -209,12 +244,12 @@ const {
   isAudioEnabled: tracksAudioEnabled,
 } = tracks;
 
-const isAudioEnabled = computed(() => {
-  if (props.mode === "list" && props.isAudioEnabled !== undefined) {
-    return props.isAudioEnabled;
-  }
-  return tracksAudioEnabled.value;
-});
+/** В списке — из пропа (родитель читает из комнаты). В сетке — из треков. */
+const isAudioEnabled = computed(() =>
+  props.mode === "list" && props.isAudioEnabled !== undefined
+    ? props.isAudioEnabled
+    : tracksAudioEnabled.value,
+);
 
 const {
   volume,
@@ -231,6 +266,11 @@ const isVolumeMenuOpen = computed(() => volumeMenuOpen.value);
 function onVolumeButtonClick(e: MouseEvent) {
   e.stopPropagation();
   toggleVolumeMenu();
+}
+
+function onListIndicatorClick(e: MouseEvent) {
+  e.stopPropagation();
+  if (!isLocalParticipant.value) toggleVolumeMenu();
 }
 
 const volumeOutsideHandlerRef = ref<((e: MouseEvent) => void) | null>(null);
@@ -272,6 +312,15 @@ watch(
 
 .player--list .player-menu {
   position: relative;
+}
+
+.player-replica-wrap {
+  min-width: 0;
+  position: absolute;
+  align-self: flex-start;
+  left: 0;
+  bottom: 32px;
+  max-width: min(280px, 100%);
 }
 
 .player-avatar video {
@@ -331,7 +380,24 @@ watch(
   pointer-events: auto;
   opacity: 1;
 }
-.volume-indicator-wrap .indicator {
+.player-menu :deep(.volume-indicator-wrap .indicator) {
   z-index: 40;
+}
+
+/* Цвет индикатора громкости по состоянию микрофона (success/danger из design.css могут не доходить из-за scoped) */
+.player-menu :deep(.volume-indicator-wrap .indicator--trigger.success) {
+  background: #0ead61;
+}
+.player-menu :deep(.volume-indicator-wrap .indicator--trigger.danger) {
+  background: #e2534b;
+}
+
+/* Hidden audio for list mode: subscribe and play remote participant */
+.player-audio-list-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>

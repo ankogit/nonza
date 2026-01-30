@@ -5,30 +5,27 @@
       
       <div class="settings-item">
         <label class="settings-label">Выберите микрофон</label>
-        <select
-          v-model="selectedInputDevice"
-          class="settings-select"
-          :disabled="isLoadingDevices"
-          @change="handleInputDeviceChange"
-        >
-          <option value="">По умолчанию</option>
-          <option
-            v-for="device in audioInputDevices"
-            :key="device.deviceId"
-            :value="device.deviceId"
+        <div class="settings-select-wrap">
+          <PixelSelect
+            v-model="selectedInputDevice"
+            class="settings-select"
+            placeholder="По умолчанию"
+            :options="inputDeviceOptions"
+            :disabled="isLoadingDevices"
+            aria-label="Выберите микрофон"
+            @update:model-value="handleInputDeviceChange"
+          />
+          <Button
+            type="icon"
+            variant="default"
+            icon-size="44px"
+            :disabled="isLoadingDevices"
+            title="Обновить список устройств"
+            @click="refreshDevices"
           >
-            {{ device.label }}
-          </option>
-        </select>
-        <button
-          type="button"
-          class="settings-refresh-button"
-          :disabled="isLoadingDevices"
-          @click="refreshDevices"
-          title="Обновить список устройств"
-        >
-          🔄
-        </button>
+            🔄
+          </Button>
+        </div>
       </div>
 
       <div class="settings-item">
@@ -66,21 +63,15 @@
       
       <div class="settings-item">
         <label class="settings-label">Выберите устройство вывода</label>
-        <select
+        <PixelSelect
           v-model="selectedOutputDevice"
           class="settings-select"
+          placeholder="По умолчанию"
+          :options="outputDeviceOptions"
           :disabled="isLoadingDevices || audioOutputDevices.length === 0 || !isOutputSupported"
-          @change="handleOutputDeviceChange"
-        >
-          <option value="">По умолчанию</option>
-          <option
-            v-for="device in audioOutputDevices"
-            :key="device.deviceId"
-            :value="device.deviceId"
-          >
-            {{ device.label }}
-          </option>
-        </select>
+          aria-label="Выберите устройство вывода"
+          @update:model-value="handleOutputDeviceChange"
+        />
         <p v-if="!isOutputSupported" class="settings-hint settings-hint--warning">
           ⚠️ Выбор устройства вывода не поддерживается в этом браузере (требуется Chrome/Edge)
         </p>
@@ -93,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import {
   useAudioDevices,
   getStoredAudioInputDevice,
@@ -103,6 +94,7 @@ import {
   applyOutputDevice,
 } from "@shared/lib";
 import { useAudioInputTest } from "@shared/lib";
+import { Button, PixelSelect } from "@shared/ui";
 
 const emit = defineEmits<{
   change: [settings: { inputDevice: string; outputDevice: string }];
@@ -124,6 +116,16 @@ const initialOutputDevice = getStoredAudioOutputDevice() || "";
 
 const selectedInputDevice = ref<string>(initialInputDevice);
 const selectedOutputDevice = ref<string>(initialOutputDevice);
+
+const inputDeviceOptions = computed(() => [
+  { value: "", label: "По умолчанию" },
+  ...audioInputDevices.value.map((d) => ({ value: d.deviceId, label: d.label })),
+]);
+
+const outputDeviceOptions = computed(() => [
+  { value: "", label: "По умолчанию" },
+  ...audioOutputDevices.value.map((d) => ({ value: d.deviceId, label: d.label })),
+]);
 
 // Проверяем поддержку setSinkId для выбора устройства вывода
 const isOutputSupported = ref(false);
@@ -265,53 +267,19 @@ onUnmounted(() => {
   color: #ccc;
 }
 
-.settings-select {
-  padding: 12px;
-  border: 2px solid #444;
-  background: #1a1a1a;
-  color: white;
-  font-size: 16px;
-  outline: none;
-  transition: none;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.settings-select:focus {
-  border-color: #2980b9;
-  box-shadow: inset 0 0 0 2px #2980b9;
-}
-
-.settings-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.settings-refresh-button {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 2px solid #444;
-  background: #1a1a1a;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
+.settings-select-wrap {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: none;
-  flex-shrink: 0;
-  margin-top: 8px;
+  align-items: stretch;
+  gap: 8px;
 }
 
-.settings-refresh-button:hover:not(:disabled) {
-  background: #2a2a2a;
-  border-color: #2980b9;
+.settings-select-wrap .settings-select {
+  flex: 1;
+  min-width: 0;
 }
 
-.settings-refresh-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.settings-select {
+  width: 100%;
 }
 
 .settings-test-group {

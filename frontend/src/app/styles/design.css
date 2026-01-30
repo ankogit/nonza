@@ -71,6 +71,7 @@
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  backdrop-filter: blur(2.5px);
 }
 
 .menu .left,
@@ -88,6 +89,90 @@
 }
 
 /* Buttons — стили перенесены в компонент Button.vue */
+
+/* Pixel-art checkboxes */
+.checkbox-pixel {
+  appearance: none;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 3px solid #444;
+  background: #1a1a1a;
+  border-radius: 0;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.checkbox-pixel:hover:not(:disabled) {
+  border-color: #555;
+  background: #252525;
+}
+
+.checkbox-pixel:checked {
+  background: #2980b9
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E")
+    center/14px 14px no-repeat;
+  border-color: #3a9ae0;
+}
+
+.checkbox-pixel:checked:hover:not(:disabled) {
+  border-color: #4aa8f0;
+  background-color: #3498db;
+}
+
+.checkbox-pixel:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Pixel-art selects */
+.select-pixel {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 36px 10px 12px;
+  border: 3px solid #444;
+  background: #1a1a1a
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bab1a8' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+    right 10px center / 20px 20px no-repeat;
+  color: #bab1a8;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: none;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.select-pixel:hover:not(:disabled) {
+  border-color: #555;
+  background-color: #252525;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bab1a8' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 10px center;
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+}
+
+.select-pixel:focus {
+  border-color: #2980b9;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3), inset 0 0 0 2px #2980b9;
+}
+
+.select-pixel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select-pixel option {
+  background: #1a1a1a;
+  color: #bab1a8;
+}
 
 /* Indicators (mic/status dots) */
 .indicator {
@@ -275,4 +360,61 @@
   margin-top: 1rem;
   margin-bottom: 1rem;
   border: none;
+}
+
+/* Mobile: нижнее меню и шапка */
+@media (max-width: 768px) {
+
+  .room-info,
+  .room-indicators {
+    padding: 12px;
+  }
+
+  .menu .left,
+  .menu .right,
+  .menu .center {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+
+  .menu .left {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  /* Кнопки меню компактнее */
+  .menu .button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-width: 2px;
+  }
+
+  .menu {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .call-grid {
+    padding-bottom: 80px;
+  }
+}
+
+/* Очень узкий экран: ещё компактнее */
+@media (max-width: 480px) {
+
+  .menu .left,
+  .menu .right,
+  .menu .center {
+    padding: 8px 6px;
+    gap: 6px;
+  }
+
+  .menu .button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
 }

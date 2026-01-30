@@ -71,6 +71,7 @@ const mockRoom = computed<Room>(() => ({
   is_temporary: true,
   expires_at: null,
   livekit_room_name: "preview-room",
+  e2ee_enabled: false,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }));

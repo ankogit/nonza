@@ -5,12 +5,14 @@
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
-        <div
+        <E2EEIndicator
           v-if="!previewMode"
-          class="indicator"
-          :class="{ success: e2eeState.isActive, default: !e2eeState.isActive }"
-          :title="e2eeState.isActive ? 'E2EE включено' : 'E2EE выключено'"
+          :room="livekitRoom"
+          :show-label="true"
         />
+        <Button variant="default" title="Настройки" @click="handleSettings">
+          ⚙️
+        </Button>
       </div>
     </div>
 
@@ -18,13 +20,16 @@
       <div class="call-grid">
         <VideoParticipant
           v-for="p in roundTableParticipants"
-          :key="`${participantsKey}-${p.identity}-${(props.getDisplayName?.(p) ?? p.name ?? p.identity)}-${p.audioTrackPublications?.size ?? 0}-${p.videoTrackPublications?.size ?? 0}`"
+          :key="`${participantsKey}-${p.identity}-${props.getDisplayName?.(p) ?? p.name ?? p.identity}-${p.audioTrackPublications?.size ?? 0}-${p.videoTrackPublications?.size ?? 0}`"
           :participant="p"
           :participant-name="
-            isLocal(p) ? props.participantName : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
+            isLocal(p)
+              ? props.participantName
+              : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
           "
           :is-speaking="speakingIdentitySet.has(p.identity)"
           :show-full-size="roundTableParticipants.length > 1"
+          :replica-text="replicaByParticipant[p.identity]?.text"
           @full-size="() => handleFullSize(p.identity)"
         />
         <template v-if="previewMode && roundTableParticipants.length === 0">
@@ -49,7 +54,12 @@
         </template>
       </div>
 
-      <div v-if="props.showDocument" class="round-table-document">
+      <div
+        v-if="props.showDocument"
+        v-show="isDocumentOpen"
+        class="round-table-document"
+        aria-label="Совместный документ"
+      >
         <CollaborativeDocument
           :room="props.room"
           :api-base-u-r-l="props.apiBaseURL"
@@ -97,6 +107,7 @@
         >
           🖥️
         </Button>
+        <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
       </div>
       <div class="center">
         <Button
@@ -109,11 +120,13 @@
       </div>
       <div class="right">
         <Button
+          v-if="props.showDocument"
           variant="default"
-          title="Настройки"
-          @click="handleSettings"
+          :class="{ active: isDocumentOpen }"
+          :title="isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'"
+          @click="toggleDocument"
         >
-          ⚙️
+          📄
         </Button>
       </div>
     </div>
@@ -132,24 +145,31 @@
             :participant-name="
               isLocal(fullscreenParticipant)
                 ? props.participantName
-                : (props.getDisplayName?.(fullscreenParticipant) ?? fullscreenParticipant.name ?? fullscreenParticipant.identity)
+                : (props.getDisplayName?.(fullscreenParticipant) ??
+                  fullscreenParticipant.name ??
+                  fullscreenParticipant.identity)
             "
             :is-speaking="
               fullscreenParticipant
                 ? speakingIdentitySet.has(fullscreenParticipant.identity)
                 : false
             "
+            :replica-text="
+              fullscreenParticipant
+                ? replicaByParticipant[fullscreenParticipant.identity]?.text
+                : undefined
+            "
           />
         </div>
-        <button
-          type="button"
-          class="button round-table-fullscreen__close"
+        <Button
+          variant="default"
+          class="round-table-fullscreen__close"
           title="Закрыть"
           aria-label="Закрыть"
           @click="closeFullscreen"
         >
           ✕
-        </button>
+        </Button>
       </div>
     </Teleport>
 
@@ -182,12 +202,15 @@
               <label class="settings-checkbox-label">
                 <input
                   type="checkbox"
-                  class="settings-checkbox"
+                  class="settings-checkbox checkbox-pixel"
                   :checked="e2eeState.isActive"
                   disabled
                 />
                 <span>End-to-End Encryption (E2EE)</span>
-                <span class="settings-status" :class="{ active: e2eeState.isActive }">
+                <span
+                  class="settings-status"
+                  :class="{ active: e2eeState.isActive }"
+                >
                   {{ e2eeState.isActive ? "Включено" : "Выключено" }}
                 </span>
               </label>
@@ -226,7 +249,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useMediaControl } from "@features/media-control";
-import { useE2EE } from "@features/e2ee";
+import { useE2EE, E2EEIndicator } from "@features/e2ee";
+import {
+  useParticipantReplica,
+  ReplicaInput,
+} from "@features/participant-replica";
 import { Button, Modal, AudioSettings } from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { CollaborativeDocument } from "@widgets/collaborative-document";
@@ -257,7 +284,16 @@ const emit = defineEmits<{
   "update:participantName": [name: string];
 }>();
 
-const { state: e2eeState } = useE2EE(props.livekitRoom);
+const { state: e2eeState } = useE2EE(() => props.livekitRoom);
+
+const { replicaByParticipant, sendReplica } = useParticipantReplica(
+  computed(() => props.livekitRoom),
+);
+
+const isDocumentOpen = ref(false);
+function toggleDocument() {
+  isDocumentOpen.value = !isDocumentOpen.value;
+}
 
 const localParticipant = computed<LocalParticipant | null>(() => {
   return props.localParticipant ?? props.livekitRoom?.localParticipant ?? null;
@@ -286,10 +322,10 @@ const participantsKey = ref(0); // Принудительный ключ для 
 const roundTableParticipants = computed(() => {
   // Принудительно читаем ключ для реактивности
   void participantsKey.value;
-  
+
   const list: (LocalParticipant | RemoteParticipant)[] = [];
   if (localParticipant.value) list.push(localParticipant.value);
-  
+
   // Создаем новый массив с именами для реактивности
   const remotes = remoteParticipants.value.map((p) => {
     // Принудительно читаем имя для реактивности
@@ -297,7 +333,7 @@ const roundTableParticipants = computed(() => {
     void name;
     return p;
   });
-  
+
   return [...list, ...remotes];
 });
 
@@ -325,8 +361,11 @@ watch(
   () => props.livekitRoom,
   (room) => {
     if (!room) return;
-    
-    const handleMetadataChanged = (_metadata: string | undefined, participant: RemoteParticipant | LocalParticipant) => {
+
+    const handleMetadataChanged = (
+      _metadata: string | undefined,
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
       console.log(
         "RoundTable: Participant metadata changed:",
         participant.identity,
@@ -338,9 +377,9 @@ watch(
       // Принудительно обновляем ключ для пересоздания компонентов
       participantsKey.value++;
     };
-    
+
     room.on(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
-    
+
     return () => {
       room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
     };
@@ -386,14 +425,19 @@ const settingsParticipantName = ref(props.participantName);
 
 const hasUnsavedSettingsChanges = computed(() => {
   // Проверяем изменения имени
-  const nameChanged = settingsParticipantName.value.trim() !== initialParticipantName.value.trim();
-  
+  const nameChanged =
+    settingsParticipantName.value.trim() !==
+    initialParticipantName.value.trim();
+
   // Проверяем изменения аудио настроек
   let audioChanged = false;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).hasUnsavedChanges === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).hasUnsavedChanges === "function"
+  ) {
     audioChanged = (audioSettingsRef.value as any).hasUnsavedChanges();
   }
-  
+
   return nameChanged || audioChanged;
 });
 
@@ -411,7 +455,10 @@ watch(
 function handleSettings() {
   // Сбрасываем к сохраненным значениям при открытии
   settingsParticipantName.value = initialParticipantName.value;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).resetSettings === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).resetSettings === "function"
+  ) {
     (audioSettingsRef.value as any).resetSettings();
   }
   isSettingsOpen.value = true;
@@ -424,22 +471,25 @@ async function handleSaveSettings() {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
-      
+
       // Обновляем имя в родительском компоненте
       emit("update:participantName", newName);
-      
+
       // Обновляем имя в LiveKit
       if (localParticipant.value) {
         try {
           await localParticipant.value.setName(newName);
           console.log("✅ Имя успешно обновлено в LiveKit:", newName);
-          console.log("Текущее имя в localParticipant:", localParticipant.value.name);
+          console.log(
+            "Текущее имя в localParticipant:",
+            localParticipant.value.name,
+          );
         } catch (error) {
           console.error("❌ Ошибка при обновлении имени в LiveKit:", error);
           // Показываем пользователю предупреждение
           alert(
             "Не удалось обновить имя для других участников. " +
-            "Возможно, требуется разрешение CanUpdateOwnMetadata в токене."
+              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене.",
           );
         }
       }
@@ -447,14 +497,20 @@ async function handleSaveSettings() {
 
     // Получаем настройки аудио перед сохранением
     let audioSettingsChanged = false;
-    if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).getSettings === "function") {
+    if (
+      audioSettingsRef.value &&
+      typeof (audioSettingsRef.value as any).getSettings === "function"
+    ) {
       const currentSettings = (audioSettingsRef.value as any).getSettings();
       const savedInput = getStoredAudioInputDevice() || "";
       audioSettingsChanged = currentSettings.inputDevice !== savedInput;
     }
 
     // Сохраняем настройки аудио
-    if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).saveSettings === "function") {
+    if (
+      audioSettingsRef.value &&
+      typeof (audioSettingsRef.value as any).saveSettings === "function"
+    ) {
       await (audioSettingsRef.value as any).saveSettings();
     }
 
@@ -479,7 +535,10 @@ async function handleSaveSettings() {
 function handleCancelSettings() {
   // Сбрасываем к сохраненным значениям
   settingsParticipantName.value = initialParticipantName.value;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).resetSettings === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).resetSettings === "function"
+  ) {
     (audioSettingsRef.value as any).resetSettings();
   }
   isSettingsOpen.value = false;
@@ -488,7 +547,11 @@ function handleCancelSettings() {
 function handleModalClose() {
   // Если есть несохраненные изменения, спрашиваем подтверждение
   if (hasUnsavedSettingsChanges.value) {
-    if (confirm("У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?")) {
+    if (
+      confirm(
+        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?",
+      )
+    ) {
       handleCancelSettings();
     }
   } else {
@@ -506,6 +569,7 @@ function handleModalClose() {
 }
 
 .round-table-content {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -513,6 +577,7 @@ function handleModalClose() {
   gap: 20px;
   padding: 20px;
   padding-bottom: 100px;
+  overflow-y: auto;
 }
 
 .round-table-document {
@@ -521,14 +586,12 @@ function handleModalClose() {
   max-height: 600px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
+  .round-table-document {
+    width: 400px;
+  }
   .round-table-content {
     flex-direction: row;
-  }
-
-  .round-table-document {
-    flex: 0 0 400px;
-    max-width: 400px;
   }
 }
 
@@ -642,10 +705,7 @@ function handleModalClose() {
 }
 
 .settings-checkbox {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: #2980b9;
+  /* размер и вид задаёт .checkbox-pixel в design.css */
 }
 
 .settings-checkbox-label span:not(.settings-status) {
@@ -671,7 +731,8 @@ function handleModalClose() {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

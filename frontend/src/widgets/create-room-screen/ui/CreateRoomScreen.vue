@@ -85,6 +85,7 @@ const handleCreateRoom = async (data: CreateRoomRequest) => {
         is_temporary: data.is_temporary ?? true,
         expires_at: null,
         livekit_room_name: "mock-room",
+        e2ee_enabled: data.e2ee_enabled ?? false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

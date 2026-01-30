@@ -49,8 +49,23 @@
         <label class="create-room-form__label">
           <input
             type="checkbox"
+            v-model="formData.e2ee_enabled"
+            class="create-room-form__checkbox checkbox-pixel"
+          />
+          End-to-End шифрование (E2EE)
+        </label>
+        <p class="create-room-form__hint">
+          Медиа и данные в комнате шифруются между участниками; сервер не имеет
+          доступа к ключам
+        </p>
+      </div>
+
+      <div class="create-room-form__input-group">
+        <label class="create-room-form__label">
+          <input
+            type="checkbox"
             v-model="formData.is_temporary"
-            class="create-room-form__checkbox"
+            class="create-room-form__checkbox checkbox-pixel"
           />
           Временная комната
         </label>
@@ -63,19 +78,14 @@
         <label for="expiresIn" class="create-room-form__label">
           Истекает через (необязательно)
         </label>
-        <select
+        <PixelSelect
           id="expiresIn"
-          v-model="formData.expires_in"
+          :model-value="formData.expires_in ?? ''"
+          placeholder="Никогда"
+          :options="expiresInOptions"
           class="create-room-form__select"
-        >
-          <option value="">Никогда</option>
-          <option value="15m">15 минут</option>
-          <option value="30m">30 минут</option>
-          <option value="1h">1 час</option>
-          <option value="2h">2 часа</option>
-          <option value="6h">6 часов</option>
-          <option value="24h">24 часа</option>
-        </select>
+          @update:model-value="(v) => (formData.expires_in = v)"
+        />
       </div>
 
       <div v-if="error" class="create-room-form__error">
@@ -106,6 +116,17 @@
 import { ref, computed } from "vue";
 import type { CreateRoomRequest } from "@entities/room";
 import type { RoomType } from "@shared/lib";
+import { PixelSelect } from "@shared/ui";
+
+const expiresInOptions = [
+  { value: "", label: "Никогда" },
+  { value: "15m", label: "15 минут" },
+  { value: "30m", label: "30 минут" },
+  { value: "1h", label: "1 час" },
+  { value: "2h", label: "2 часа" },
+  { value: "6h", label: "6 часов" },
+  { value: "24h", label: "24 часа" },
+];
 
 const emit = defineEmits<{
   submit: [data: CreateRoomRequest];
@@ -117,6 +138,7 @@ const formData = ref<CreateRoomRequest & { expires_in?: string }>({
   room_type: "conference_hall" as RoomType,
   is_temporary: true,
   expires_in: "",
+  e2ee_enabled: true,
 });
 
 const error = ref<string | null>(null);
@@ -165,6 +187,7 @@ const handleSubmit = async () => {
       room_type: formData.value.room_type,
       is_temporary: formData.value.is_temporary,
       expires_in: formData.value.expires_in || undefined,
+      e2ee_enabled: formData.value.e2ee_enabled ?? false,
     };
 
     emit("submit", submitData);
@@ -220,8 +243,7 @@ const handleSubmit = async () => {
   color: #e74c3c;
 }
 
-.create-room-form__input,
-.create-room-form__select {
+.create-room-form__input {
   width: 100%;
   padding: 12px;
   border: 2px solid #444;
@@ -233,17 +255,17 @@ const handleSubmit = async () => {
   transition: none;
 }
 
-.create-room-form__input:focus,
-.create-room-form__select:focus {
+.create-room-form__input:focus {
   border-color: #2980b9;
   box-shadow: inset 0 0 0 2px #2980b9;
 }
 
+.create-room-form__select {
+  width: 100%;
+}
+
 .create-room-form__checkbox {
-  width: 18px;
-  height: 18px;
   margin-right: 8px;
-  cursor: pointer;
 }
 
 .create-room-form__hint {

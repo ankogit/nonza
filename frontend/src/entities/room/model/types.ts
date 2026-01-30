@@ -9,6 +9,7 @@ export interface Room {
   is_temporary: boolean;
   expires_at: string | null;
   livekit_room_name: string;
+  e2ee_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +19,7 @@ export interface CreateRoomRequest {
   room_type: RoomType;
   is_temporary?: boolean;
   expires_in?: string;
+  e2ee_enabled?: boolean;
 }
 
 export interface RoomTokenRequest {
@@ -30,4 +32,5 @@ export interface RoomTokenResponse {
   url: string;
   room_name?: string;
   participant_id?: string;
+  encryption_key?: string;
 }

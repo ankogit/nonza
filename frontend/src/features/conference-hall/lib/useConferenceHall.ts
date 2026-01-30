@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, watch } from "vue";
+import { ref, computed, onUnmounted, watch, nextTick } from "vue";
 import type {
   LocalParticipant,
   RemoteParticipant,
@@ -94,21 +94,25 @@ export function useConferenceHall(
         if (data.type === "conference_hall_state" && data.payload) {
           const receivedState = data.payload as Partial<ConferenceHallState>;
 
-          if (receivedState.leaderIdentity !== undefined) {
-            state.value.leaderIdentity = receivedState.leaderIdentity;
-          }
+          // Defer state updates to next tick so we don't trigger Vue re-renders
+          // synchronously inside the LiveKit callback (avoids patch/emitsOptions errors).
+          nextTick(() => {
+            if (receivedState.leaderIdentity !== undefined) {
+              state.value.leaderIdentity = receivedState.leaderIdentity;
+            }
 
-          if (Array.isArray(receivedState.raisedHands)) {
-            state.value.raisedHands = [...receivedState.raisedHands];
-          }
+            if (Array.isArray(receivedState.raisedHands)) {
+              state.value.raisedHands = [...receivedState.raisedHands];
+            }
 
-          if (Array.isArray(receivedState.speakingPermissions)) {
-            state.value.speakingPermissions = [
-              ...receivedState.speakingPermissions,
-            ];
-          }
+            if (Array.isArray(receivedState.speakingPermissions)) {
+              state.value.speakingPermissions = [
+                ...receivedState.speakingPermissions,
+              ];
+            }
 
-          updateParticipants();
+            updateParticipants();
+          });
         } else if (data.type === "request_state") {
           // Someone requested current state, send it
           broadcastState();

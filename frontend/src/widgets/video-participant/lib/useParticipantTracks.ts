@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onUnmounted, watch, nextTick, triggerRef } from "vue";
 import { ParticipantEvent, LocalParticipant, Track } from "livekit-client";
 import type { RemoteParticipant, RemoteAudioTrack } from "livekit-client";
 import { applyStoredOutputDevice } from "@shared/lib";
@@ -93,14 +93,20 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
       const videoTrackEnded = videoPub?.track?.mediaStreamTrack?.readyState === "ended";
       const videoPubEffective = videoTrackEnded ? undefined : videoPub;
 
+      type AudioPubLike = {
+        track?: { mediaStreamTrack: MediaStreamTrack } | RemoteAudioTrack;
+        isSubscribed?: boolean;
+        isMuted?: boolean;
+        source?: Track.Source;
+      };
+      const audioPubs = Array.from(
+        participant.audioTrackPublications.values() as unknown as Iterable<AudioPubLike>,
+      ) as AudioPubLike[];
+      const audioPubBySource =
+        participant.getTrackPublication?.(Track.Source.Microphone) as AudioPubLike | undefined;
       const audioPub =
-        participant.audioTrackPublications.size > 0
-          ? (
-              Array.from(
-                participant.audioTrackPublications.values() as unknown as Iterable<unknown>,
-              ) as { track?: { mediaStreamTrack: MediaStreamTrack }; isSubscribed?: boolean; isMuted?: boolean }[]
-            )[0]
-          : undefined;
+        audioPubBySource ??
+        (audioPubs.length > 0 ? audioPubs[0] : undefined);
 
       const isLocal = checkIsLocal(participant);
 
@@ -135,7 +141,11 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
         }
       }
 
-      isAudioEnabled.value = audioPub ? audioPub.isMuted === false && !!audioPub.track : false;
+      // Микрофон вкл ⟺ есть публикация и isMuted === false (undefined = выкл)
+      const isMuted = audioPub?.isMuted;
+      const next = !!audioPub && isMuted === false;
+      isAudioEnabled.value = next;
+      triggerRef(isAudioEnabled);
     } catch {
       videoTrack.value = null;
       audioTrack.value = null;
@@ -144,35 +154,83 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     }
   }
 
-  onMounted(() => {
-    if ((props.previewMode ?? false) || !props.participant) {
-      videoTrack.value = null;
-      isAudioEnabled.value = true;
-      return;
-    }
-    const participant = props.participant;
+  function subscribeToParticipant(participant: NonNullable<ParticipantLike>) {
     updateTracks();
-    participant.on("trackSubscribed", () => updateTracks());
-    participant.on("trackUnsubscribed", () => updateTracks());
-    participant.on("trackPublished", (publication: { trackSid?: string; isSubscribed?: boolean; setSubscribed?(v: boolean): void }) => {
+    let scheduled = false;
+    const onTrackEvent = () => {
+      if (scheduled) return;
+      scheduled = true;
+      nextTick(() => {
+        scheduled = false;
+        updateTracks();
+      });
+    };
+    const onTrackSubscribed = onTrackEvent;
+    const onTrackUnsubscribed = onTrackEvent;
+    const onTrackPublished = (publication: { trackSid?: string; isSubscribed?: boolean; setSubscribed?(v: boolean): void }) => {
       if (!checkIsLocal(participant) && isRemoteParticipant(participant) && publication.trackSid && !publication.isSubscribed) {
         publication.setSubscribed?.(true);
       }
-      updateTracks();
-    });
-    participant.on("trackUnpublished", () => updateTracks());
-    participant.on(ParticipantEvent.TrackMuted, () => updateTracks());
-    participant.on(ParticipantEvent.TrackUnmuted, () => updateTracks());
-  });
+      onTrackEvent();
+    };
+    const onTrackUnpublished = onTrackEvent;
+    const onMuted = onTrackEvent;
+    const onUnmuted = onTrackEvent;
 
+    participant.on(ParticipantEvent.TrackSubscribed, onTrackSubscribed);
+    participant.on(ParticipantEvent.TrackUnsubscribed, onTrackUnsubscribed);
+    participant.on(ParticipantEvent.TrackPublished, onTrackPublished);
+    participant.on(ParticipantEvent.TrackUnpublished, onTrackUnpublished);
+    participant.on(ParticipantEvent.TrackMuted, onMuted);
+    participant.on(ParticipantEvent.TrackUnmuted, onUnmuted);
+
+    const onLocalTrackPublished = onTrackEvent;
+    const onLocalTrackUnpublished = onTrackEvent;
+    if (checkIsLocal(participant)) {
+      participant.on(ParticipantEvent.LocalTrackPublished, onLocalTrackPublished);
+      participant.on(ParticipantEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+    }
+
+    return () => {
+      participant.off(ParticipantEvent.TrackSubscribed, onTrackSubscribed);
+      participant.off(ParticipantEvent.TrackUnsubscribed, onTrackUnsubscribed);
+      participant.off(ParticipantEvent.TrackPublished, onTrackPublished);
+      participant.off(ParticipantEvent.TrackUnpublished, onTrackUnpublished);
+      participant.off(ParticipantEvent.TrackMuted, onMuted);
+      participant.off(ParticipantEvent.TrackUnmuted, onUnmuted);
+      if (checkIsLocal(participant)) {
+        participant.off(ParticipantEvent.LocalTrackPublished, onLocalTrackPublished);
+        participant.off(ParticipantEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
+      }
+    };
+  }
+
+  let unsubscribe: (() => void) | null = null;
+
+  // Watch participant *reference* only. Track changes are handled by event listeners
+  // in subscribeToParticipant; deep: true would observe LiveKit internals and cause
+  // recursive updates when updateTracks() reads participant.trackPublications.
   watch(
-    () => props.participant,
-    (p) => {
-      if (p && !(props.previewMode ?? false)) updateTracks();
+    () => [props.participant, props.previewMode] as const,
+    ([p, previewMode]) => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+      if (!p || previewMode) {
+        videoTrack.value = null;
+        audioTrack.value = null;
+        remoteLiveKitAudioTrack.value = null;
+        isAudioEnabled.value = true;
+        return;
+      }
+      unsubscribe = subscribeToParticipant(p);
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
+  // Shallow watch only: react when element/track refs change, not when DOM/track is mutated
+  // (deep: true would re-trigger when doAttach* mutates the element → recursive updates).
   watch(
     () => [videoElement.value, videoTrack.value] as const,
     ([el, track]) => {
@@ -180,7 +238,7 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
         nextTick(() => doAttachVideoTrack(track));
       }
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
   watch(
@@ -188,16 +246,19 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     async ([el, track, isLocal, remote]) => {
       if (!el || (props.previewMode ?? false) || isLocal) return;
       if (remote) {
-        // Применяем устройство вывода для удаленного аудио
         await applyStoredOutputDevice(el);
         return;
       }
       if (track) nextTick(() => doAttachAudioTrack(track));
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
   onUnmounted(() => {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
     if (videoElement.value?.srcObject) {
       const stream = videoElement.value.srcObject as MediaStream;
       stream.getTracks().forEach((t) => t.stop());

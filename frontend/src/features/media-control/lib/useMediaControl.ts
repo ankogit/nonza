@@ -1,4 +1,4 @@
-import { ref, computed, watch, type ComputedRef } from 'vue'
+import { ref, computed, watch, nextTick, type ComputedRef } from 'vue'
 import type { LocalParticipant, LocalTrackPublication } from 'livekit-client'
 import { Track, ParticipantEvent } from 'livekit-client'
 import { getStoredAudioInputDevice, getDefaultAudioConstraints } from '@shared/lib'
@@ -51,7 +51,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       }
       updateState()
       if (!p) return
-      const onTrackChange = () => updateState()
+      const onTrackChange = () => nextTick(updateState)
       p.on(ParticipantEvent.LocalTrackPublished, onTrackChange)
       p.on(ParticipantEvent.LocalTrackUnpublished, onTrackChange)
       cleanup = () => {
@@ -80,13 +80,13 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
           await participant.value.publishTrack(videoTracks[0], { source: Track.Source.Camera })
         }
       }
-      updateState()
+      nextTick(updateState)
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       const videoTracks = stream.getVideoTracks()
       if (videoTracks.length > 0) {
         await participant.value.publishTrack(videoTracks[0], { source: Track.Source.Camera })
-        updateState()
+        nextTick(updateState)
       }
     }
   }
@@ -111,7 +111,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
           await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone })
         }
       }
-      updateState()
+      nextTick(updateState)
     } else {
       // Enable audio
       const storedDeviceId = getStoredAudioInputDevice()
@@ -122,7 +122,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       const audioTracks = track.getAudioTracks()
       if (audioTracks.length > 0) {
         await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone })
-        updateState()
+        nextTick(updateState)
       }
     }
   }
@@ -138,7 +138,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       if (screenTrack?.track) {
         await screenTrack.track.stop()
         await participant.value.unpublishTrack(screenTrack.track)
-        updateState()
+        nextTick(updateState)
       }
     } else {
       // Start screen sharing
@@ -151,7 +151,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
         const videoTracks = stream.getVideoTracks()
         if (videoTracks.length > 0) {
           await participant.value.publishTrack(videoTracks[0], { source: Track.Source.ScreenShare })
-          updateState()
+          nextTick(updateState)
 
           // Stop screen sharing when user stops it
           videoTracks[0].onended = () => {
@@ -196,7 +196,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
       
       if (audioTracks.length > 0) {
         await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone });
-        updateState();
+        nextTick(updateState);
       }
     } catch (error) {
       console.error("Failed to switch audio input device:", error);
@@ -209,7 +209,7 @@ export function useMediaControl(participant: ComputedRef<LocalParticipant | null
         const audioTracks = stream.getAudioTracks();
         if (audioTracks.length > 0) {
           await participant.value.publishTrack(audioTracks[0], { source: Track.Source.Microphone });
-          updateState();
+          nextTick(updateState);
         }
       } catch (recoveryError) {
         console.error("Failed to recover audio:", recoveryError);

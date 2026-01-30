@@ -1,5 +1,6 @@
 <template>
-  <PreviewMode v-if="isPreviewMode" />
+  <UiKitPage v-if="showUiKit" />
+  <PreviewMode v-else-if="isPreviewMode" />
   <RoomCreated
     v-else-if="createdRoom"
     :room="createdRoom"
@@ -22,10 +23,12 @@
 import { ref, onMounted } from "vue";
 import NonzaWidget from "./NonzaWidget.vue";
 import PreviewMode from "./PreviewMode.vue";
+import UiKitPage from "./UiKitPage.vue";
 import { CreateRoomScreen } from "@widgets/create-room-screen";
 import { RoomCreated } from "@widgets/room-created";
 import type { Room } from "@entities/room";
 
+const showUiKit = ref(false);
 const isPreviewMode = ref(false);
 const showCreateRoom = ref(false);
 const createdRoom = ref<Room | null>(null);
@@ -34,10 +37,14 @@ const livekitURL = import.meta.env.VITE_LIVEKIT_URL || "ws://localhost:7880";
 
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search);
+  showUiKit.value =
+    urlParams.get("ui-kit") === "true" || urlParams.get("page") === "ui-kit";
   isPreviewMode.value =
-    urlParams.get("preview") === "true" || urlParams.get("mode") === "preview";
+    !showUiKit.value &&
+    (urlParams.get("preview") === "true" || urlParams.get("mode") === "preview");
   showCreateRoom.value =
-    urlParams.get("create") === "true" || urlParams.get("action") === "create";
+    !showUiKit.value &&
+    (urlParams.get("create") === "true" || urlParams.get("action") === "create");
 
   // Auto-fill room code from URL if provided
   const code = urlParams.get("code");

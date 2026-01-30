@@ -9,6 +9,7 @@
     :has-raised-hand="hasRaisedHand"
     :has-speaking-permission="hasSpeakingPermission"
     :show-full-size="showFullSize"
+    :replica-text="replicaText"
     @full-size="emit('full-size')"
   />
 </template>
@@ -26,6 +27,7 @@ defineProps<{
   hasRaisedHand?: boolean;
   hasSpeakingPermission?: boolean;
   showFullSize?: boolean;
+  replicaText?: string;
 }>();
 
 const emit = defineEmits<{ "full-size": [] }>();

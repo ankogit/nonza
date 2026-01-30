@@ -4,7 +4,7 @@
     :class="classes"
     :style="style"
     :disabled="disabled"
-    @click="$emit('click', $event)"
+    @click="emit('click', $event)"
   >
     <slot />
   </button>
@@ -59,7 +59,7 @@ const style = computed(() => {
   } as const;
 });
 
-defineEmits<{
+const emit = defineEmits<{
   click: [event: MouseEvent];
 }>();
 </script>

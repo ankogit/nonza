@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, type ComputedRef } from "vue";
+import { ref, computed, onUnmounted, nextTick, type ComputedRef } from "vue";
 import { Room, RoomApi } from "@entities/room";
 import {
   Room as LiveKitRoom,
@@ -6,9 +6,37 @@ import {
   RemoteParticipant,
   LocalParticipant,
   ParticipantEvent,
+  ExternalE2EEKeyProvider,
+  type RoomOptions,
 } from "livekit-client";
+import e2eeWorkerUrl from "livekit-client/e2ee-worker?url";
 import { normalizeLiveKitUrl, isValidToken } from "@shared/lib";
 import type { RoomTokenResponse } from "@entities/room";
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/** Убирает MaxListenersExceededWarning у PCTransport (livekit-client не вызывает setMaxListeners). */
+function setLiveKitTransportMaxListeners(room: LiveKitRoom): void {
+  const engine = (
+    room as {
+      engine?: {
+        pcManager?: {
+          publisher: { setMaxListeners: (n: number) => void };
+          subscriber?: { setMaxListeners: (n: number) => void };
+        };
+      };
+    }
+  ).engine;
+  const pm = engine?.pcManager;
+  if (!pm) return;
+  pm.publisher.setMaxListeners(100);
+  pm.subscriber?.setMaxListeners(100);
+}
 
 export interface RoomConnectionState {
   room: Room | null;
@@ -27,7 +55,11 @@ export interface UseRoomConnectionReturn {
   localParticipant: ComputedRef<LocalParticipant | null>;
   remoteParticipants: ComputedRef<RemoteParticipant[]>;
   getDisplayName: (participant: RemoteParticipant | LocalParticipant) => string;
-  connect: (shortCode: string, participantName: string, livekitUrl: string) => Promise<void>;
+  connect: (
+    shortCode: string,
+    participantName: string,
+    livekitUrl: string,
+  ) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -43,20 +75,16 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     participantNames: {},
   });
 
-  // Helper to update participants and increment version
   const updateParticipants = (
     updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void,
   ) => {
-    const newParticipants = new Map(state.value.participants) as any as Map<string, RemoteParticipant | LocalParticipant>;
-    updater(newParticipants);
-    state.value.participants = newParticipants as any;
+    const next = new Map(state.value.participants) as Map<
+      string,
+      RemoteParticipant | LocalParticipant
+    >;
+    updater(next);
+    state.value.participants = next;
     state.value.participantsVersion++;
-    console.log(
-      "Participants updated, version:",
-      state.value.participantsVersion,
-      "count:",
-      newParticipants.size,
-    );
   };
 
   const localParticipant = computed(() => {
@@ -75,7 +103,9 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   }) as ComputedRef<RemoteParticipant[]>;
 
   /** Display name for UI: uses reactive participantNames so other clients see name updates */
-  const getDisplayName = (participant: RemoteParticipant | LocalParticipant): string => {
+  const getDisplayName = (
+    participant: RemoteParticipant | LocalParticipant,
+  ): string => {
     const fromMap = state.value.participantNames[participant.identity];
     if (fromMap !== undefined && fromMap !== "") return fromMap;
     return participant.name ?? participant.identity;
@@ -114,11 +144,27 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       // Normalize LiveKit URL
       const connectUrl = normalizeLiveKitUrl(tokenResponse.url || livekitUrl);
 
-      const livekitRoom = new LiveKitRoom({
-        // Configure room options
+      const useE2EE = Boolean(tokenResponse.encryption_key?.trim());
+      const roomOptions: RoomOptions = {
         adaptiveStream: true,
         dynacast: true,
-      });
+      };
+      let keyProvider: InstanceType<typeof ExternalE2EEKeyProvider> | null =
+        null;
+
+      if (useE2EE) {
+        keyProvider = new ExternalE2EEKeyProvider();
+        const worker = new Worker(e2eeWorkerUrl, { type: "module" });
+        roomOptions.encryption = { keyProvider, worker };
+      }
+
+      const livekitRoom = new LiveKitRoom(roomOptions);
+
+      if (keyProvider && tokenResponse.encryption_key) {
+        const keyBuffer = base64ToArrayBuffer(tokenResponse.encryption_key);
+        await keyProvider.setKey(keyBuffer);
+        await livekitRoom.setE2EEEnabled(true);
+      }
 
       // Connect with proper error handling
       try {
@@ -139,12 +185,13 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       state.value.livekitRoom = livekitRoom;
       state.value.isConnected = true;
 
-      // Setup event listeners
       setupEventListeners(livekitRoom);
+      setLiveKitTransportMaxListeners(livekitRoom);
 
       if (livekitRoom.localParticipant) {
         const local = livekitRoom.localParticipant;
-        if (local.name) state.value.participantNames[local.identity] = local.name;
+        if (local.name)
+          state.value.participantNames[local.identity] = local.name;
         updateParticipants((map) => {
           map.set(local.identity, local);
         });
@@ -196,46 +243,31 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       if (p.name) state.value.participantNames[p.identity] = p.name;
     });
 
-    // Helper function to setup participant event listeners
-    const setupParticipantListeners = (participant: RemoteParticipant | LocalParticipant) => {
-      participant.on(ParticipantEvent.TrackMuted, (publication) => {
-        console.log(
-          "Track muted event for participant:",
-          participant.identity,
-          "track:",
-          publication.kind,
-        );
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      });
-
-      participant.on(ParticipantEvent.TrackUnmuted, (publication) => {
-        console.log(
-          "Track unmuted event for participant:",
-          participant.identity,
-          "track:",
-          publication.kind,
-        );
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      });
-
+    const setupParticipantListeners = (
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
       participant.on(ParticipantEvent.ParticipantMetadataChanged, () => {
-        if (participant.name !== undefined)
-          state.value.participantNames[participant.identity] = participant.name;
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
+        nextTick(() => {
+          if (participant.name !== undefined)
+            state.value.participantNames[participant.identity] =
+              participant.name;
+          updateParticipants((map) => {
+            map.set(participant.identity, participant);
+          });
         });
       });
 
-      participant.on(ParticipantEvent.ParticipantNameChanged, (name: string) => {
-        state.value.participantNames[participant.identity] = name;
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      });
+      participant.on(
+        ParticipantEvent.ParticipantNameChanged,
+        (name: string) => {
+          nextTick(() => {
+            state.value.participantNames[participant.identity] = name;
+            updateParticipants((map) => {
+              map.set(participant.identity, participant);
+            });
+          });
+        },
+      );
     };
 
     // Setup listeners for already connected participants
@@ -248,11 +280,17 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       setupParticipantListeners(room.localParticipant);
     }
 
-    const setParticipantDisplayName = (participant: RemoteParticipant | LocalParticipant, name: string) => {
+    const setParticipantDisplayName = (
+      participant: RemoteParticipant | LocalParticipant,
+      name: string,
+    ) => {
       state.value.participantNames[participant.identity] = name;
     };
 
-    const handleRoomMetadataChanged = (_metadata: string | undefined, participant: RemoteParticipant | LocalParticipant) => {
+    const handleRoomMetadataChanged = (
+      _metadata: string | undefined,
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
       const newName = participant.name ?? "";
       setParticipantDisplayName(participant, newName);
       updateParticipants((map) => {
@@ -261,10 +299,15 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       });
     };
 
-    const handleRoomNameChanged = (name: string, participant: RemoteParticipant | LocalParticipant) => {
-      setParticipantDisplayName(participant, name);
-      updateParticipants((map) => {
-        map.set(participant.identity, participant);
+    const handleRoomNameChanged = (
+      name: string,
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
+      nextTick(() => {
+        setParticipantDisplayName(participant, name);
+        updateParticipants((map) => {
+          map.set(participant.identity, participant);
+        });
       });
     };
 
@@ -274,11 +317,6 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     room.on(
       RoomEvent.ParticipantConnected,
       (participant: RemoteParticipant) => {
-        if (participant.name) state.value.participantNames[participant.identity] = participant.name;
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-
         setupParticipantListeners(participant);
 
         // Subscribe to all existing tracks when participant connects
@@ -287,58 +325,79 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
             publication.setSubscribed(true);
           }
         });
+
+        nextTick(() => {
+          if (participant.name)
+            state.value.participantNames[participant.identity] =
+              participant.name;
+          updateParticipants((map) => {
+            map.set(participant.identity, participant);
+          });
+        });
       },
     );
 
     room.on(
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
-        delete state.value.participantNames[participant.identity];
-        updateParticipants((map) => {
-          map.delete(participant.identity);
+        nextTick(() => {
+          delete state.value.participantNames[participant.identity];
+          updateParticipants((map) => {
+            map.delete(participant.identity);
+          });
         });
       },
     );
 
-    // Handle track published events - subscribe to new tracks
+    // Batch track publish/unpublish: один updateParticipants на nextTick вместо N при быстрых событиях.
+    const pendingBump = new Map<string, RemoteParticipant | LocalParticipant>();
+    let bumpScheduled = false;
+    const flushBump = () => {
+      bumpScheduled = false;
+      if (pendingBump.size === 0) return;
+      updateParticipants((m) => {
+        pendingBump.forEach((p, id) => m.set(id, p));
+      });
+      pendingBump.clear();
+    };
+    const bumpParticipant = (
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
+      pendingBump.set(participant.identity, participant);
+      if (!bumpScheduled) {
+        bumpScheduled = true;
+        nextTick(flushBump);
+      }
+    };
+
     room.on(RoomEvent.TrackPublished, (publication, participant) => {
-      if (participant instanceof RemoteParticipant && publication.trackSid) {
-        // Automatically subscribe to remote tracks when they're published
-        if (!publication.isSubscribed) {
-          publication.setSubscribed(true);
-        }
+      if (
+        participant instanceof RemoteParticipant &&
+        publication.trackSid &&
+        !publication.isSubscribed
+      ) {
+        publication.setSubscribed(true);
       }
-      // Update state to reflect new track
-      if (participant) {
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      }
+      bumpParticipant(participant);
     });
-
-    // Handle track subscriptions - track is now available
-    room.on(RoomEvent.TrackSubscribed, (_track, _publication, participant) => {
-      if (participant) {
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      }
-    });
-
-    room.on(RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => {
-      if (participant) {
-        updateParticipants((map) => {
-          map.set(participant.identity, participant);
-        });
-      }
-    });
+    room.on(RoomEvent.TrackUnpublished, (_pub, participant) =>
+      bumpParticipant(participant),
+    );
+    room.on(RoomEvent.LocalTrackPublished, (_pub, participant) =>
+      bumpParticipant(participant),
+    );
+    room.on(RoomEvent.LocalTrackUnpublished, (_pub, participant) =>
+      bumpParticipant(participant),
+    );
   };
 
   onUnmounted(() => {
     disconnect();
   });
 
-  const stateComputed = computed(() => state.value) as unknown as ComputedRef<RoomConnectionState>;
+  const stateComputed = computed(
+    () => state.value,
+  ) as unknown as ComputedRef<RoomConnectionState>;
 
   return {
     state: stateComputed,

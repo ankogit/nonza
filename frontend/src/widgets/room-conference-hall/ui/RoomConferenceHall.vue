@@ -5,24 +5,30 @@
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
-        <div
+        <E2EEIndicator
           v-if="!previewMode"
-          class="indicator"
-          :class="{ success: e2eeState.isActive, default: !e2eeState.isActive }"
-          :title="e2eeState.isActive ? 'E2EE включено' : 'E2EE выключено'"
+          :room="livekitRoom"
+          :show-label="true"
         />
+        <div class="right">
+          <Button variant="default" title="Настройки" @click="handleSettings">
+            ⚙️
+          </Button>
+        </div>
       </div>
     </div>
 
     <div class="conference-hall__content">
       <div class="conference-hall__main">
         <div v-if="leaderParticipant" class="conference-hall__leader">
-            <VideoParticipant
-            :participant="leaderParticipant"
+          <VideoParticipant
+            :participant="resolveParticipant(leaderParticipant)"
             :participant-name="
               isLocal(leaderParticipant)
                 ? props.participantName
-                : (props.getDisplayName?.(leaderParticipant) ?? leaderParticipant.name ?? leaderParticipant.identity)
+                : (props.getDisplayName?.(leaderParticipant) ??
+                  leaderParticipant.name ??
+                  leaderParticipant.identity)
             "
             :is-speaking="
               leaderParticipant
@@ -31,6 +37,11 @@
             "
             :is-leader="true"
             :show-full-size="true"
+            :replica-text="
+              leaderParticipant
+                ? replicaByParticipant[leaderParticipant.identity]?.text
+                : undefined
+            "
             @full-size="
               () =>
                 leaderParticipant && handleFullSize(leaderParticipant.identity)
@@ -54,15 +65,19 @@
           "
           class="conference-hall__raised"
         >
-          <h3 class="conference-hall__sidebar-title">✋ Поднятые руки</h3>
+          <h3 class="conference-hall__sidebar-title font-bebas">
+            ✋ Поднятые руки
+          </h3>
           <div
             v-for="participant in conferenceHall.participantsWithRaisedHands
               .value"
             :key="participant.identity"
             class="conference-hall__raised-item"
           >
-            <span class="conference-hall__participant-name">{{
-              getParticipantState(participant.identity)?.name ?? participant.name ?? participant.identity
+            <span class="conference-hall__participant-name font-bebas">{{
+              getParticipantState(participant.identity)?.name ??
+              participant.name ??
+              participant.identity
             }}</span>
             <div class="conference-hall__raised-actions">
               <button
@@ -86,56 +101,87 @@
         </section>
 
         <section class="conference-hall__others">
-          <h3 class="conference-hall__sidebar-title">Участники</h3>
+          <h2 class="conference-hall__sidebar-title font-bebas">Участники</h2>
+          <hr class="HR" />
+
           <div class="conference-hall__others-grid">
-            <Player
-              v-for="p in otherParticipants"
-              :key="p.identity"
-              mode="list"
-              :participant-name="
-                isLocal(p) ? props.participantName : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
-              "
-              :is-speaking="speakingIdentitySet.has(p.identity)"
-              :is-leader="getParticipantState(p.identity)?.isLeader ?? false"
-              :has-raised-hand="getParticipantState(p.identity)?.hasRaisedHand ?? false"
-              :has-speaking-permission="
-                getParticipantState(p.identity)?.hasSpeakingPermission ?? false
-              "
-            >
-              <template #actions>
-                <button
-                  v-if="
-                    !previewMode &&
-                    conferenceHall.isLeader.value &&
-                    getParticipantState(p.identity)?.hasRaisedHand &&
-                    !getParticipantState(p.identity)?.isLeader
-                  "
-                  type="button"
-                  class="indicator indicator--trigger success"
-                  title="Разрешить говорить"
-                  @click="handleGrantSpeaking(p.identity)"
-                >
-                  ✅
-                </button>
-                <button
-                  v-if="
-                    !previewMode &&
-                    conferenceHall.isLeader.value &&
-                    getParticipantState(p.identity)?.hasSpeakingPermission &&
-                    !getParticipantState(p.identity)?.isLeader
-                  "
-                  type="button"
-                  class="indicator indicator--trigger danger"
-                  title="Забрать право говорить"
-                  @click="handleRevokeSpeaking(p.identity)"
-                >
-                  🔇
-                </button>
-              </template>
-            </Player>
-            <template v-if="previewMode && otherParticipants.length === 0">
-              <Player mode="list" participant-name="Alice" />
-              <Player mode="list" participant-name="Bob" />
+            <template v-if="previewMode && allParticipants.length === 0">
+              <Player
+                key="preview-alice"
+                mode="list"
+                participant-name="Alice"
+              />
+              <Player key="preview-bob" mode="list" participant-name="Bob" />
+            </template>
+            <template v-else>
+              <Player
+                v-for="p in allParticipants"
+                :key="p.identity"
+                mode="list"
+                :participant="resolveParticipant(p)"
+                :is-audio-enabled="isParticipantMicOn(p)"
+                :participant-name="
+                  isLocal(p)
+                    ? props.participantName
+                    : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
+                "
+                :is-speaking="speakingIdentitySet.has(p.identity)"
+                :is-leader="getParticipantState(p.identity)?.isLeader ?? false"
+                :has-raised-hand="
+                  getParticipantState(p.identity)?.hasRaisedHand ?? false
+                "
+                :has-speaking-permission="
+                  getParticipantState(p.identity)?.hasSpeakingPermission ??
+                  false
+                "
+                :replica-text="replicaByParticipant[p.identity]?.text"
+              >
+                <template #actions>
+                  <!-- Рука поднята и права голоса нет: лидер видит галочку — дать право -->
+                  <button
+                    v-if="
+                      !previewMode &&
+                      conferenceHall.isLeader.value &&
+                      getParticipantState(p.identity)?.hasRaisedHand &&
+                      !getParticipantState(p.identity)?.hasSpeakingPermission &&
+                      !getParticipantState(p.identity)?.isLeader
+                    "
+                    type="button"
+                    class="indicator indicator--trigger success"
+                    title="Дать право голоса"
+                    @click="handleGrantSpeaking(p.identity)"
+                  >
+                    ✅
+                  </button>
+                  <!-- Право голоса есть: лидер видит кнопку «забрать», остальные — только индикатор -->
+                  <button
+                    v-if="
+                      !previewMode &&
+                      conferenceHall.isLeader.value &&
+                      getParticipantState(p.identity)?.hasSpeakingPermission &&
+                      !getParticipantState(p.identity)?.isLeader
+                    "
+                    type="button"
+                    class="indicator indicator--trigger success"
+                    title="Забрать право голоса"
+                    @click="handleRevokeSpeaking(p.identity)"
+                  >
+                    🎤
+                  </button>
+                  <span
+                    v-else-if="
+                      !previewMode &&
+                      !conferenceHall.isLeader.value &&
+                      getParticipantState(p.identity)?.hasSpeakingPermission &&
+                      !getParticipantState(p.identity)?.isLeader
+                    "
+                    class="indicator success"
+                    title="Право голоса"
+                  >
+                    🎤
+                  </span>
+                </template>
+              </Player>
             </template>
           </div>
         </section>
@@ -146,7 +192,7 @@
       <div class="left">
         <Button
           v-if="!previewMode && !conferenceHall.isLeader.value"
-          :class="{ warning: hasRaisedHand }"
+          :class="{ warning: hasRaisedHand, default: !hasRaisedHand }"
           :title="hasRaisedHand ? 'Опустить руку' : 'Поднять руку'"
           @click="handleRaiseHand"
         >
@@ -157,12 +203,15 @@
             active: mediaState.isAudioEnabled,
             danger: !mediaState.isAudioEnabled,
           }"
+          :disabled="!canSpeak"
           :title="
-            mediaState.isAudioEnabled
-              ? 'Выключить микрофон'
-              : 'Включить микрофон'
+            canSpeak
+              ? mediaState.isAudioEnabled
+                ? 'Выключить микрофон'
+                : 'Включить микрофон'
+              : 'Дождитесь разрешения от лидера говорить'
           "
-          @click="toggleAudio"
+          @click="handleToggleAudio"
         >
           {{ mediaState.isAudioEnabled ? "🎤" : "🔇" }}
         </Button>
@@ -190,6 +239,11 @@
         >
           🖥️
         </Button>
+        <ReplicaInput
+          v-if="!previewMode"
+          @submit="sendReplica"
+          :max-length="32"
+        />
       </div>
       <div class="center">
         <Button
@@ -198,15 +252,6 @@
           @click="handleDisconnect"
         >
           📞
-        </Button>
-      </div>
-      <div class="right">
-        <Button
-          variant="default"
-          title="Настройки"
-          @click="handleSettings"
-        >
-          ⚙️
         </Button>
       </div>
     </div>
@@ -221,11 +266,13 @@
       >
         <div class="conference-hall-fullscreen__video">
           <VideoParticipant
-            :participant="fullscreenParticipant"
+            :participant="resolveParticipant(fullscreenParticipant)"
             :participant-name="
               isLocal(fullscreenParticipant)
                 ? props.participantName
-                : (props.getDisplayName?.(fullscreenParticipant) ?? fullscreenParticipant.name ?? fullscreenParticipant.identity)
+                : (props.getDisplayName?.(fullscreenParticipant) ??
+                  fullscreenParticipant.name ??
+                  fullscreenParticipant.identity)
             "
             :is-speaking="
               speakingIdentitySet.has(fullscreenParticipant.identity)
@@ -276,12 +323,15 @@
               <label class="settings-checkbox-label">
                 <input
                   type="checkbox"
-                  class="settings-checkbox"
+                  class="settings-checkbox checkbox-pixel"
                   :checked="e2eeState.isActive"
                   disabled
                 />
                 <span>End-to-End Encryption (E2EE)</span>
-                <span class="settings-status" :class="{ active: e2eeState.isActive }">
+                <span
+                  class="settings-status"
+                  :class="{ active: e2eeState.isActive }"
+                >
                   {{ e2eeState.isActive ? "Включено" : "Выключено" }}
                 </span>
               </label>
@@ -321,13 +371,17 @@
 import { ref, computed, watch } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
-import { useE2EE } from "@features/e2ee";
+import { useE2EE, E2EEIndicator } from "@features/e2ee";
+import {
+  useParticipantReplica,
+  ReplicaInput,
+} from "@features/participant-replica";
 import { Button, Modal, AudioSettings } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { setParticipantName, getStoredAudioInputDevice } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@entities/room";
-import { RoomEvent } from "livekit-client";
+import { RoomEvent, Track } from "livekit-client";
 import type {
   Room as LiveKitRoom,
   RemoteParticipant,
@@ -351,7 +405,11 @@ const emit = defineEmits<{
   "update:participantName": [name: string];
 }>();
 
-const { state: e2eeState } = useE2EE(props.livekitRoom);
+const { state: e2eeState } = useE2EE(() => props.livekitRoom);
+
+const { replicaByParticipant, sendReplica } = useParticipantReplica(
+  computed(() => props.livekitRoom),
+);
 
 const localParticipant = computed<LocalParticipant | null>(() => {
   return props.localParticipant ?? props.livekitRoom?.localParticipant ?? null;
@@ -402,14 +460,22 @@ watch(
   () => props.livekitRoom,
   (room) => {
     if (!room) return;
-    
-    const handleMetadataChanged = (_metadata: string | undefined, participant: RemoteParticipant | LocalParticipant) => {
-      console.log("Metadata changed for participant:", participant.identity, "new name:", participant.name);
+
+    const handleMetadataChanged = (
+      _metadata: string | undefined,
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
+      console.log(
+        "Metadata changed for participant:",
+        participant.identity,
+        "new name:",
+        participant.name,
+      );
       conferenceHall.updateParticipants();
     };
-    
+
     room.on(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
-    
+
     return () => {
       room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
     };
@@ -441,8 +507,11 @@ watch(
   () => props.livekitRoom,
   (room) => {
     if (!room) return;
-    
-    const handleMetadataChanged = (_metadata: string | undefined, participant: RemoteParticipant | LocalParticipant) => {
+
+    const handleMetadataChanged = (
+      _metadata: string | undefined,
+      participant: RemoteParticipant | LocalParticipant,
+    ) => {
       console.log(
         "ConferenceHall: Participant metadata changed:",
         participant.identity,
@@ -458,9 +527,9 @@ watch(
         conferenceHall.state.value.participants.get(participant.identity)?.name,
       );
     };
-    
+
     room.on(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
-    
+
     return () => {
       room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
     };
@@ -475,25 +544,39 @@ const leaderParticipant = computed(() => {
   return remoteParticipants.value.find((p) => p.identity === id) || null;
 });
 
-const otherParticipants = computed(() => {
-  const leaderId = conferenceHall.leader.value?.identity;
-  if (!leaderId) {
-    const all: (LocalParticipant | RemoteParticipant)[] = [];
-    if (localParticipant.value) all.push(localParticipant.value);
-    return [...all, ...remoteParticipants.value];
-  }
-  const others: (LocalParticipant | RemoteParticipant)[] = [];
-  if (localParticipant.value && localParticipant.value.identity !== leaderId) {
-    others.push(localParticipant.value);
-  }
-  return [
-    ...others,
-    ...remoteParticipants.value.filter((p) => p.identity !== leaderId),
-  ];
+/** Единый список участников: лидер показывается и в этом списке, и отдельно в главном окне. */
+const allParticipants = computed(() => {
+  const list: (LocalParticipant | RemoteParticipant)[] = [];
+  if (localParticipant.value) list.push(localParticipant.value);
+  return [...list, ...remoteParticipants.value];
 });
 
 const isLocal = (p: LocalParticipant | RemoteParticipant) =>
   localParticipant.value?.identity === p.identity;
+
+/** Участник из комнаты по identity (единый источник для треков). */
+function resolveParticipant(
+  p: LocalParticipant | RemoteParticipant | null,
+): LocalParticipant | RemoteParticipant | null {
+  if (!p) return null;
+  const room = props.livekitRoom;
+  const fromRoom =
+    room?.getParticipantByIdentity?.(p.identity) ??
+    room?.remoteParticipants?.get?.(p.identity);
+  return (fromRoom ?? p) as LocalParticipant | RemoteParticipant | null;
+}
+
+/** Микрофон вкл ⟺ есть публикация микрофона и isMuted === false. Источник правды для списка. */
+function isParticipantMicOn(
+  p: LocalParticipant | RemoteParticipant | null,
+): boolean {
+  if (!p) return false;
+  const participant = resolveParticipant(p);
+  const micPub = participant?.getTrackPublication?.(Track.Source.Microphone) as
+    | { isMuted?: boolean }
+    | undefined;
+  return Boolean(micPub && micPub.isMuted === false);
+}
 
 const fullscreenIdentity = ref<string | null>(null);
 
@@ -502,7 +585,7 @@ const fullscreenParticipant = computed(() => {
   if (!id) return null;
   const leader = leaderParticipant.value;
   if (leader?.identity === id) return leader;
-  return otherParticipants.value.find((p) => p.identity === id) ?? null;
+  return allParticipants.value.find((p) => p.identity === id) ?? null;
 });
 
 function handleFullSize(identity: string) {
@@ -523,6 +606,19 @@ const hasRaisedHand = computed(() => {
   );
 });
 
+const hasSpeakingPermission = computed(() => {
+  if (!localParticipant.value) return false;
+  return (
+    getParticipantState(localParticipant.value.identity)
+      ?.hasSpeakingPermission ?? false
+  );
+});
+
+/** Говорить может только лидер или участник, которому лидер выдал право голоса (поднятая рука — только заявка). */
+const canSpeak = computed(
+  () => conferenceHall.isLeader.value || hasSpeakingPermission.value,
+);
+
 const {
   state: mediaState,
   toggleVideo,
@@ -530,6 +626,20 @@ const {
   toggleScreenShare,
   switchAudioInputDevice,
 } = useMediaControl(localParticipant);
+
+/** При потере права говорить — выключаем микрофон */
+const prevCanSpeak = ref(canSpeak.value);
+watch(canSpeak, (speak) => {
+  if (prevCanSpeak.value && !speak && mediaState.value.isAudioEnabled) {
+    toggleAudio();
+  }
+  prevCanSpeak.value = speak;
+});
+
+const handleToggleAudio = () => {
+  if (!canSpeak.value) return;
+  toggleAudio();
+};
 
 const handleRaiseHand = () => {
   hasRaisedHand.value ? conferenceHall.lowerHand() : conferenceHall.raiseHand();
@@ -558,14 +668,19 @@ const settingsParticipantName = ref(props.participantName);
 
 const hasUnsavedSettingsChanges = computed(() => {
   // Проверяем изменения имени
-  const nameChanged = settingsParticipantName.value.trim() !== initialParticipantName.value.trim();
-  
+  const nameChanged =
+    settingsParticipantName.value.trim() !==
+    initialParticipantName.value.trim();
+
   // Проверяем изменения аудио настроек
   let audioChanged = false;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).hasUnsavedChanges === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).hasUnsavedChanges === "function"
+  ) {
     audioChanged = (audioSettingsRef.value as any).hasUnsavedChanges();
   }
-  
+
   return nameChanged || audioChanged;
 });
 
@@ -583,7 +698,10 @@ watch(
 function handleSettings() {
   // Сбрасываем к сохраненным значениям при открытии
   settingsParticipantName.value = initialParticipantName.value;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).resetSettings === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).resetSettings === "function"
+  ) {
     (audioSettingsRef.value as any).resetSettings();
   }
   isSettingsOpen.value = true;
@@ -596,26 +714,29 @@ async function handleSaveSettings() {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
-      
+
       // Обновляем имя в родительском компоненте
       emit("update:participantName", newName);
-      
+
       // Обновляем имя в LiveKit
       if (localParticipant.value) {
         try {
           await localParticipant.value.setName(newName);
           console.log("✅ Имя успешно обновлено в LiveKit:", newName);
-          console.log("Текущее имя в localParticipant:", localParticipant.value.name);
+          console.log(
+            "Текущее имя в localParticipant:",
+            localParticipant.value.name,
+          );
         } catch (error) {
           console.error("❌ Ошибка при обновлении имени в LiveKit:", error);
           // Показываем пользователю предупреждение
           alert(
             "Не удалось обновить имя для других участников. " +
-            "Возможно, требуется разрешение CanUpdateOwnMetadata в токене."
+              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене.",
           );
         }
       }
-      
+
       // Обновляем состояние в conferenceHall (имя уже обновится через событие ParticipantMetadataChanged)
       // Но обновим сразу для локального отображения
       conferenceHall.updateParticipants();
@@ -623,14 +744,20 @@ async function handleSaveSettings() {
 
     // Получаем настройки аудио перед сохранением
     let audioSettingsChanged = false;
-    if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).getSettings === "function") {
+    if (
+      audioSettingsRef.value &&
+      typeof (audioSettingsRef.value as any).getSettings === "function"
+    ) {
       const currentSettings = (audioSettingsRef.value as any).getSettings();
       const savedInput = getStoredAudioInputDevice() || "";
       audioSettingsChanged = currentSettings.inputDevice !== savedInput;
     }
 
     // Сохраняем настройки аудио
-    if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).saveSettings === "function") {
+    if (
+      audioSettingsRef.value &&
+      typeof (audioSettingsRef.value as any).saveSettings === "function"
+    ) {
       await (audioSettingsRef.value as any).saveSettings();
     }
 
@@ -655,7 +782,10 @@ async function handleSaveSettings() {
 function handleCancelSettings() {
   // Сбрасываем к сохраненным значениям
   settingsParticipantName.value = initialParticipantName.value;
-  if (audioSettingsRef.value && typeof (audioSettingsRef.value as any).resetSettings === "function") {
+  if (
+    audioSettingsRef.value &&
+    typeof (audioSettingsRef.value as any).resetSettings === "function"
+  ) {
     (audioSettingsRef.value as any).resetSettings();
   }
   isSettingsOpen.value = false;
@@ -664,7 +794,11 @@ function handleCancelSettings() {
 function handleModalClose() {
   // Если есть несохраненные изменения, спрашиваем подтверждение
   if (hasUnsavedSettingsChanges.value) {
-    if (confirm("У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?")) {
+    if (
+      confirm(
+        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?",
+      )
+    ) {
       handleCancelSettings();
     }
   } else {
@@ -688,6 +822,25 @@ function handleModalClose() {
   padding: 16px;
   overflow: hidden;
   min-height: 0;
+  padding-bottom: 100px;
+}
+
+@media (max-width: 768px) {
+  .conference-hall__content {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .conference-hall__main,
+  .conference-hall__sidebar {
+    flex-shrink: 0;
+  }
+
+  .conference-hall__sidebar {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .conference-hall__main {
@@ -784,6 +937,7 @@ function handleModalClose() {
 }
 
 .conference-hall__others {
+  padding: 16px 8px 8px 8px;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -914,10 +1068,7 @@ function handleModalClose() {
 }
 
 .settings-checkbox {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: #2980b9;
+  /* размер и вид задаёт .checkbox-pixel в design.css */
 }
 
 .settings-checkbox-label span:not(.settings-status) {
@@ -943,7 +1094,8 @@ function handleModalClose() {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

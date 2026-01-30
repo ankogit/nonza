@@ -125,7 +125,7 @@ const urlCode = urlParams.get("code");
 
 const shortCode = ref(props.defaultShortCode || urlCode || "");
 const participantName = ref(
-  getParticipantName() || props.defaultParticipantName || ""
+  getParticipantName() || props.defaultParticipantName || "",
 );
 
 watch(
@@ -133,7 +133,7 @@ watch(
   (name) => {
     if (name.trim()) setParticipantName(name);
   },
-  { immediate: false }
+  { immediate: false },
 );
 const error = ref<string | null>(null);
 const room = ref<RoomEntity | null>(null);
@@ -155,7 +155,7 @@ const isConnected = computed(() => connectionState.value.isConnected);
 const canConnect = computed(
   () =>
     shortCode.value.trim().length > 0 &&
-    participantName.value.trim().length > 0
+    participantName.value.trim().length > 0,
 );
 
 const handleConnect = async () => {
@@ -256,7 +256,7 @@ const handleRandomizeName = () => {
 
 .nonza-widget__input {
   flex: 1;
-  padding: 12px;
+  padding: 8px;
   border: 2px solid #444;
   border-radius: 0;
   background: #1a1a1a;
@@ -264,6 +264,7 @@ const handleRandomizeName = () => {
   font-size: 16px;
   outline: none;
   transition: none;
+  width: 100%;
 }
 
 .nonza-widget__input:focus {
