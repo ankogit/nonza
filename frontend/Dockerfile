@@ -1,5 +1,11 @@
 FROM node:22-alpine AS builder
 
+# Переменные подставляются в бандл на этапе сборки (Vite читает import.meta.env)
+ARG VITE_API_BASE_URL
+ARG VITE_LIVEKIT_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_LIVEKIT_URL=$VITE_LIVEKIT_URL
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
