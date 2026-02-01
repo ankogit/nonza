@@ -417,7 +417,7 @@ const {
   toggleAudio,
   toggleScreenShare,
   switchAudioInputDevice,
-} = useMediaControl(localParticipant);
+} = useMediaControl(localParticipant, computed(() => props.livekitRoom));
 
 const handleDisconnect = () => {
   emit("disconnect");

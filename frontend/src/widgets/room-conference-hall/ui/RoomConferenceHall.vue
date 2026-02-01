@@ -614,7 +614,7 @@ const {
   toggleAudio,
   toggleScreenShare,
   switchAudioInputDevice,
-} = useMediaControl(localParticipant);
+} = useMediaControl(localParticipant, computed(() => props.livekitRoom));
 
 /** При потере права говорить — выключаем микрофон */
 const prevCanSpeak = ref(canSpeak.value);

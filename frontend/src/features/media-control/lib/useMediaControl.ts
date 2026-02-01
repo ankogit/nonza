@@ -1,5 +1,9 @@
 import { ref, computed, watch, nextTick, type ComputedRef } from "vue";
-import type { LocalParticipant, LocalTrackPublication } from "livekit-client";
+import type {
+  LocalParticipant,
+  LocalTrackPublication,
+  Room,
+} from "livekit-client";
 import { Track, ParticipantEvent, ConnectionState } from "livekit-client";
 import {
   getStoredAudioInputDevice,
@@ -16,6 +20,7 @@ export interface MediaControlState {
 
 export function useMediaControl(
   participant: ComputedRef<LocalParticipant | null>,
+  room: ComputedRef<Room | null>,
 ) {
   const state = ref<MediaControlState>({
     isVideoEnabled: false,
@@ -71,14 +76,14 @@ export function useMediaControl(
     { immediate: true },
   );
 
-  const isRoomReady = (room: LocalParticipant["room"]) =>
-    !room ||
-    room.state === ConnectionState.Connected ||
-    room.state === ConnectionState.Connecting;
+  const isRoomReady = (r: Room | null) =>
+    !r ||
+    r.state === ConnectionState.Connected ||
+    r.state === ConnectionState.Connecting;
 
   const toggleVideo = async (): Promise<void> => {
-    if (!participant.value || !isRoomReady(participant.value.room)) return;
-    const room = participant.value.room;
+    if (!participant.value || !isRoomReady(room.value)) return;
+    const r = room.value;
 
     try {
       const cameraPub = Array.from(
@@ -116,14 +121,14 @@ export function useMediaControl(
         }
       }
     } catch (err) {
-      if (room?.state !== ConnectionState.Connected) return;
+      if (r?.state !== ConnectionState.Connected) return;
       console.error("toggleVideo failed:", err);
     }
   };
 
   const toggleAudio = async (): Promise<void> => {
-    if (!participant.value || !isRoomReady(participant.value.room)) return;
-    const room = participant.value.room;
+    if (!participant.value || !isRoomReady(room.value)) return;
+    const r = room.value;
 
     try {
       const audioTrack = participant.value.audioTrackPublications.values()
@@ -162,14 +167,14 @@ export function useMediaControl(
         }
       }
     } catch (err) {
-      if (room?.state !== ConnectionState.Connected) return;
+      if (r?.state !== ConnectionState.Connected) return;
       console.error("toggleAudio failed:", err);
     }
   };
 
   const toggleScreenShare = async (): Promise<void> => {
-    if (!participant.value || !isRoomReady(participant.value.room)) return;
-    const room = participant.value.room;
+    if (!participant.value || !isRoomReady(room.value)) return;
+    const r = room.value;
 
     try {
       if (state.value.isScreenSharing) {
@@ -203,7 +208,7 @@ export function useMediaControl(
         }
       }
     } catch (err) {
-      if (room?.state !== ConnectionState.Connected) return;
+      if (r?.state !== ConnectionState.Connected) return;
       console.error("toggleScreenShare failed:", err);
     }
   };

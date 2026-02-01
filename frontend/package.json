@@ -8,9 +8,9 @@
   "types": "./dist/nonza-widget.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/nonza-widget.d.ts",
       "import": "./dist/nonza-widget.es.js",
-      "require": "./dist/nonza-widget.umd.js",
-      "types": "./dist/nonza-widget.d.ts"
+      "require": "./dist/nonza-widget.umd.js"
     },
     "./style.css": "./dist/style.css"
   },

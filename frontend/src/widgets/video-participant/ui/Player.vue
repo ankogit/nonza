@@ -261,11 +261,6 @@ const micIndicatorRef = ref<{ wrapEl: HTMLElement | null } | null>(null);
 
 const isVolumeMenuOpen = computed(() => volumeMenuOpen.value);
 
-function onVolumeButtonClick(e: MouseEvent) {
-  e.stopPropagation();
-  toggleVolumeMenu();
-}
-
 function onListIndicatorClick(e: MouseEvent) {
   e.stopPropagation();
   if (!isLocalParticipant.value) toggleVolumeMenu();
