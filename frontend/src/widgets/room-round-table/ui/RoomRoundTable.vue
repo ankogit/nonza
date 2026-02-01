@@ -604,11 +604,13 @@ function handleModalClose() {
   min-height: 400px;
   max-height: 600px;
   padding: 20px;
+  margin-bottom: 50px;
 }
 
 @media (min-width: 768px) {
   .round-table-document {
     width: 400px;
+    margin-bottom: 0px;
   }
   .round-table-content {
     flex-direction: row;
