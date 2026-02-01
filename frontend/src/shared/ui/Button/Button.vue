@@ -74,7 +74,9 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   background: #457fb3;
-  border: 3px solid #ffffff20;
+  border: 3px solid #ffffff10;
+  border-top: 3px solid #ffffff20;
+  border-left: 3px solid #ffffff20;
   filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.25));
   transition:
     scale 0.15s ease,

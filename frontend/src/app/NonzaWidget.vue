@@ -1,6 +1,25 @@
 <template>
   <div class="nonza-widget" :class="{ 'nonza-widget--connected': isConnected }">
-    <div v-if="!isConnected" class="nonza-widget__connect">
+    <div v-if="isReconnecting" class="nonza-widget__reconnecting">
+      <div class="nonza-widget__reconnecting-card">
+        <p class="nonza-widget__reconnecting-text">Восстанавливаем подключение</p>
+        <p class="nonza-widget__reconnecting-hint">Соединение с комнатой было потеряно</p>
+        <Button
+          type="text"
+          variant="accent"
+          size="medium"
+          :disabled="isConnecting"
+          class="nonza-widget__reconnecting-button"
+          @click="handleReconnect"
+        >
+          {{ isConnecting ? "Подключение..." : "Переподключиться" }}
+        </Button>
+        <div v-if="connectionState.error" class="nonza-widget__error">
+          {{ connectionState.error }}
+        </div>
+      </div>
+    </div>
+    <div v-else-if="!isConnected" class="nonza-widget__connect">
       <div class="nonza-widget__connect-form">
         <h2 class="nonza-widget__title">Присоединиться к комнате</h2>
         <div class="nonza-widget__input-group nonza-widget__input-group--full">
@@ -95,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRoomConnection } from "@features/room-connection";
 import { RoomConferenceHall } from "@widgets/room-conference-hall";
 import { RoomRoundTable } from "@widgets/room-round-table";
@@ -106,6 +125,9 @@ import {
   getParticipantName,
   setParticipantName,
   generateParticipantName,
+  getRoomShortCode,
+  setRoomShortCode,
+  clearRoomShortCode,
 } from "@shared/lib";
 import type { Room as RoomEntity } from "@entities/room";
 
@@ -146,11 +168,13 @@ const {
   remoteParticipants,
   getDisplayName,
   connect,
+  reconnect,
   disconnect,
 } = useRoomConnection(roomApi);
 
 const isConnecting = computed(() => connectionState.value.isConnecting);
 const isConnected = computed(() => connectionState.value.isConnected);
+const isReconnecting = computed(() => connectionState.value.isReconnecting);
 
 const canConnect = computed(
   () =>
@@ -163,14 +187,26 @@ const handleConnect = async () => {
 
   error.value = null;
   const name = participantName.value.trim();
+  const code = shortCode.value.trim();
 
   try {
-    await connect(shortCode.value.trim(), name, livekitURL);
-    // Get values from connection state after connection
+    await connect(code, name, livekitURL);
     room.value = connectionState.value.room;
+    setRoomShortCode(code);
   } catch (err) {
     error.value =
       err instanceof Error ? err.message : "Не удалось подключиться";
+  }
+};
+
+const handleReconnect = async () => {
+  error.value = null;
+  try {
+    await reconnect();
+    room.value = connectionState.value.room;
+  } catch (err) {
+    error.value =
+      err instanceof Error ? err.message : "Не удалось переподключиться";
   }
 };
 
@@ -178,6 +214,7 @@ const handleDisconnect = async () => {
   await disconnect();
   room.value = null;
   error.value = null;
+  clearRoomShortCode();
 };
 
 const handleCreateRoom = () => {
@@ -189,13 +226,22 @@ const handleRandomizeName = () => {
   participantName.value = name;
   setParticipantName(name);
 };
+
+onMounted(() => {
+  const savedShortCode = getRoomShortCode()?.trim();
+  const savedName = getParticipantName()?.trim();
+  if (savedShortCode && savedName) {
+    shortCode.value = savedShortCode;
+    participantName.value = savedName;
+  }
+});
 </script>
 
 <style scoped>
 .nonza-widget {
   width: 100%;
   height: 100%;
-  min-height: 600px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #1a1a1a;
@@ -204,12 +250,47 @@ const handleRandomizeName = () => {
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+@media (min-width: 768px) and (min-height: 600px) {
+  .nonza-widget {
+    min-height: 600px;
+  }
+}
+
+.nonza-widget__reconnecting,
 .nonza-widget__connect {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.nonza-widget__reconnecting-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface, #2a2a2a);
+  padding: 32px;
+  border: 2px solid #444;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.nonza-widget__reconnecting-text {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 500;
+  color: white;
+}
+
+.nonza-widget__reconnecting-hint {
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  color: #999;
+}
+
+.nonza-widget__reconnecting-button {
+  width: 100%;
 }
 
 .nonza-widget__connect-form {

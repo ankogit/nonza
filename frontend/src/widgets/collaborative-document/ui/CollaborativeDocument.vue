@@ -212,6 +212,35 @@ const connectionStatus = ref<"connecting" | "connected" | "disconnected">(
   "disconnected",
 );
 
+function handleBeforeUnload() {
+  if (awareness && provider.value?.connected) {
+    try {
+      awareness.setLocalState(null);
+      const p = provider.value as any;
+      if (p?.ws?.readyState === WebSocket.OPEN) {
+        const update = encodeAwarenessUpdate(awareness, [awareness.clientID]);
+        if (update.length > 0) {
+          const base64 = btoa(
+            String.fromCharCode.apply(null, Array.from(update)),
+          );
+          p.ws.send(
+            JSON.stringify({
+              type: "yjs_awareness",
+              room_id: p.roomId,
+              payload: { update: base64 },
+            }),
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "[CollaborativeDocument] Error sending final awareness update:",
+        error,
+      );
+    }
+  }
+}
+
 const initializeEditor = () => {
   if (!props.room || !props.apiBaseURL) {
     console.warn("[CollaborativeDocument] Missing room or apiBaseURL");
@@ -224,11 +253,6 @@ const initializeEditor = () => {
     : "ws://";
   const wsHost = props.apiBaseURL.replace(/^https?:\/\//, "");
   const wsUrl = `${wsProtocol}${wsHost}`;
-
-  console.log(
-    "[CollaborativeDocument] Initializing editor for room:",
-    props.room.id,
-  );
 
   // Clean up existing provider if it exists
   if (provider.value) {
@@ -243,11 +267,6 @@ const initializeEditor = () => {
     color: userColor,
   });
 
-  console.log("[CollaborativeDocument] Set awareness user:", {
-    name: props.participantName,
-    color: userColor,
-  });
-
   // Create WebSocket provider with awareness
   provider.value = new YjsWebSocketProvider({
     url: wsUrl,
@@ -257,15 +276,8 @@ const initializeEditor = () => {
     awareness: awareness,
   });
 
-  console.log(
-    "[CollaborativeDocument] Provider created, awareness:",
-    provider.value.awareness,
-  );
-
-  // Listen to connection status
   provider.value.onStatus((status) => {
     connectionStatus.value = status;
-    console.log("[CollaborativeDocument] Connection status:", status);
   });
 
   // Initialize TipTap editor with Y.js collaboration
@@ -274,13 +286,6 @@ const initializeEditor = () => {
     try {
       editor.value = new Editor({
         onCreate: ({ editor: currentEditor }) => {
-          console.log("[CollaborativeDocument] Editor onCreate called");
-          console.log(
-            "[CollaborativeDocument] Provider awareness:",
-            provider.value?.awareness,
-          );
-
-          // Set initial user info when editor is created
           const userColor = getColorForUser(props.participantName);
           currentEditor
             .chain()
@@ -291,62 +296,15 @@ const initializeEditor = () => {
             })
             .run();
 
-          console.log("[CollaborativeDocument] updateUser called with:", {
-            name: props.participantName,
-            color: userColor,
-          });
-
-          // Check collaboration caret storage once on creation (for debugging)
-          nextTick(() => {
-            const users = currentEditor.storage.collaborationCaret?.users || [];
-            if (users.length > 0) {
-              console.log(
-                "[CollaborativeDocument] CollaborationCaret users on init:",
-                users.length,
-              );
-            }
-          });
-
-          // Handle synced event
           if (
             provider.value &&
             typeof (provider.value as any).on === "function"
           ) {
-            (provider.value as any).on("synced", () => {
-              console.log("[CollaborativeDocument] Document synced");
-              // Don't set default content - empty document is valid state
-            });
+            (provider.value as any).on("synced", () => {});
           }
 
-          // Monitor awareness changes (only log when users change, not on every cursor movement)
           if (provider.value?.awareness) {
-            let lastUserCount = 0;
-            provider.value.awareness.on(
-              "change",
-              (changes: {
-                added: number[];
-                updated: number[];
-                removed: number[];
-              }) => {
-                const statesMap = provider.value!.awareness.getStates() as Map<
-                  number,
-                  any
-                >;
-                const currentUserCount = statesMap.size;
-                // Only log when the number of users changes (user joined/left)
-                if (currentUserCount !== lastUserCount) {
-                  console.log(
-                    "[CollaborativeDocument] Awareness users changed:",
-                    lastUserCount,
-                    "->",
-                    currentUserCount,
-                    "changes:",
-                    changes,
-                  );
-                  lastUserCount = currentUserCount;
-                }
-              },
-            );
+            provider.value.awareness.on("change", () => {});
           }
         },
         extensions: [
@@ -386,8 +344,6 @@ const initializeEditor = () => {
           },
         },
       });
-
-      console.log("[CollaborativeDocument] Editor initialized successfully");
     } catch (error) {
       console.error(
         "[CollaborativeDocument] Error initializing editor:",
@@ -404,8 +360,6 @@ const handleCopy = async () => {
     // Get text content from editor
     const text = editor.value.getText();
     await navigator.clipboard.writeText(text);
-    // Можно добавить уведомление об успешном копировании
-    console.log("Text copied to clipboard");
   } catch (error) {
     console.error("Failed to copy text:", error);
   }
@@ -490,59 +444,13 @@ watch(
 
 onMounted(async () => {
   isMounted.value = true;
-  // Initialize editor after component is mounted
-  if (props.room && props.apiBaseURL) {
-    // Wait for next tick to ensure DOM is fully ready
-    await nextTick();
-    initializeEditor();
-  }
-
-  // Send final awareness update before page unloads
-  // This ensures other clients are notified immediately when user closes the page
-  const handleBeforeUnload = () => {
-    if (awareness && provider.value?.connected) {
-      try {
-        // Set local state to null to mark client as offline
-        awareness.setLocalState(null);
-
-        // Send final awareness update synchronously via WebSocket
-        // This must be synchronous because page is closing
-        if (
-          provider.value &&
-          (provider.value as any).ws &&
-          (provider.value as any).ws.readyState === WebSocket.OPEN
-        ) {
-          const update = encodeAwarenessUpdate(awareness, [awareness.clientID]);
-          if (update.length > 0) {
-            const base64 = btoa(
-              String.fromCharCode.apply(null, Array.from(update)),
-            );
-            const message = JSON.stringify({
-              type: "yjs_awareness",
-              room_id: (provider.value as any).roomId,
-              payload: { update: base64 },
-            });
-            // Send synchronously - this is the last chance before page closes
-            (provider.value as any).ws.send(message);
-          }
-        }
-      } catch (error) {
-        console.error(
-          "[CollaborativeDocument] Error sending final awareness update:",
-          error,
-        );
-      }
-    }
-  };
-
   window.addEventListener("beforeunload", handleBeforeUnload);
   window.addEventListener("pagehide", handleBeforeUnload);
 
-  // Cleanup listeners on unmount
-  onBeforeUnmount(() => {
-    window.removeEventListener("beforeunload", handleBeforeUnload);
-    window.removeEventListener("pagehide", handleBeforeUnload);
-  });
+  if (props.room && props.apiBaseURL) {
+    await nextTick();
+    initializeEditor();
+  }
 });
 
 // Generate a consistent color for a user based on their name
@@ -565,10 +473,11 @@ function getColorForUser(name: string): string {
 }
 
 onBeforeUnmount(() => {
-  // Disconnect provider first - this will send final awareness update
-  // setLocalState(null) marks the client as offline and notifies others
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+  window.removeEventListener("pagehide", handleBeforeUnload);
+
   if (provider.value) {
-    provider.value.destroy(); // This calls disconnect() which handles awareness cleanup
+    provider.value.destroy();
   }
 
   editor.value?.destroy();

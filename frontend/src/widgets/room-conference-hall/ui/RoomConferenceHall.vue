@@ -5,13 +5,22 @@
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
+        <div
+          v-if="!previewMode && (connectionStatus === 'warning' || connectionStatus === 'bad')"
+          class="connection-indicator"
+          :class="`connection-indicator--${connectionStatus}`"
+          :title="connectionLabel"
+        >
+          {{ connectionStatus === "bad" ? "📵" : "⚠️" }}
+          <span class="connection-indicator__label">{{ connectionLabel }}</span>
+        </div>
         <E2EEIndicator
           v-if="!previewMode"
           :room="livekitRoom"
           :show-label="true"
         />
         <div class="right">
-          <Button variant="default" title="Настройки" @click="handleSettings">
+          <Button variant="default" size="small" title="Настройки" @click="handleSettings">
             ⚙️
           </Button>
         </div>
@@ -372,6 +381,7 @@ import { ref, computed, watch } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE, E2EEIndicator } from "@features/e2ee";
+import { useConnectionIndicator } from "@features/room-connection";
 import {
   useParticipantReplica,
   ReplicaInput,
@@ -406,6 +416,10 @@ const emit = defineEmits<{
 }>();
 
 const { state: e2eeState } = useE2EE(() => props.livekitRoom);
+
+const livekitRoomRef = computed(() => props.livekitRoom);
+const { connectionStatus, connectionLabel } =
+  useConnectionIndicator(livekitRoomRef);
 
 const { replicaByParticipant, sendReplica } = useParticipantReplica(
   computed(() => props.livekitRoom),
@@ -461,16 +475,7 @@ watch(
   (room) => {
     if (!room) return;
 
-    const handleMetadataChanged = (
-      _metadata: string | undefined,
-      participant: RemoteParticipant | LocalParticipant,
-    ) => {
-      console.log(
-        "Metadata changed for participant:",
-        participant.identity,
-        "new name:",
-        participant.name,
-      );
+    const handleMetadataChanged = () => {
       conferenceHall.updateParticipants();
     };
 
@@ -508,24 +513,8 @@ watch(
   (room) => {
     if (!room) return;
 
-    const handleMetadataChanged = (
-      _metadata: string | undefined,
-      participant: RemoteParticipant | LocalParticipant,
-    ) => {
-      console.log(
-        "ConferenceHall: Participant metadata changed:",
-        participant.identity,
-        "new name:",
-        participant.name,
-        "isLocal:",
-        participant === room.localParticipant,
-      );
-      // Обновляем состояние conferenceHall
+    const handleMetadataChanged = () => {
       conferenceHall.updateParticipants();
-      console.log(
-        "After update, participant name in conferenceHall:",
-        conferenceHall.state.value.participants.get(participant.identity)?.name,
-      );
     };
 
     room.on(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
@@ -722,11 +711,6 @@ async function handleSaveSettings() {
       if (localParticipant.value) {
         try {
           await localParticipant.value.setName(newName);
-          console.log("✅ Имя успешно обновлено в LiveKit:", newName);
-          console.log(
-            "Текущее имя в localParticipant:",
-            localParticipant.value.name,
-          );
         } catch (error) {
           console.error("❌ Ошибка при обновлении имени в LiveKit:", error);
           // Показываем пользователю предупреждение
@@ -813,6 +797,26 @@ function handleModalClose() {
   font-size: 1.5rem;
   font-weight: 400;
   letter-spacing: 0.02em;
+}
+
+.connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.connection-indicator--warning {
+  background: rgba(255, 190, 83, 0.2);
+  color: var(--color-accent, #ffbe53);
+}
+.connection-indicator--bad {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+.connection-indicator__label {
+  white-space: nowrap;
 }
 
 .conference-hall__content {

@@ -6,9 +6,18 @@
       mode === 'list' && 'player--list',
     ]"
   >
-    <!-- Grid: video/avatar + fullscreen -->
     <template v-if="mode === 'grid'">
-      <div class="player-avatar">
+      <div
+        v-memo="[
+          mode,
+          previewMode,
+          participant?.identity,
+          videoTrack,
+          participantName,
+          showFullSize,
+        ]"
+        class="player-avatar"
+      >
         <video
           v-if="!previewMode && participant"
           :ref="tracks.videoElement"
@@ -34,7 +43,6 @@
       </div>
       <FullscreenIcon v-if="showFullSize" @click="emit('full-size')" />
     </template>
-    <!-- List mode: hidden audio for remote participants so we subscribe and hear them -->
     <audio
       v-if="
         mode === 'list' && !isLocalParticipant && !previewMode && participant
@@ -46,106 +54,54 @@
       aria-hidden="true"
     />
 
-    <!-- Menu: same structure for grid and list -->
     <div class="player-menu bg-dark-blur-90">
       <div class="player-menu-inner">
         <div class="left">
-          <div class="player-name color-white font-bebas">
-            {{ participantName }}
+          <div
+            v-memo="nameReplicaMemo"
+            class="player-menu__identity"
+          >
+            <div class="player-name color-white font-bebas">
+              {{ nameReplica.participantName }}
+            </div>
+            <ReplicaBlock
+              v-if="nameReplica.replicaText?.trim()"
+              :text="nameReplica.replicaText"
+            />
           </div>
-          <div v-if="replicaText?.trim()" class="player-replica-wrap">
-            <SpeechBubble :text="replicaText" />
-          </div>
-          <span v-if="isLeader" class="indicator default" title="Лидер">
+          <span
+            v-if="leaderHand.isLeader"
+            v-memo="[leaderHand.isLeader]"
+            class="indicator default"
+            title="Лидер"
+          >
             👑
           </span>
         </div>
         <div class="right">
-          <!-- List: actions slot (grant/revoke speaking, etc.) -->
-          <slot v-if="mode === 'list'" name="actions" />
-          <span
-            v-if="hasRaisedHand"
-            class="indicator warning"
-            title="Поднята рука"
-          >
-            ✋
-          </span>
-          <!-- Список: индикатор микрофона для всех; громкость только у удалённых -->
-          <div
-            v-if="mode === 'list' && !previewMode && participant"
-            ref="volumeWrapRef"
-            class="volume-indicator-wrap"
-            :class="{ 'volume-indicator-wrap--open': isVolumeMenuOpen }"
-          >
-            <div v-if="!isLocalParticipant" class="volume-menu">
-              <input
-                type="range"
-                class="volume-slider"
-                :min="VOLUME_MIN"
-                :max="VOLUME_MAX"
-                step="5"
-                :value="volume"
-                :title="`${volume}%`"
-                @input="onVolumeInput"
-              />
-            </div>
-            <button
-              type="button"
-              class="indicator"
-              :class="[
-                isAudioEnabled ? 'success' : 'danger',
-                { 'indicator--trigger': !isLocalParticipant },
-              ]"
-              :title="
-                isLocalParticipant
-                  ? isAudioEnabled
-                    ? 'Микрофон вкл'
-                    : 'Микрофон выкл'
-                  : isVolumeMenuOpen
-                    ? 'Скрыть громкость'
-                    : 'Громкость'
-              "
-              aria-label="Микрофон"
-              @click="onListIndicatorClick"
+          <template v-memo="[mode, hasRaisedHand]">
+            <slot v-if="mode === 'list'" name="actions" />
+            <span
+              v-if="hasRaisedHand"
+              class="indicator warning"
+              title="Поднята рука"
             >
-              {{ isAudioEnabled ? "🔊" : "🔇" }}
-            </button>
-          </div>
-          <!-- Grid: громкость только у удалённых -->
-          <div
-            v-if="
-              mode === 'grid' &&
-              !isLocalParticipant &&
-              !previewMode &&
-              participant
-            "
-            ref="volumeWrapRef"
-            class="volume-indicator-wrap"
-            :class="{ 'volume-indicator-wrap--open': isVolumeMenuOpen }"
-          >
-            <div class="volume-menu">
-              <input
-                type="range"
-                class="volume-slider"
-                :min="VOLUME_MIN"
-                :max="VOLUME_MAX"
-                step="5"
-                :value="volume"
-                :title="`${volume}%`"
-                @input="onVolumeInput"
-              />
-            </div>
-            <button
-              type="button"
-              class="indicator indicator--trigger"
-              :class="isAudioEnabled ? 'success' : 'danger'"
-              :title="isVolumeMenuOpen ? 'Скрыть громкость' : 'Громкость'"
-              aria-label="Громкость"
-              @click="onVolumeButtonClick"
-            >
-              🔊
-            </button>
-          </div>
+              ✋
+            </span>
+          </template>
+          <MicIndicator
+            ref="micIndicatorRef"
+            :is-audio-enabled="isAudioEnabled"
+            :is-local-participant="isLocalParticipant"
+            :is-volume-menu-open="isVolumeMenuOpen"
+            :volume="volume"
+            :volume-min="VOLUME_MIN"
+            :volume-max="VOLUME_MAX"
+            :show-volume-slider="!isLocalParticipant"
+            :list-mode="true"
+            @click="onListIndicatorClick"
+            @volume-input="onVolumeInput"
+          />
         </div>
       </div>
     </div>
@@ -160,7 +116,8 @@ import type {
   RemoteAudioTrack,
 } from "livekit-client";
 import FullscreenIcon from "./FullscreenIcon.vue";
-import SpeechBubble from "./SpeechBubble.vue";
+import MicIndicator from "./MicIndicator.vue";
+import ReplicaBlock from "./ReplicaBlock.vue";
 import {
   useParticipantTracks,
   type UseParticipantTracksProps,
@@ -178,9 +135,7 @@ const props = withDefaults(
     hasRaisedHand?: boolean;
     hasSpeakingPermission?: boolean;
     showFullSize?: boolean;
-    /** Only for list mode: show mic indicator when participant has no tracks in this component */
     isAudioEnabled?: boolean;
-    /** Short message/replica shown under the participant name (e.g. when they can't speak) */
     replicaText?: string;
   }>(),
   {
@@ -196,7 +151,51 @@ const props = withDefaults(
 
 const emit = defineEmits<{ "full-size": [] }>();
 
-// Reactive props for useParticipantTracks (only used in grid mode; list mode passes participant: null)
+const nameReplica = ref({
+  participantName: props.participantName ?? "",
+  replicaText: props.replicaText ?? "",
+});
+const leaderHand = ref({
+  isLeader: props.isLeader ?? false,
+  hasRaisedHand: props.hasRaisedHand ?? false,
+});
+watch(
+  () => ({
+    participantName: props.participantName ?? "",
+    replicaText: props.replicaText ?? "",
+    isLeader: props.isLeader ?? false,
+    hasRaisedHand: props.hasRaisedHand ?? false,
+  }),
+  (next) => {
+    const prevNr = nameReplica.value;
+    if (
+      prevNr.participantName !== next.participantName ||
+      prevNr.replicaText !== next.replicaText
+    ) {
+      nameReplica.value = {
+        participantName: next.participantName,
+        replicaText: next.replicaText,
+      };
+    }
+    const prevLh = leaderHand.value;
+    if (
+      prevLh.isLeader !== next.isLeader ||
+      prevLh.hasRaisedHand !== next.hasRaisedHand
+    ) {
+      leaderHand.value = {
+        isLeader: next.isLeader,
+        hasRaisedHand: next.hasRaisedHand,
+      };
+    }
+  },
+  { immediate: true },
+);
+
+const nameReplicaMemo = computed(
+  () =>
+    [nameReplica.value.participantName, nameReplica.value.replicaText] as const,
+);
+
 const tracksProps = reactive<UseParticipantTracksProps>({
   participant: null,
   participantName: props.participantName,
@@ -217,7 +216,6 @@ watch(
       tracksProps.participantName = participantName;
       tracksProps.previewMode = previewMode ?? false;
     } else {
-      // List mode: still pass remote participant so we subscribe and play their audio
       tracksProps.participant = participant ?? null;
       tracksProps.participantName = participantName;
       tracksProps.previewMode = previewMode ?? false;
@@ -244,7 +242,6 @@ const {
   isAudioEnabled: tracksAudioEnabled,
 } = tracks;
 
-/** В списке — из пропа (родитель читает из комнаты). В сетке — из треков. */
 const isAudioEnabled = computed(() =>
   props.mode === "list" && props.isAudioEnabled !== undefined
     ? props.isAudioEnabled
@@ -254,12 +251,13 @@ const isAudioEnabled = computed(() =>
 const {
   volume,
   volumeMenuOpen,
-  volumeWrapRef,
   onVolumeInput,
   toggleVolumeMenu,
   VOLUME_MIN,
   VOLUME_MAX,
 } = volumeApi;
+
+const micIndicatorRef = ref<{ wrapEl: HTMLElement | null } | null>(null);
 
 const isVolumeMenuOpen = computed(() => volumeMenuOpen.value);
 
@@ -283,10 +281,8 @@ watch(
     }
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (
-        volumeWrapRef.value &&
-        !volumeWrapRef.value.contains(e.target as Node)
-      ) {
+      const wrapEl = micIndicatorRef.value?.wrapEl;
+      if (wrapEl && !wrapEl.contains(e.target as Node)) {
         volumeMenuOpen.value = false;
       }
     };
@@ -314,15 +310,6 @@ watch(
   position: relative;
 }
 
-.player-replica-wrap {
-  min-width: 0;
-  position: absolute;
-  align-self: flex-start;
-  left: 0;
-  bottom: 32px;
-  max-width: min(280px, 100%);
-}
-
 .player-avatar video {
   width: 100%;
   height: 100%;
@@ -347,49 +334,6 @@ watch(
 
 .player-menu .indicator {
   font-size: 0.875rem;
-}
-
-/* Volume: wrap is positioning context; menu animates translateX(0) → translateX(-24px) when open */
-.player-menu :deep(.volume-indicator-wrap) {
-  position: relative;
-}
-
-.player-menu :deep(.volume-menu) {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 100px;
-  min-width: 100px;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2.5px);
-  z-index: 21;
-  transform: translateX(0px) translateY(0);
-  visibility: hidden;
-  pointer-events: none;
-  opacity: 0;
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease,
-    visibility 0.2s;
-}
-
-.player-menu :deep(.volume-indicator-wrap--open .volume-menu) {
-  transform: translateX(-24px) translateY(0);
-  visibility: visible;
-  pointer-events: auto;
-  opacity: 1;
-}
-.player-menu :deep(.volume-indicator-wrap .indicator) {
-  z-index: 40;
-}
-
-/* Цвет индикатора громкости по состоянию микрофона (success/danger из design.css могут не доходить из-за scoped) */
-.player-menu :deep(.volume-indicator-wrap .indicator--trigger.success) {
-  background: #0ead61;
-}
-.player-menu :deep(.volume-indicator-wrap .indicator--trigger.danger) {
-  background: #e2534b;
 }
 
 /* Hidden audio for list mode: subscribe and play remote participant */

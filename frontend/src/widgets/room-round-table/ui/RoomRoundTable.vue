@@ -5,12 +5,21 @@
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
+        <div
+          v-if="!previewMode && (connectionStatus === 'warning' || connectionStatus === 'bad')"
+          class="connection-indicator"
+          :class="`connection-indicator--${connectionStatus}`"
+          :title="connectionLabel"
+        >
+          {{ connectionStatus === "bad" ? "📵" : "⚠️" }}
+          <span class="connection-indicator__label">{{ connectionLabel }}</span>
+        </div>
         <E2EEIndicator
           v-if="!previewMode"
           :room="livekitRoom"
           :show-label="true"
         />
-        <Button variant="default" title="Настройки" @click="handleSettings">
+        <Button variant="default" size="small" title="Настройки" @click="handleSettings">
           ⚙️
         </Button>
       </div>
@@ -20,7 +29,7 @@
       <div class="call-grid">
         <VideoParticipant
           v-for="p in roundTableParticipants"
-          :key="`${participantsKey}-${p.identity}-${props.getDisplayName?.(p) ?? p.name ?? p.identity}-${p.audioTrackPublications?.size ?? 0}-${p.videoTrackPublications?.size ?? 0}`"
+          :key="`${participantsKey}-${p.identity}-${props.getDisplayName?.(p) ?? p.name ?? p.identity}`"
           :participant="p"
           :participant-name="
             isLocal(p)
@@ -73,7 +82,7 @@
         <Button
           :class="{
             active: mediaState.isAudioEnabled,
-            danger: !mediaState.isAudioEnabled,
+            default: !mediaState.isAudioEnabled,
           }"
           :title="
             mediaState.isAudioEnabled
@@ -87,7 +96,7 @@
         <Button
           :class="{
             active: mediaState.isVideoEnabled,
-            danger: !mediaState.isVideoEnabled,
+            default: !mediaState.isVideoEnabled,
           }"
           :title="
             mediaState.isVideoEnabled ? 'Выключить видео' : 'Включить видео'
@@ -100,7 +109,7 @@
           v-if="!previewMode"
           :class="{
             active: mediaState.isScreenSharing,
-            danger: !mediaState.isScreenSharing,
+            default: !mediaState.isScreenSharing,
           }"
           title="Трансляция экрана"
           @click="toggleScreenShare"
@@ -250,6 +259,7 @@
 import { ref, computed, watch } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useE2EE, E2EEIndicator } from "@features/e2ee";
+import { useConnectionIndicator } from "@features/room-connection";
 import {
   useParticipantReplica,
   ReplicaInput,
@@ -285,6 +295,10 @@ const emit = defineEmits<{
 }>();
 
 const { state: e2eeState } = useE2EE(() => props.livekitRoom);
+
+const livekitRoomRef = computed(() => props.livekitRoom);
+const { connectionStatus, connectionLabel } =
+  useConnectionIndicator(livekitRoomRef);
 
 const { replicaByParticipant, sendReplica } = useParticipantReplica(
   computed(() => props.livekitRoom),
@@ -364,17 +378,8 @@ watch(
 
     const handleMetadataChanged = (
       _metadata: string | undefined,
-      participant: RemoteParticipant | LocalParticipant,
+      _participant: RemoteParticipant | LocalParticipant,
     ) => {
-      console.log(
-        "RoundTable: Participant metadata changed:",
-        participant.identity,
-        "new name:",
-        participant.name,
-        "isLocal:",
-        participant === room.localParticipant,
-      );
-      // Принудительно обновляем ключ для пересоздания компонентов
       participantsKey.value++;
     };
 
@@ -479,11 +484,6 @@ async function handleSaveSettings() {
       if (localParticipant.value) {
         try {
           await localParticipant.value.setName(newName);
-          console.log("✅ Имя успешно обновлено в LiveKit:", newName);
-          console.log(
-            "Текущее имя в localParticipant:",
-            localParticipant.value.name,
-          );
         } catch (error) {
           console.error("❌ Ошибка при обновлении имени в LiveKit:", error);
           // Показываем пользователю предупреждение
@@ -568,22 +568,42 @@ function handleModalClose() {
   letter-spacing: 0.02em;
 }
 
+.connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.connection-indicator--warning {
+  background: rgba(255, 190, 83, 0.2);
+  color: var(--color-accent, #ffbe53);
+}
+.connection-indicator--bad {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+.connection-indicator__label {
+  white-space: nowrap;
+}
+
 .round-table-content {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow: hidden;
-  gap: 20px;
-  padding: 20px;
-  padding-bottom: 100px;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  gap: 0px;
 }
 
 .round-table-document {
   flex: 0 0 400px;
   min-height: 400px;
   max-height: 600px;
+  padding: 20px;
 }
 
 @media (min-width: 768px) {

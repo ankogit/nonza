@@ -400,9 +400,7 @@ const selectOptions = [
   { value: "c", label: "Вариант C" },
 ];
 
-const onAudioChange = (settings: { inputDevice: string; outputDevice: string }) => {
-  console.log("Audio settings:", settings);
-};
+const onAudioChange = (_settings: { inputDevice: string; outputDevice: string }) => {};
 </script>
 
 <style scoped>

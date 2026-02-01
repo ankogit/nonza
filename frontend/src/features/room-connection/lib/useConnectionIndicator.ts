@@ -19,11 +19,10 @@ export function useConnectionIndicator(livekitRoom: Ref<Room | null>) {
     if (
       state === ConnectionState.Connected &&
       (quality === ConnectionQuality.Excellent ||
-        quality === ConnectionQuality.Good ||
         quality === ConnectionQuality.Unknown)
     )
       return "good";
-    return "warning"; // Connecting, Reconnecting, SignalReconnecting, Poor
+    return "warning";
   });
 
   const connectionLabel = computed(() => {

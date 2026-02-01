@@ -66,7 +66,13 @@ function runTypingAnimation() {
   typingTimer = setTimeout(tick, TYPING_DELAY_MS);
 }
 
-watch(() => props.text, runTypingAnimation, { immediate: true });
+watch(
+  () => props.text,
+  (newText, oldText) => {
+    if (newText !== oldText) runTypingAnimation();
+  },
+  { immediate: true },
+);
 
 onUnmounted(stopTyping);
 </script>

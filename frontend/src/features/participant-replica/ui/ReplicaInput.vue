@@ -51,12 +51,16 @@ function submit() {
   padding: 6px 10px;
   border: 3px solid #444;
   border-right: none;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
   background: #1a1a1a;
   color: #bab1a8;
   font-size: 13px;
   outline: none;
   box-sizing: border-box;
   font-family: "Bebas Neue", sans-serif;
+  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.25));
 }
 
 .replica-input__field::placeholder {

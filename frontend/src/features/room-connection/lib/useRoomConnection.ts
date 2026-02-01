@@ -3,6 +3,7 @@ import { Room, RoomApi } from "@entities/room";
 import {
   Room as LiveKitRoom,
   RoomEvent,
+  ConnectionState,
   RemoteParticipant,
   LocalParticipant,
   ParticipantEvent,
@@ -43,10 +44,10 @@ export interface RoomConnectionState {
   livekitRoom: LiveKitRoom | null;
   isConnecting: boolean;
   isConnected: boolean;
+  isReconnecting: boolean;
   error: string | null;
   participants: Map<string, RemoteParticipant | LocalParticipant>;
   participantsVersion: number; // Version counter to force reactivity
-  /** Reactive display names (identity -> name) so Vue updates when remote name changes */
   participantNames: Record<string, string>;
 }
 
@@ -60,6 +61,7 @@ export interface UseRoomConnectionReturn {
     participantName: string,
     livekitUrl: string,
   ) => Promise<void>;
+  reconnect: () => Promise<void>;
   disconnect: () => void;
 }
 
@@ -69,11 +71,16 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     livekitRoom: null,
     isConnecting: false,
     isConnected: false,
+    isReconnecting: false,
     error: null,
     participants: new Map(),
     participantsVersion: 0,
     participantNames: {},
   });
+
+  const lastShortCode = ref<string>("");
+  const lastParticipantName = ref<string>("");
+  const lastLivekitUrl = ref<string>("");
 
   const updateParticipants = (
     updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void,
@@ -184,6 +191,10 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
       state.value.livekitRoom = livekitRoom;
       state.value.isConnected = true;
+      state.value.isReconnecting = false;
+      lastShortCode.value = shortCode;
+      lastParticipantName.value = participantName;
+      lastLivekitUrl.value = livekitUrl;
 
       setupEventListeners(livekitRoom);
       setLiveKitTransportMaxListeners(livekitRoom);
@@ -210,10 +221,32 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       await state.value.livekitRoom.disconnect();
       state.value.livekitRoom = null;
       state.value.isConnected = false;
+      state.value.isReconnecting = false;
       state.value.participants.clear();
       state.value.participantNames = {};
     }
     state.value.room = null;
+    lastShortCode.value = "";
+    lastParticipantName.value = "";
+    lastLivekitUrl.value = "";
+  };
+
+  const reconnect = async (): Promise<void> => {
+    const code = lastShortCode.value?.trim();
+    const name = lastParticipantName.value?.trim();
+    const url = lastLivekitUrl.value;
+    if (!code || !name || !url) {
+      state.value.isReconnecting = false;
+      state.value.error = "Нет данных для переподключения";
+      return;
+    }
+    state.value.error = null;
+    try {
+      await connect(code, name, url);
+    } catch (err) {
+      state.value.error =
+        err instanceof Error ? err.message : "Не удалось переподключиться";
+    }
   };
 
   const setupEventListeners = (room: LiveKitRoom) => {
@@ -314,6 +347,24 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     room.on(RoomEvent.ParticipantMetadataChanged, handleRoomMetadataChanged);
     room.on(RoomEvent.ParticipantNameChanged, handleRoomNameChanged);
 
+    room.on(RoomEvent.ConnectionStateChanged, (s: ConnectionState) => {
+      if (
+        s === ConnectionState.Reconnecting ||
+        s === ConnectionState.SignalReconnecting
+      ) {
+        state.value.isReconnecting = true;
+      } else if (s === ConnectionState.Connected) {
+        state.value.isReconnecting = false;
+      } else if (s === ConnectionState.Disconnected) {
+        state.value.isConnected = false;
+        state.value.livekitRoom = null;
+        state.value.isReconnecting = true;
+        state.value.participants.clear();
+        state.value.participantNames = {};
+        state.value.participantsVersion++;
+      }
+    });
+
     room.on(
       RoomEvent.ParticipantConnected,
       (participant: RemoteParticipant) => {
@@ -405,6 +456,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     remoteParticipants,
     getDisplayName,
     connect,
+    reconnect,
     disconnect,
   };
 }

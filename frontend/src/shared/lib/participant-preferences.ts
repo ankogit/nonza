@@ -1,5 +1,34 @@
 const STORAGE_KEY_NAME = "nonza_participant_name";
 const STORAGE_KEY_VOLUMES = "nonza_volumes";
+const STORAGE_KEY_ROOM_SHORT_CODE = "nonza_room_short_code";
+
+export function getRoomShortCode(): string | null {
+  try {
+    return sessionStorage.getItem(STORAGE_KEY_ROOM_SHORT_CODE);
+  } catch {
+    return null;
+  }
+}
+
+export function setRoomShortCode(shortCode: string): void {
+  try {
+    if (shortCode.trim()) {
+      sessionStorage.setItem(STORAGE_KEY_ROOM_SHORT_CODE, shortCode.trim());
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearRoomShortCode(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getParticipantName(): string | null {
   try {

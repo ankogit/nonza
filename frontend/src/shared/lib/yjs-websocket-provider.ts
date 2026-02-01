@@ -79,8 +79,6 @@ export class YjsWebSocketProvider {
 
     // Listen to awareness updates if provided
     if (this.awareness) {
-      console.log("[YjsWebSocketProvider] Setting up awareness listener");
-
       // Listen to awareness changes and send updates
       // The "change" event provides added/updated/removed arrays
       this.awareness.on(
@@ -94,9 +92,6 @@ export class YjsWebSocketProvider {
           // When awareness updates locally (cursor movement), origin will be something else (usually null or the awareness object itself)
           // So we skip only if origin is explicitly this provider (meaning we just applied a remote update)
           if (origin === this) {
-            console.log(
-              "[YjsWebSocketProvider] Skipping awareness update from remote (already applied)",
-            );
             return;
           }
 
@@ -113,9 +108,6 @@ export class YjsWebSocketProvider {
               this.ws &&
               this.ws.readyState === WebSocket.OPEN
             ) {
-              console.log(
-                "[YjsWebSocketProvider] Sending disconnection awareness update",
-              );
               this.sendAwarenessUpdate(update);
               return;
             }
@@ -135,9 +127,6 @@ export class YjsWebSocketProvider {
           const update = encodeAwarenessUpdate(this.awareness, changedClients);
 
           if (update.length === 0) {
-            console.log(
-              "[YjsWebSocketProvider] Encoded awareness update is empty",
-            );
             return;
           }
 
@@ -154,11 +143,6 @@ export class YjsWebSocketProvider {
             this.awarenessDebounceTimeout = window.setTimeout(() => {
               this.flushPendingAwarenessUpdate();
             }, this.AWARENESS_DEBOUNCE_MS);
-          } else {
-            console.log(
-              "[YjsWebSocketProvider] WebSocket not ready, cannot send awareness update. State:",
-              this.ws?.readyState,
-            );
           }
         },
       );
@@ -189,7 +173,6 @@ export class YjsWebSocketProvider {
       this.ws.binaryType = "arraybuffer";
 
       this.ws.onopen = () => {
-        console.log("[YjsWebSocketProvider] Connected");
         this.reconnectAttempts = 0;
         this.emitStatus("connected");
 
@@ -198,14 +181,6 @@ export class YjsWebSocketProvider {
       };
 
       this.ws.onmessage = (event: MessageEvent) => {
-        console.log(
-          "[YjsWebSocketProvider] Received message, type:",
-          event.data instanceof ArrayBuffer ? "binary" : "text",
-          "size:",
-          event.data instanceof ArrayBuffer
-            ? event.data.byteLength
-            : (event.data as string).length,
-        );
         this.handleMessage(event);
       };
 
@@ -219,12 +194,6 @@ export class YjsWebSocketProvider {
       };
 
       this.ws.onclose = (event) => {
-        console.log("[YjsWebSocketProvider] WebSocket closed", {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-        });
-
         // Clear awareness state when disconnecting to remove stale selections/cursors
         if (
           this.awareness &&
@@ -270,10 +239,6 @@ export class YjsWebSocketProvider {
     // Handle binary messages (Y.js document updates or awareness updates)
     if (event.data instanceof ArrayBuffer) {
       const update = new Uint8Array(event.data);
-      console.log(
-        "[YjsWebSocketProvider] Received binary update, size:",
-        update.length,
-      );
 
       // Try to apply as document update first (most common case)
       // If it fails and update is small, try as awareness update
@@ -285,75 +250,21 @@ export class YjsWebSocketProvider {
         try {
           // Try to apply as awareness update
           // Get states before update for comparison
-          const statesBefore = Array.from(this.awareness.getStates().entries());
-          console.log(
-            `[YjsWebSocketProvider] Applying awareness update (binary, size: ${update.length} bytes), states before:`,
-            statesBefore.length,
-          );
-
           applyAwarenessUpdate(this.awareness, update, this);
-          console.log(
-            `[YjsWebSocketProvider] Applied awareness update successfully`,
-          );
-
-          // Log awareness states after update
-          const statesMap = this.awareness.getStates() as Map<number, any>;
-          console.log(
-            `[YjsWebSocketProvider] Awareness states after update:`,
-            statesMap.size,
-          );
-          statesMap.forEach((state: any, clientId: number) => {
-            console.log(`[YjsWebSocketProvider] Client ${clientId}:`, state);
-            if (state.user) {
-              console.log(`[YjsWebSocketProvider]   - User:`, state.user);
-            }
-            if (state.cursor) {
-              console.log(`[YjsWebSocketProvider]   - Cursor:`, state.cursor);
-            }
-          });
-
-          // Trigger change event manually to ensure CollaborationCaret gets notified
-          // This might be needed if the change event doesn't fire automatically
-          setTimeout(() => {
-            const statesAfter = Array.from(
-              this.awareness.getStates().entries(),
-            );
-            console.log(
-              `[YjsWebSocketProvider] Awareness states after timeout:`,
-              statesAfter.length,
-            );
-          }, 100);
-
           return;
-        } catch (awarenessError) {
+        } catch {
           // If awareness update fails, try as document update
-          console.log(
-            `[YjsWebSocketProvider] Failed to apply as awareness update (${awarenessError instanceof Error ? awarenessError.message : String(awarenessError)}), trying as document update`,
-          );
-          // Fall through to document update handling
         }
       }
 
       // Apply as document update (either because it's large, awareness failed, or it's empty)
       // Empty updates are valid - they represent document clearing
       try {
-        if (update.length === 0) {
-          console.log(
-            "[YjsWebSocketProvider] Received empty update (document cleared)",
-          );
-        }
-        // Y.js can handle empty updates - they clear the document
         Y.applyUpdate(this.doc, update, this);
         if (!this.synced) {
           this.synced = true;
-          console.log(
-            "[YjsWebSocketProvider] Document synced for the first time",
-          );
           this.emitSynced();
         }
-        console.log(
-          `[YjsWebSocketProvider] Applied document update (binary, size: ${update.length} bytes)`,
-        );
       } catch (error) {
         console.error(
           "[YjsWebSocketProvider] Error applying document update:",
@@ -413,12 +324,8 @@ export class YjsWebSocketProvider {
           Y.applyUpdate(this.doc, update, this);
           if (!this.synced) {
             this.synced = true;
-            console.log(
-              "[YjsWebSocketProvider] Document synced for the first time (from JSON)",
-            );
             this.emitSynced();
           }
-          console.log("[YjsWebSocketProvider] Applied update from server");
         } catch (error) {
           console.error(
             "[YjsWebSocketProvider] Error decoding/applying update:",
@@ -433,33 +340,15 @@ export class YjsWebSocketProvider {
         "[YjsWebSocketProvider] Received yjs_awareness as JSON (should be binary)",
       );
     } else if (message.type === "connected") {
-      // Server confirmed connection - request document sync
-      console.log(
-        "[YjsWebSocketProvider] Connection confirmed, requesting sync",
-      );
       this.sendSync();
     } else if (message.type === "yjs_sync_ack") {
-      // Server acknowledged sync request
-      console.log("[YjsWebSocketProvider] Sync acknowledged by server");
       // If server had no state (first participant), push our full state so server has it for new joiners
       const payload = message.payload as { synced?: boolean } | undefined;
       if (payload?.synced === false) {
         window.setTimeout(() => this.sendFullState(), 500);
       }
     } else if (message.type === "user_joined") {
-      // New participant joined — push full state so server and new joiner get latest
-      console.log("[YjsWebSocketProvider] User joined, sending full state");
       this.sendFullState();
-    } else if (message.type === "user_left") {
-      // User left - Y.js awareness will automatically remove their state after 30 seconds
-      // We don't need to do anything special here - the awareness protocol handles it
-      const payload = message.payload as { user_id?: string } | undefined;
-      const leftUserId = payload?.user_id;
-      if (leftUserId) {
-        console.log(
-          `[YjsWebSocketProvider] User left: ${leftUserId} (awareness will auto-remove after 30s)`,
-        );
-      }
     }
   }
 
@@ -482,7 +371,6 @@ export class YjsWebSocketProvider {
       // Merge multiple updates into one using Y.js mergeUpdates
       // This reduces the number of messages sent to the server
       const updatesToMerge = [...this.pendingUpdates];
-      const updateCount = this.pendingUpdates.length;
       const mergedUpdate = Y.mergeUpdates(updatesToMerge);
       this.pendingUpdates = [];
       this.updateDebounceTimeout = null;
@@ -499,12 +387,6 @@ export class YjsWebSocketProvider {
         },
       };
       const jsonMessage = JSON.stringify(message);
-      console.log(
-        "[YjsWebSocketProvider] Sending merged update to server, merged from",
-        updateCount,
-        "updates, size:",
-        mergedUpdate.length,
-      );
       this.ws.send(jsonMessage);
 
       // If update is very small (likely document was cleared), also send full state
@@ -547,10 +429,6 @@ export class YjsWebSocketProvider {
         payload: { update: base64 },
       };
       this.ws.send(JSON.stringify(message));
-      console.log(
-        "[YjsWebSocketProvider] Sent debounced awareness update, size:",
-        update.length,
-      );
     } catch (error) {
       console.error(
         "[YjsWebSocketProvider] Error sending awareness update:",
@@ -576,10 +454,6 @@ export class YjsWebSocketProvider {
         },
       };
       const jsonMessage = JSON.stringify(message);
-      console.log(
-        "[YjsWebSocketProvider] Sent immediate awareness update, size:",
-        update.length,
-      );
       this.ws.send(jsonMessage);
     } catch (error) {
       console.error(
@@ -601,7 +475,6 @@ export class YjsWebSocketProvider {
       room_id: this.roomId,
     };
 
-    console.log("[YjsWebSocketProvider] Requesting document sync from server");
     this.ws.send(JSON.stringify(message));
   }
 
@@ -621,10 +494,6 @@ export class YjsWebSocketProvider {
         payload: { update: base64 },
       };
       this.ws.send(JSON.stringify(message));
-      console.log(
-        "[YjsWebSocketProvider] Sent full state to server, size:",
-        stateUpdate.length,
-      );
     } catch (error) {
       console.error("[YjsWebSocketProvider] Error sending full state:", error);
     }
@@ -638,10 +507,6 @@ export class YjsWebSocketProvider {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-    console.log(
-      `[YjsWebSocketProvider] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
-    );
 
     this.reconnectTimeout = window.setTimeout(() => {
       this.connect();

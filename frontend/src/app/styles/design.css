@@ -34,7 +34,8 @@
 
 .dashboard {
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -71,7 +72,7 @@
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  backdrop-filter: blur(2.5px);
+  backdrop-filter: blur(10px);
 }
 
 .menu .left,
@@ -393,7 +394,7 @@
   }
 
   .call-grid {
-    padding-bottom: 80px;
+    padding-bottom: 100px;
   }
 }
 

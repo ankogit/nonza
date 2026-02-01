@@ -154,7 +154,6 @@ if (typeof HTMLAudioElement !== "undefined") {
     "setSinkId" in testAudio && typeof testAudio.setSinkId === "function";
 }
 
-// Отслеживаем изменения для уведомления родителя
 watch([selectedInputDevice, selectedOutputDevice], () => {
   emit("change", {
     inputDevice: selectedInputDevice.value,
@@ -199,7 +198,6 @@ const saveSettings = async () => {
     localStorage.removeItem("nonza_audio_output_device");
   }
 
-  // Применяем устройство вывода ко всем аудио элементам
   const audioElements = document.querySelectorAll("audio");
   for (const audio of audioElements) {
     try {
@@ -213,7 +211,6 @@ const saveSettings = async () => {
   }
 };
 
-// Проверка наличия несохраненных изменений
 const hasUnsavedChanges = () => {
   const savedInput = getStoredAudioInputDevice() || "";
   const savedOutput = getStoredAudioOutputDevice() || "";
@@ -223,18 +220,14 @@ const hasUnsavedChanges = () => {
   );
 };
 
-// Метод для получения текущих настроек
 const getSettings = () => ({
   inputDevice: selectedInputDevice.value,
   outputDevice: selectedOutputDevice.value,
 });
 
-// Метод для сброса к сохраненным значениям
 const resetSettings = () => {
-  const savedInput = getStoredAudioInputDevice() || "";
-  const savedOutput = getStoredAudioOutputDevice() || "";
-  selectedInputDevice.value = savedInput;
-  selectedOutputDevice.value = savedOutput;
+  selectedInputDevice.value = getStoredAudioInputDevice() || "";
+  selectedOutputDevice.value = getStoredAudioOutputDevice() || "";
 };
 
 // Экспортируем методы для использования извне

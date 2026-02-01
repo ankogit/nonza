@@ -1,6 +1,6 @@
 import { ref, computed, watch, nextTick, type ComputedRef } from "vue";
 import type { LocalParticipant, LocalTrackPublication } from "livekit-client";
-import { Track, ParticipantEvent } from "livekit-client";
+import { Track, ParticipantEvent, ConnectionState } from "livekit-client";
 import {
   getStoredAudioInputDevice,
   getDefaultAudioConstraints,
@@ -71,19 +71,38 @@ export function useMediaControl(
     { immediate: true },
   );
 
+  const isRoomReady = (room: LocalParticipant["room"]) =>
+    !room ||
+    room.state === ConnectionState.Connected ||
+    room.state === ConnectionState.Connecting;
+
   const toggleVideo = async (): Promise<void> => {
-    if (!participant.value) return;
+    if (!participant.value || !isRoomReady(participant.value.room)) return;
+    const room = participant.value.room;
 
-    const cameraPub = Array.from(
-      participant.value.videoTrackPublications.values(),
-    ).find((pub) => pub.source === Track.Source.Camera) as
-      | LocalTrackPublication
-      | undefined;
+    try {
+      const cameraPub = Array.from(
+        participant.value.videoTrackPublications.values(),
+      ).find((pub) => pub.source === Track.Source.Camera) as
+        | LocalTrackPublication
+        | undefined;
 
-    if (cameraPub?.track) {
-      if (state.value.isVideoEnabled) {
-        await cameraPub.track.stop();
-        await participant.value.unpublishTrack(cameraPub.track);
+      if (cameraPub?.track) {
+        if (state.value.isVideoEnabled) {
+          await cameraPub.track.stop();
+          await participant.value.unpublishTrack(cameraPub.track);
+        } else {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const videoTracks = stream.getVideoTracks();
+          if (videoTracks.length > 0) {
+            await participant.value.publishTrack(videoTracks[0], {
+              source: Track.Source.Camera,
+            });
+          }
+        }
+        nextTick(updateState);
       } else {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -93,31 +112,41 @@ export function useMediaControl(
           await participant.value.publishTrack(videoTracks[0], {
             source: Track.Source.Camera,
           });
+          nextTick(updateState);
         }
       }
-      nextTick(updateState);
-    } else {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const videoTracks = stream.getVideoTracks();
-      if (videoTracks.length > 0) {
-        await participant.value.publishTrack(videoTracks[0], {
-          source: Track.Source.Camera,
-        });
-        nextTick(updateState);
-      }
+    } catch (err) {
+      if (room?.state !== ConnectionState.Connected) return;
+      console.error("toggleVideo failed:", err);
     }
   };
 
   const toggleAudio = async (): Promise<void> => {
-    if (!participant.value) return;
+    if (!participant.value || !isRoomReady(participant.value.room)) return;
+    const room = participant.value.room;
 
-    const audioTrack = participant.value.audioTrackPublications.values().next()
-      .value as LocalTrackPublication | undefined;
+    try {
+      const audioTrack = participant.value.audioTrackPublications.values()
+        .next().value as LocalTrackPublication | undefined;
 
-    if (audioTrack?.track) {
-      if (state.value.isAudioEnabled) {
-        await audioTrack.track.stop();
-        await participant.value.unpublishTrack(audioTrack.track);
+      if (audioTrack?.track) {
+        if (state.value.isAudioEnabled) {
+          await audioTrack.track.stop();
+          await participant.value.unpublishTrack(audioTrack.track);
+        } else {
+          const storedDeviceId = getStoredAudioInputDevice();
+          const constraints: MediaStreamConstraints = {
+            audio: getDefaultAudioConstraints(storedDeviceId ?? undefined),
+          };
+          const track = await navigator.mediaDevices.getUserMedia(constraints);
+          const audioTracks = track.getAudioTracks();
+          if (audioTracks.length > 0) {
+            await participant.value.publishTrack(audioTracks[0], {
+              source: Track.Source.Microphone,
+            });
+          }
+        }
+        nextTick(updateState);
       } else {
         const storedDeviceId = getStoredAudioInputDevice();
         const constraints: MediaStreamConstraints = {
@@ -129,65 +158,53 @@ export function useMediaControl(
           await participant.value.publishTrack(audioTracks[0], {
             source: Track.Source.Microphone,
           });
+          nextTick(updateState);
         }
       }
-      nextTick(updateState);
-    } else {
-      // Enable audio
-      const storedDeviceId = getStoredAudioInputDevice();
-      const constraints: MediaStreamConstraints = {
-        audio: getDefaultAudioConstraints(storedDeviceId ?? undefined),
-      };
-      const track = await navigator.mediaDevices.getUserMedia(constraints);
-      const audioTracks = track.getAudioTracks();
-      if (audioTracks.length > 0) {
-        await participant.value.publishTrack(audioTracks[0], {
-          source: Track.Source.Microphone,
-        });
-        nextTick(updateState);
-      }
+    } catch (err) {
+      if (room?.state !== ConnectionState.Connected) return;
+      console.error("toggleAudio failed:", err);
     }
   };
 
   const toggleScreenShare = async (): Promise<void> => {
-    if (!participant.value) return;
+    if (!participant.value || !isRoomReady(participant.value.room)) return;
+    const room = participant.value.room;
 
-    if (state.value.isScreenSharing) {
-      // Stop screen sharing
-      const screenTrack = Array.from(
-        participant.value.trackPublications.values(),
-      ).find((pub) => pub.source === Track.Source.ScreenShare) as
-        | LocalTrackPublication
-        | undefined;
+    try {
+      if (state.value.isScreenSharing) {
+        const screenTrack = Array.from(
+          participant.value.trackPublications.values(),
+        ).find((pub) => pub.source === Track.Source.ScreenShare) as
+          | LocalTrackPublication
+          | undefined;
 
-      if (screenTrack?.track) {
-        await screenTrack.track.stop();
-        await participant.value.unpublishTrack(screenTrack.track);
-        nextTick(updateState);
-      }
-    } else {
-      // Start screen sharing
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true,
-        });
-
-        const videoTracks = stream.getVideoTracks();
-        if (videoTracks.length > 0) {
-          await participant.value.publishTrack(videoTracks[0], {
-            source: Track.Source.ScreenShare,
-          });
+        if (screenTrack?.track) {
+          await screenTrack.track.stop();
+          await participant.value.unpublishTrack(screenTrack.track);
           nextTick(updateState);
-
-          // Stop screen sharing when user stops it
-          videoTracks[0].onended = () => {
-            toggleScreenShare();
-          };
         }
-      } catch (error) {
-        console.error("Failed to start screen sharing:", error);
+      } else {
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true,
+          });
+          const videoTracks = stream.getVideoTracks();
+          if (videoTracks.length > 0) {
+            await participant.value.publishTrack(videoTracks[0], {
+              source: Track.Source.ScreenShare,
+            });
+            nextTick(updateState);
+            videoTracks[0].onended = () => toggleScreenShare();
+          }
+        } catch (error) {
+          console.error("Failed to start screen sharing:", error);
+        }
       }
+    } catch (err) {
+      if (room?.state !== ConnectionState.Connected) return;
+      console.error("toggleScreenShare failed:", err);
     }
   };
 
@@ -208,17 +225,14 @@ export function useMediaControl(
     }
 
     try {
-      // Останавливаем текущий трек
       await audioTrack.track.stop();
       await participant.value.unpublishTrack(audioTrack.track);
 
-      // Получаем новое устройство из настроек
       const storedDeviceId = getStoredAudioInputDevice();
       const constraints: MediaStreamConstraints = {
         audio: getDefaultAudioConstraints(storedDeviceId ?? undefined),
       };
 
-      // Создаем новый трек с новым устройством
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const audioTracks = stream.getAudioTracks();
 
@@ -230,7 +244,6 @@ export function useMediaControl(
       }
     } catch (error) {
       console.error("Failed to switch audio input device:", error);
-      // В случае ошибки пытаемся восстановить микрофон
       try {
         const constraints: MediaStreamConstraints = {
           audio: getDefaultAudioConstraints(),
