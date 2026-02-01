@@ -611,6 +611,7 @@ function handleModalClose() {
   .round-table-document {
     width: 400px;
     margin-bottom: 0px;
+    max-height: calc(100% - 90px);
   }
   .round-table-content {
     flex-direction: row;
