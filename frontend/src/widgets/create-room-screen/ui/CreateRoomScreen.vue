@@ -1,5 +1,5 @@
 <template>
-  <div class="create-room-screen">
+  <div class="create-room-screen full-page">
     <div class="create-room-screen__container">
       <div
         v-if="!defaultOrgId && !isPreviewMode"
@@ -116,19 +116,10 @@ const handleCancel = () => {
 </script>
 
 <style scoped>
-.create-room-screen {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #1a1a1a;
-  padding: 24px;
-}
-
 .create-room-screen__container {
   width: 100%;
   max-width: 600px;
+  flex-shrink: 0;
 }
 
 .create-room-screen__loading {

@@ -1,5 +1,5 @@
 <template>
-  <div class="room-created">
+  <div class="room-created full-page">
     <div class="room-created__container">
       <div class="room-created__icon">✓</div>
       <h2 class="room-created__title">Комната создана!</h2>
@@ -73,19 +73,10 @@ const copyCode = async () => {
 </script>
 
 <style scoped>
-.room-created {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #1a1a1a;
-  padding: 24px;
-}
-
 .room-created__container {
   width: 100%;
   max-width: 500px;
+  flex-shrink: 0;
   background: #2a2a2a;
   border: 2px solid #444;
   padding: 32px;
@@ -141,6 +132,7 @@ const copyCode = async () => {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .room-created__code-text {
@@ -158,6 +150,7 @@ const copyCode = async () => {
 
 .room-created__copy-button {
   padding: 12px 20px;
+  min-height: 44px;
   border: 2px solid #2980b9;
   border-radius: 0;
   background: #2980b9;
@@ -194,10 +187,12 @@ const copyCode = async () => {
   display: flex;
   gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .room-created__button {
   padding: 12px 24px;
+  min-height: 44px;
   border: 2px solid;
   border-radius: 0;
   font-size: 16px;
@@ -230,5 +225,32 @@ const copyCode = async () => {
 
 .room-created__button--secondary:hover {
   background: #444;
+}
+
+@media (max-width: 480px) {
+  .room-created__container {
+    padding: 20px;
+  }
+
+  .room-created__title {
+    font-size: 22px;
+  }
+
+  .room-created__code {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .room-created__code-text {
+    font-size: 18px;
+  }
+
+  .room-created__actions {
+    flex-direction: column;
+  }
+
+  .room-created__button {
+    width: 100%;
+  }
 }
 </style>

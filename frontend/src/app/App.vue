@@ -1,26 +1,28 @@
 <template>
-  <UiKitPage v-if="showUiKit" />
-  <PreviewMode v-else-if="isPreviewMode" />
-  <RoomCreated
-    v-else-if="createdRoom"
-    :room="createdRoom"
-    @close="createdRoom = null"
-    @join="handleJoinRoom"
-  />
-  <CreateRoomScreen
-    v-else-if="showCreateRoom"
-    @created="handleRoomCreated"
-    @cancel="showCreateRoom = false"
-  />
-  <NonzaWidget
-    v-else
-    :api-base-u-r-l="apiBaseURL"
-    :livekit-u-r-l="livekitURL"
-  />
+  <div class="app__view" :class="{ 'app__view--scroll': needsScroll }">
+    <UiKitPage v-if="showUiKit" />
+    <PreviewMode v-else-if="isPreviewMode" />
+    <RoomCreated
+      v-else-if="createdRoom"
+      :room="createdRoom"
+      @close="createdRoom = null"
+      @join="handleJoinRoom"
+    />
+    <CreateRoomScreen
+      v-else-if="showCreateRoom"
+      @created="handleRoomCreated"
+      @cancel="showCreateRoom = false"
+    />
+    <NonzaWidget
+      v-else
+      :api-base-u-r-l="apiBaseURL"
+      :livekit-u-r-l="livekitURL"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import NonzaWidget from "./NonzaWidget.vue";
 import PreviewMode from "./PreviewMode.vue";
 import UiKitPage from "./UiKitPage.vue";
@@ -32,6 +34,10 @@ const showUiKit = ref(false);
 const isPreviewMode = ref(false);
 const showCreateRoom = ref(false);
 const createdRoom = ref<Room | null>(null);
+
+const needsScroll = computed(
+  () => showUiKit.value || isPreviewMode.value || !!createdRoom.value || showCreateRoom.value,
+);
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const livekitURL = import.meta.env.VITE_LIVEKIT_URL || "ws://localhost:7880";
 
@@ -86,5 +92,20 @@ body {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app__view--scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

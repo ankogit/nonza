@@ -253,6 +253,9 @@ const handleSubmit = async () => {
   font-size: 16px;
   outline: none;
   transition: none;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .create-room-form__input:focus {
@@ -366,6 +369,7 @@ const handleSubmit = async () => {
 }
 
 .create-room-form__button {
+  min-height: 44px;
   padding: 12px 24px;
   border: 2px solid;
   border-radius: 0;
@@ -374,6 +378,7 @@ const handleSubmit = async () => {
   cursor: pointer;
   transition: none;
   box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
 }
 
 .create-room-form__button:active:not(:disabled) {
@@ -404,5 +409,59 @@ const handleSubmit = async () => {
 
 .create-room-form__button--secondary:hover:not(:disabled) {
   background: #444;
+}
+
+@media (max-width: 480px) {
+  .create-room-form__header {
+    padding: 16px;
+  }
+
+  .create-room-form__title {
+    font-size: 20px;
+  }
+
+  .create-room-form__content {
+    padding: 16px;
+  }
+
+  .create-room-form__input-group {
+    margin-bottom: 20px;
+  }
+
+  .create-room-form__room-types {
+    gap: 10px;
+  }
+
+  .room-type-card {
+    padding: 12px;
+    gap: 12px;
+    min-height: 44px;
+  }
+
+  .room-type-card__icon {
+    font-size: 28px;
+  }
+
+  .room-type-card__title {
+    font-size: 16px;
+  }
+
+  .room-type-card__description {
+    font-size: 13px;
+  }
+
+  .create-room-form__actions {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+  }
+
+  .create-room-form__button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 </style>
