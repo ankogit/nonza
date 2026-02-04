@@ -8,6 +8,7 @@ import { Track, ParticipantEvent, ConnectionState } from "livekit-client";
 import {
   getStoredAudioInputDevice,
   getDefaultAudioConstraints,
+  playNotificationSound,
 } from "@shared/lib";
 
 export interface MediaControlState {
@@ -107,7 +108,10 @@ export function useMediaControl(
             });
           }
         }
-        nextTick(updateState);
+        nextTick(() => {
+          updateState();
+          playNotificationSound(state.value.isVideoEnabled ? "mic_on" : "mic_off").catch(() => {});
+        });
       } else {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -117,7 +121,10 @@ export function useMediaControl(
           await participant.value.publishTrack(videoTracks[0], {
             source: Track.Source.Camera,
           });
-          nextTick(updateState);
+          nextTick(() => {
+            updateState();
+            playNotificationSound(state.value.isVideoEnabled ? "mic_on" : "mic_off").catch(() => {});
+          });
         }
       }
     } catch (err) {
@@ -151,7 +158,10 @@ export function useMediaControl(
             });
           }
         }
-        nextTick(updateState);
+        nextTick(() => {
+          updateState();
+          playNotificationSound(state.value.isAudioEnabled ? "mic_on" : "mic_off").catch(() => {});
+        });
       } else {
         const storedDeviceId = getStoredAudioInputDevice();
         const constraints: MediaStreamConstraints = {
@@ -163,7 +173,10 @@ export function useMediaControl(
           await participant.value.publishTrack(audioTracks[0], {
             source: Track.Source.Microphone,
           });
-          nextTick(updateState);
+          nextTick(() => {
+            updateState();
+            playNotificationSound(state.value.isAudioEnabled ? "mic_on" : "mic_off").catch(() => {});
+          });
         }
       }
     } catch (err) {
@@ -187,7 +200,10 @@ export function useMediaControl(
         if (screenTrack?.track) {
           await screenTrack.track.stop();
           await participant.value.unpublishTrack(screenTrack.track);
-          nextTick(updateState);
+          nextTick(() => {
+            updateState();
+            playNotificationSound("mic_off").catch(() => {});
+          });
         }
       } else {
         try {
@@ -200,7 +216,10 @@ export function useMediaControl(
             await participant.value.publishTrack(videoTracks[0], {
               source: Track.Source.ScreenShare,
             });
-            nextTick(updateState);
+            nextTick(() => {
+              updateState();
+              playNotificationSound("mic_on").catch(() => {});
+            });
             videoTracks[0].onended = () => toggleScreenShare();
           }
         } catch (error) {

@@ -11,7 +11,10 @@
           :class="`connection-indicator--${connectionStatus}`"
           :title="connectionLabel"
         >
-          {{ connectionStatus === "bad" ? "📵" : "⚠️" }}
+          <PixelIcon
+            :name="connectionStatus === 'bad' ? 'connection-bad' : 'connection-medium'"
+            variant="small"
+          />
           <span class="connection-indicator__label">{{ connectionLabel }}</span>
         </div>
         <E2EEIndicator
@@ -21,7 +24,7 @@
         />
         <div class="right">
           <Button variant="default" size="small" title="Настройки" @click="handleSettings">
-            ⚙️
+            <PixelIcon name="settings" variant="large" />
           </Button>
         </div>
       </div>
@@ -56,7 +59,9 @@
                 leaderParticipant && handleFullSize(leaderParticipant.identity)
             "
           />
-          <div class="conference-hall__leader-label">👑 Main Speaker</div>
+          <div class="conference-hall__leader-label">
+            <PixelIcon name="leader" variant="small" /> Main Speaker
+          </div>
         </div>
         <div v-else class="conference-hall__placeholder">
           <span class="conference-hall__placeholder-text"
@@ -75,7 +80,7 @@
           class="conference-hall__raised"
         >
           <h3 class="conference-hall__sidebar-title font-bebas">
-            ✋ Поднятые руки
+            <PixelIcon name="hand" variant="small" /> Поднятые руки
           </h3>
           <div
             v-for="participant in conferenceHall.participantsWithRaisedHands
@@ -95,7 +100,7 @@
                 title="Разрешить говорить"
                 @click="handleGrantSpeaking(participant.identity)"
               >
-                ✅
+                <PixelIcon name="check" variant="small" />
               </button>
               <button
                 type="button"
@@ -103,7 +108,7 @@
                 title="Передать лидерство"
                 @click="handleTransferLeadership(participant.identity)"
               >
-                👑
+                <PixelIcon name="leader" variant="small" />
               </button>
             </div>
           </div>
@@ -160,9 +165,8 @@
                     title="Дать право голоса"
                     @click="handleGrantSpeaking(p.identity)"
                   >
-                    ✅
+                    <PixelIcon name="check" variant="small" />
                   </button>
-                  <!-- Право голоса есть: лидер видит кнопку «забрать», остальные — только индикатор -->
                   <button
                     v-if="
                       !previewMode &&
@@ -175,7 +179,7 @@
                     title="Забрать право голоса"
                     @click="handleRevokeSpeaking(p.identity)"
                   >
-                    🎤
+                    <PixelIcon name="mic-on" variant="small" />
                   </button>
                   <span
                     v-else-if="
@@ -187,7 +191,7 @@
                     class="indicator success"
                     title="Право голоса"
                   >
-                    🎤
+                    <PixelIcon name="mic-on" variant="small" />
                   </span>
                 </template>
               </Player>
@@ -205,7 +209,7 @@
           :title="hasRaisedHand ? 'Опустить руку' : 'Поднять руку'"
           @click="handleRaiseHand"
         >
-          ✋
+          <PixelIcon name="hand" variant="large" />
         </Button>
         <Button
           :class="{
@@ -222,7 +226,10 @@
           "
           @click="handleToggleAudio"
         >
-          {{ mediaState.isAudioEnabled ? "🎤" : "🔇" }}
+          <PixelIcon
+            :name="mediaState.isAudioEnabled ? 'mic-on' : 'mic-off'"
+            variant="large"
+          />
         </Button>
         <Button
           v-if="!previewMode && conferenceHall.isLeader.value"
@@ -235,7 +242,10 @@
           "
           @click="toggleVideo"
         >
-          {{ mediaState.isVideoEnabled ? "📹" : "📹" }}
+          <PixelIcon
+            :name="mediaState.isVideoEnabled ? 'video-on' : 'video-off'"
+            variant="large"
+          />
         </Button>
         <Button
           v-if="!previewMode && conferenceHall.isLeader.value"
@@ -246,7 +256,10 @@
           title="Трансляция экрана"
           @click="toggleScreenShare"
         >
-          🖥️
+          <PixelIcon
+            :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'"
+            variant="large"
+          />
         </Button>
         <ReplicaInput
           v-if="!previewMode"
@@ -260,7 +273,7 @@
           title="Закончить разговор"
           @click="handleDisconnect"
         >
-          📞
+          <PixelIcon name="hangup" variant="large" />
         </Button>
       </div>
     </div>
@@ -298,7 +311,7 @@
           aria-label="Закрыть"
           @click="closeFullscreen"
         >
-          ✕
+          <PixelIcon name="close" variant="large" />
         </Button>
       </div>
     </Teleport>
@@ -369,7 +382,8 @@
           :class="{ 'button--has-changes': hasUnsavedSettingsChanges }"
           @click="handleSaveSettings"
         >
-          {{ hasUnsavedSettingsChanges ? "💾 Сохранить" : "Сохранить" }}
+          <PixelIcon v-if="hasUnsavedSettingsChanges" name="document" variant="small" />
+          Сохранить
         </Button>
       </template>
     </Modal>
@@ -386,7 +400,7 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
-import { Button, Modal, AudioSettings } from "@shared/ui";
+import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { setParticipantName, getStoredAudioInputDevice } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
@@ -421,10 +435,6 @@ const livekitRoomRef = computed(() => props.livekitRoom);
 const { connectionStatus, connectionLabel } =
   useConnectionIndicator(livekitRoomRef);
 
-const { replicaByParticipant, sendReplica } = useParticipantReplica(
-  computed(() => props.livekitRoom),
-);
-
 const localParticipant = computed<LocalParticipant | null>(() => {
   return props.localParticipant ?? props.livekitRoom?.localParticipant ?? null;
 });
@@ -456,6 +466,13 @@ const conferenceHall = useConferenceHall(
   () => remoteParticipants.value,
   () => props.participantName,
   () => props.livekitRoom,
+);
+
+const { replicaByParticipant, sendReplica } = useParticipantReplica(
+  computed(() => props.livekitRoom),
+  {
+    raisedHands: () => conferenceHall.state.value.raisedHands,
+  },
 );
 
 watch(

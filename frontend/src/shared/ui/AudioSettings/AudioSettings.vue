@@ -23,7 +23,7 @@
             title="Обновить список устройств"
             @click="refreshDevices"
           >
-            🔄
+            <PixelIcon name="refresh" variant="large" />
           </Button>
         </div>
       </div>
@@ -88,6 +88,34 @@
         </p>
       </div>
     </div>
+
+    <div class="settings-section">
+      <h3 class="settings-section-title">Звуковые уведомления</h3>
+      <div
+        v-for="eventId in notificationSounds.eventIds"
+        :key="eventId"
+        class="settings-item settings-item--row"
+      >
+        <div class="settings-notification-row">
+          <Switch
+            :model-value="getEventConfig(eventId).enabled"
+            @update:model-value="notificationSounds.setEventEnabled(eventId, $event)"
+          >
+            {{ eventLabels[eventId] }}
+          </Switch>
+          <Button
+            type="icon"
+            variant="default"
+            icon-size="36px"
+            :disabled="!getEventConfig(eventId).enabled"
+            :title="`Проверить: ${eventLabels[eventId]}`"
+            @click="notificationSounds.play(eventId)"
+          >
+            <PixelIcon name="volume-high" variant="small" />
+          </Button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -100,9 +128,23 @@ import {
   getStoredAudioOutputDevice,
   setStoredAudioOutputDevice,
   applyOutputDevice,
+  useNotificationSounds,
 } from "@shared/lib";
+import type { NotificationSoundEventId } from "@shared/lib";
 import { useAudioInputTest } from "@shared/lib";
-import { Button, PixelSelect } from "@shared/ui";
+import { Button, PixelSelect, PixelIcon, Switch } from "@shared/ui";
+
+const notificationSounds = useNotificationSounds();
+function getEventConfig(id: NotificationSoundEventId) {
+  return notificationSounds.eventsConfig.value[id];
+}
+const eventLabels: Record<NotificationSoundEventId, string> = {
+  participant_joined: "Участник вошёл в комнату",
+  participant_left: "Участник вышел из комнаты",
+  message: "Новое сообщение",
+  mic_on: "Микрофон включён",
+  mic_off: "Микрофон выключен",
+};
 
 const emit = defineEmits<{
   change: [settings: { inputDevice: string; outputDevice: string }];
@@ -394,5 +436,20 @@ onUnmounted(() => {
 .settings-hint--warning {
   color: #ffbe53;
   font-style: normal;
+}
+
+.settings-item--row {
+  gap: 0;
+}
+
+.settings-notification-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.settings-notification-row .pixel-switch {
+  flex: 1;
 }
 </style>

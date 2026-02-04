@@ -8,14 +8,14 @@
           title="Копировать"
           @click="handleCopy"
         >
-          📋
+          <PixelIcon name="document" variant="small" />
         </button>
         <button
           class="collaborative-document__button"
           title="Скачать"
           @click="handleDownload"
         >
-          💾
+          <PixelIcon name="document" variant="small" />
         </button>
         <div
           v-if="connectionStatus !== 'connected'"
@@ -162,7 +162,7 @@
         @click="handleLink"
         title="Ссылка"
       >
-        🔗
+        <PixelIcon name="document" variant="small" />
       </button>
     </div>
     <div class="collaborative-document__editor-wrapper">
@@ -180,6 +180,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { PixelIcon } from "@shared/ui";
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";

@@ -33,13 +33,19 @@
             }"
             @click="formData.room_type = type.value as RoomType"
           >
-            <div class="room-type-card__icon">{{ type.icon }}</div>
+            <div class="room-type-card__icon">
+              <PixelIcon :name="type.iconName" variant="large" />
+            </div>
             <div class="room-type-card__content">
               <h3 class="room-type-card__title">{{ type.title }}</h3>
               <p class="room-type-card__description">{{ type.description }}</p>
             </div>
             <div class="room-type-card__check">
-              <span v-if="formData.room_type === type.value">✓</span>
+              <PixelIcon
+                v-if="formData.room_type === type.value"
+                name="check"
+                variant="small"
+              />
             </div>
           </div>
         </div>
@@ -116,7 +122,7 @@
 import { ref, computed } from "vue";
 import type { CreateRoomRequest } from "@entities/room";
 import type { RoomType } from "@shared/lib";
-import { PixelSelect } from "@shared/ui";
+import { PixelSelect, PixelIcon } from "@shared/ui";
 
 const expiresInOptions = [
   { value: "", label: "Никогда" },
@@ -156,14 +162,14 @@ const roomTypes = [
   {
     value: "conference_hall",
     title: "Конференц-зал",
-    icon: "🎤",
+    iconName: "conference" as const,
     description:
       "Один основной спикер, остальные в сетке. Идеально для вебинаров, лекций и презентаций.",
   },
   {
     value: "round_table",
     title: "Круглый стол",
-    icon: "👥",
+    iconName: "round-table" as const,
     description:
       "Равноправные участники в круге. Подходит для командных встреч, обсуждений и совместной работы.",
   },

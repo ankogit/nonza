@@ -1,6 +1,7 @@
 import { ref, computed, watch, onUnmounted, type Ref } from "vue";
 import { RoomEvent } from "livekit-client";
 import type { Room, RemoteParticipant } from "livekit-client";
+import { playNotificationSound } from "@shared/lib";
 
 const REPLICA_TOPIC = "participant-replica";
 
@@ -33,7 +34,15 @@ function decodePayload(payload: Uint8Array): ReplicaMessage | null {
   }
 }
 
-export function useParticipantReplica(room: Ref<Room | null>) {
+export interface UseParticipantReplicaOptions {
+  /** Играть звук нового сообщения при получении только если отправитель в этом списке (например, поднял руку). Не передавать = играть всегда. */
+  raisedHands?: () => string[];
+}
+
+export function useParticipantReplica(
+  room: Ref<Room | null>,
+  options?: UseParticipantReplicaOptions,
+) {
   const replicaByIdentity = ref<Record<string, ReplicaMessage>>({});
 
   const replicaByParticipant = computed(() => replicaByIdentity.value);
@@ -71,6 +80,7 @@ export function useParticipantReplica(room: Ref<Room | null>) {
         topic: REPLICA_TOPIC,
       })
       .catch((err) => console.error("[participant-replica] send failed:", err));
+    playNotificationSound("message").catch(() => {});
   }
 
   const offDataReceived = ref<(() => void) | null>(null);
@@ -87,6 +97,13 @@ export function useParticipantReplica(room: Ref<Room | null>) {
       if (topic !== REPLICA_TOPIC || !participant) return;
       const msg = decodePayload(payload);
       if (!msg) return;
+      if (msg.text.trim() !== "") {
+        const raised = options?.raisedHands?.();
+        const shouldPlay = !raised || raised.includes(participant.identity);
+        if (shouldPlay) {
+          playNotificationSound("message").catch(() => {});
+        }
+      }
       const next = { ...replicaByIdentity.value };
       if (msg.text.trim() === "") {
         delete next[participant.identity];

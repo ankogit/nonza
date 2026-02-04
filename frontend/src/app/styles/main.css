@@ -1,4 +1,5 @@
 @import './design.css';
+@import './pixel-icons.css';
 
 :root {
   --color-primary: #e74c3c;

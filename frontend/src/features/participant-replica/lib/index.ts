@@ -1,2 +1,2 @@
 export { useParticipantReplica } from "./useParticipantReplica";
-export type { ReplicaMessage } from "./useParticipantReplica";
+export type { ReplicaMessage, UseParticipantReplicaOptions } from "./useParticipantReplica";

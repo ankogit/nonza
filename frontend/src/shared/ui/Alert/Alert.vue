@@ -17,12 +17,13 @@
       aria-label="Закрыть"
       @click="emit('close')"
     >
-      ✕
+      <PixelIcon name="close" :size="14" />
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { PixelIcon } from "@shared/ui";
 withDefaults(
   defineProps<{
     variant?: "info" | "success" | "warning" | "danger";

@@ -14,14 +14,14 @@
       title="Отправить реплику"
       @click="submit"
     >
-      💬
+      <PixelIcon name="message" variant="large" />
     </Button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { Button } from "@shared/ui";
+import { Button, PixelIcon } from "@shared/ui";
 
 const props = defineProps<{
   maxLength?: number;

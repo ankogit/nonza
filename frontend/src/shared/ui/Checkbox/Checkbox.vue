@@ -13,7 +13,7 @@
       @change="onChange"
     />
     <span class="pixel-checkbox__box" aria-hidden="true">
-      <span v-if="modelValue" class="pixel-checkbox__check">✓</span>
+      <PixelIcon v-if="modelValue" name="check" :size="14" class="pixel-checkbox__check" />
     </span>
     <span v-if="$slots.default" class="pixel-checkbox__label">
       <slot />
@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { PixelIcon } from "@shared/ui";
 withDefaults(
   defineProps<{
     modelValue: boolean;

@@ -11,7 +11,7 @@ import {
   type RoomOptions,
 } from "livekit-client";
 import e2eeWorkerUrl from "livekit-client/e2ee-worker?url";
-import { normalizeLiveKitUrl, isValidToken } from "@shared/lib";
+import { normalizeLiveKitUrl, isValidToken, playNotificationSound } from "@shared/lib";
 import type { RoomTokenResponse } from "@entities/room";
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -368,6 +368,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     room.on(
       RoomEvent.ParticipantConnected,
       (participant: RemoteParticipant) => {
+        playNotificationSound("participant_joined").catch(() => {});
         setupParticipantListeners(participant);
 
         // Subscribe to all existing tracks when participant connects
@@ -391,6 +392,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     room.on(
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
+        playNotificationSound("participant_left").catch(() => {});
         nextTick(() => {
           delete state.value.participantNames[participant.identity];
           updateParticipants((map) => {

@@ -10,7 +10,10 @@
     :title="tooltip"
   >
     <span class="e2ee-indicator__icon" aria-hidden="true">
-      {{ state.isActive ? "🔒" : "🔓" }}
+      <PixelIcon
+        :name="state.isActive ? 'lock-closed' : 'lock-open'"
+        variant="small"
+      />
     </span>
     <span v-if="showLabel" class="e2ee-indicator__label">E2EE</span>
   </div>
@@ -18,6 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { PixelIcon } from "@shared/ui";
 import { useE2EE } from "../lib/useE2EE";
 import type { Room } from "livekit-client";
 

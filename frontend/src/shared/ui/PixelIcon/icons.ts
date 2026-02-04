@@ -1,0 +1,46 @@
+export const PIXEL_ICON_NAMES = [
+  'fullscreen',
+  'mic-on',
+  'mic-off',
+  'mic-off-2',
+  'headphones-on',
+  'headphones-off',
+  'video-on',
+  'video-off',
+  'logo',
+  'up',
+  'down',
+  'right',
+  'left',
+  'close',
+  'screen-on',
+  'screen-off',
+  'hangup',
+  'leader',
+  'hand',
+  'connection-none',
+  'connection-bad',
+  'connection-medium',
+  'connection-good',
+  'conference',
+  'round-table',
+  'people',
+  'volume-high',
+  'volume-medium',
+  'volume-off',
+  'settings',
+  'lock-closed',
+  'lock-open',
+  'burger',
+  'refresh',
+  'reload',
+  'document',
+  'message',
+  'check',
+] as const;
+
+export type PixelIconName = (typeof PIXEL_ICON_NAMES)[number];
+
+export function pixelIconClass(name: PixelIconName): string {
+  return `pi pi-${name}`;
+}

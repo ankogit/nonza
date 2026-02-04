@@ -44,22 +44,42 @@
         <div class="ui-kit__block">
           <h3 class="ui-kit__block-title">Иконки (варианты)</h3>
           <div class="ui-kit__row ui-kit__row--wrap">
-            <Button type="icon" variant="primary" title="Primary">🎤</Button>
-            <Button type="icon" variant="danger" title="Danger">✕</Button>
-            <Button type="icon" variant="warning" title="Warning">⚠</Button>
-            <Button type="icon" variant="default" title="Default">⚙</Button>
-            <Button type="icon" variant="active" title="Active">●</Button>
-            <Button type="icon" variant="secondary" title="Secondary">📹</Button>
-            <Button type="icon" variant="accent" title="Accent">🔊</Button>
+            <Button type="icon" variant="primary" title="Primary">
+              <PixelIcon name="mic-on" variant="large" />
+            </Button>
+            <Button type="icon" variant="danger" title="Danger">
+              <PixelIcon name="close" variant="large" />
+            </Button>
+            <Button type="icon" variant="warning" title="Warning">
+              <PixelIcon name="connection-medium" variant="large" />
+            </Button>
+            <Button type="icon" variant="default" title="Default">
+              <PixelIcon name="settings" variant="large" />
+            </Button>
+            <Button type="icon" variant="active" title="Active">
+              <PixelIcon name="volume-high" variant="large" />
+            </Button>
+            <Button type="icon" variant="secondary" title="Secondary">
+              <PixelIcon name="video-on" variant="large" />
+            </Button>
+            <Button type="icon" variant="accent" title="Accent">
+              <PixelIcon name="volume-high" variant="large" />
+            </Button>
           </div>
         </div>
 
         <div class="ui-kit__block">
           <h3 class="ui-kit__block-title">Размеры (icon)</h3>
           <div class="ui-kit__row ui-kit__row--wrap">
-            <Button type="icon" variant="primary" size="small">S</Button>
-            <Button type="icon" variant="primary" size="medium">M</Button>
-            <Button type="icon" variant="primary" size="large">L</Button>
+            <Button type="icon" variant="primary" size="small">
+              <PixelIcon name="mic-on" variant="small" />
+            </Button>
+            <Button type="icon" variant="primary" size="medium">
+              <PixelIcon name="mic-on" variant="large" />
+            </Button>
+            <Button type="icon" variant="primary" size="large">
+              <PixelIcon name="mic-on" variant="large" />
+            </Button>
           </div>
         </div>
 
@@ -77,7 +97,9 @@
         <div class="ui-kit__block">
           <h3 class="ui-kit__block-title">Disabled</h3>
           <div class="ui-kit__row ui-kit__row--wrap">
-            <Button type="icon" variant="primary" disabled>🎤</Button>
+            <Button type="icon" variant="primary" disabled>
+              <PixelIcon name="mic-on" variant="large" />
+            </Button>
             <Button type="text" variant="primary" size="medium" disabled>Недоступно</Button>
           </div>
         </div>
@@ -354,6 +376,7 @@ import {
   Button,
   Modal,
   PixelSelect,
+  PixelIcon,
   AudioSettings,
   Input,
   Textarea,

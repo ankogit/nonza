@@ -75,7 +75,7 @@
             class="indicator default"
             title="Лидер"
           >
-            👑
+            <PixelIcon name="leader" variant="small" />
           </span>
         </div>
         <div class="right">
@@ -86,7 +86,7 @@
               class="indicator warning"
               title="Поднята рука"
             >
-              ✋
+              <PixelIcon name="hand" variant="small" />
             </span>
           </template>
           <MicIndicator
@@ -115,6 +115,7 @@ import type {
   LocalParticipant,
   RemoteAudioTrack,
 } from "livekit-client";
+import { PixelIcon } from "@shared/ui";
 import FullscreenIcon from "./FullscreenIcon.vue";
 import MicIndicator from "./MicIndicator.vue";
 import ReplicaBlock from "./ReplicaBlock.vue";

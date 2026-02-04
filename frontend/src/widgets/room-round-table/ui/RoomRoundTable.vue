@@ -11,7 +11,10 @@
           :class="`connection-indicator--${connectionStatus}`"
           :title="connectionLabel"
         >
-          {{ connectionStatus === "bad" ? "📵" : "⚠️" }}
+          <PixelIcon
+            :name="connectionStatus === 'bad' ? 'connection-bad' : 'connection-medium'"
+            variant="small"
+          />
           <span class="connection-indicator__label">{{ connectionLabel }}</span>
         </div>
         <E2EEIndicator
@@ -20,7 +23,7 @@
           :show-label="true"
         />
         <Button variant="default" size="small" title="Настройки" @click="handleSettings">
-          ⚙️
+          <PixelIcon name="settings" variant="large" />
         </Button>
       </div>
     </div>
@@ -91,7 +94,10 @@
           "
           @click="toggleAudio"
         >
-          {{ mediaState.isAudioEnabled ? "🎤" : "🔇" }}
+          <PixelIcon
+            :name="mediaState.isAudioEnabled ? 'mic-on' : 'mic-off'"
+            variant="large"
+          />
         </Button>
         <Button
           :class="{
@@ -103,7 +109,10 @@
           "
           @click="toggleVideo"
         >
-          {{ mediaState.isVideoEnabled ? "📹" : "📹" }}
+          <PixelIcon
+            :name="mediaState.isVideoEnabled ? 'video-on' : 'video-off'"
+            variant="large"
+          />
         </Button>
         <Button
           v-if="!previewMode"
@@ -114,7 +123,10 @@
           title="Трансляция экрана"
           @click="toggleScreenShare"
         >
-          🖥️
+          <PixelIcon
+            :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'"
+            variant="large"
+          />
         </Button>
         <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
       </div>
@@ -124,7 +136,7 @@
           title="Закончить разговор"
           @click="handleDisconnect"
         >
-          📞
+          <PixelIcon name="hangup" variant="large" />
         </Button>
       </div>
       <div class="right">
@@ -135,7 +147,7 @@
           :title="isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'"
           @click="toggleDocument"
         >
-          📄
+          <PixelIcon name="document" variant="large" />
         </Button>
       </div>
     </div>
@@ -177,7 +189,7 @@
           aria-label="Закрыть"
           @click="closeFullscreen"
         >
-          ✕
+          <PixelIcon name="close" variant="large" />
         </Button>
       </div>
     </Teleport>
@@ -248,7 +260,12 @@
           :class="{ 'button--has-changes': hasUnsavedSettingsChanges }"
           @click="handleSaveSettings"
         >
-          {{ hasUnsavedSettingsChanges ? "💾 Сохранить" : "Сохранить" }}
+          <PixelIcon
+            v-if="hasUnsavedSettingsChanges"
+            name="document"
+            variant="small"
+          />
+          Сохранить
         </Button>
       </template>
     </Modal>
@@ -264,7 +281,7 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
-import { Button, Modal, AudioSettings } from "@shared/ui";
+import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { CollaborativeDocument } from "@widgets/collaborative-document";
 import { setParticipantName, getStoredAudioInputDevice } from "@shared/lib";

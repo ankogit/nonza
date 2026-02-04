@@ -1,7 +1,9 @@
 <template>
   <div class="room-created full-page">
     <div class="room-created__container">
-      <div class="room-created__icon">✓</div>
+      <div class="room-created__icon">
+        <PixelIcon name="check" :size="36" />
+      </div>
       <h2 class="room-created__title">Комната создана!</h2>
       <p class="room-created__subtitle">{{ room.name }}</p>
 
@@ -16,7 +18,11 @@
             @click="copyCode"
             :class="{ 'room-created__copy-button--copied': copied }"
           >
-            {{ copied ? "✓ Скопировано" : "Копировать" }}
+            <template v-if="copied">
+              <PixelIcon name="check" variant="small" class="room-created__copy-icon" />
+              Скопировано
+            </template>
+            <template v-else>Копировать</template>
           </button>
         </div>
         <p class="room-created__hint">
@@ -44,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { PixelIcon } from "@shared/ui";
 import type { Room } from "@entities/room";
 
 const props = defineProps<{
@@ -97,6 +104,15 @@ const copyCode = async () => {
   justify-content: center;
   border: 2px solid #45a049;
   box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.room-created__icon .pi {
+  filter: brightness(0) invert(1);
+}
+
+.room-created__copy-button .room-created__copy-icon {
+  margin-right: 6px;
+  vertical-align: middle;
 }
 
 .room-created__title {

@@ -27,13 +27,23 @@
       aria-label="Микрофон"
       @click="emit('click', $event)"
     >
-      {{ listMode ? (isAudioEnabled ? '🔊' : '🔇') : '🔊' }}
+      <PixelIcon
+        :name="
+          listMode
+            ? isAudioEnabled
+              ? 'volume-high'
+              : 'volume-off'
+            : 'volume-high'
+        "
+        variant="small"
+      />
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { PixelIcon } from "@shared/ui";
 
 const props = withDefaults(
   defineProps<{

@@ -2,8 +2,12 @@
   <div class="nonza-widget" :class="{ 'nonza-widget--connected': isConnected }">
     <div v-if="isReconnecting" class="nonza-widget__reconnecting">
       <div class="nonza-widget__reconnecting-card">
-        <p class="nonza-widget__reconnecting-text">Восстанавливаем подключение</p>
-        <p class="nonza-widget__reconnecting-hint">Соединение с комнатой было потеряно</p>
+        <p class="nonza-widget__reconnecting-text">
+          Восстанавливаем подключение
+        </p>
+        <p class="nonza-widget__reconnecting-hint">
+          Соединение с комнатой было потеряно
+        </p>
         <Button
           type="text"
           variant="accent"
@@ -48,7 +52,7 @@
               :title="'Сгенерировать случайное имя'"
               @click="handleRandomizeName"
             >
-              🎲
+              <PixelIcon name="reload" variant="large" />
             </button>
           </div>
         </div>
@@ -119,7 +123,7 @@ import { useRoomConnection } from "@features/room-connection";
 import { RoomConferenceHall } from "@widgets/room-conference-hall";
 import { RoomRoundTable } from "@widgets/room-round-table";
 import { RoomApi } from "@entities/room";
-import { Button } from "@shared/ui";
+import { Button, PixelIcon } from "@shared/ui";
 import { ApiClient } from "@shared/api";
 import {
   getParticipantName,
@@ -147,7 +151,7 @@ const urlCode = urlParams.get("code");
 
 const shortCode = ref(props.defaultShortCode || urlCode || "");
 const participantName = ref(
-  getParticipantName() || props.defaultParticipantName || "",
+  getParticipantName() || props.defaultParticipantName || ""
 );
 
 watch(
@@ -155,7 +159,7 @@ watch(
   (name) => {
     if (name.trim()) setParticipantName(name);
   },
-  { immediate: false },
+  { immediate: false }
 );
 const error = ref<string | null>(null);
 const room = ref<RoomEntity | null>(null);
@@ -178,8 +182,7 @@ const isReconnecting = computed(() => connectionState.value.isReconnecting);
 
 const canConnect = computed(
   () =>
-    shortCode.value.trim().length > 0 &&
-    participantName.value.trim().length > 0,
+    shortCode.value.trim().length > 0 && participantName.value.trim().length > 0
 );
 
 const handleConnect = async () => {
@@ -246,8 +249,7 @@ onMounted(() => {
   flex-direction: column;
   background: #1a1a1a;
   color: white;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 @media (min-width: 768px) and (min-height: 600px) {
