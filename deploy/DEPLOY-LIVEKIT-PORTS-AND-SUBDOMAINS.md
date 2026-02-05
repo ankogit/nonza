@@ -125,6 +125,49 @@ turn:
 
 ---
 
+## Проверка проброса портов TURN (3478, 5349)
+
+Проверять лучше **снаружи** (с ноутбука или другого хоста в интернете), чтобы убедиться, что до портов доходят пакеты через шлюз и файрвол.
+
+### TCP 5349 (TURN over TLS)
+
+С любого хоста:
+```bash
+nc -zv turn.nonza.ru 5349
+```
+Ожидание: `Connection to turn.nonza.ru 5349 port [tcp/*] succeeded!`  
+Таймаут или `Connection refused` — порт не проброшен или nginx не слушает 5349.
+
+Проверка TLS (опционально):
+```bash
+openssl s_client -connect turn.nonza.ru:5349 -brief
+```
+Должен пройти TLS handshake (сертификат turn.nonza.ru).
+
+Если turn.nonza.ru за шлюзом 95.143.188.166, на шлюзе должен быть DNAT: входящий TCP 5349 → 10.50.0.103:5349. Локально на nginx (10.50.0.103): `ss -tlnp | grep 5349` — должен слушать nginx.
+
+### UDP 3478 (TURN over UDP)
+
+UDP не даёт «соединение» как TCP. Варианты:
+
+**1. nmap (снаружи):**
+```bash
+nmap -sU -p 3478 turn.nonza.ru
+```
+`open` — порт доступен. `open|filtered` — пакеты доходят, но ответа может не быть (для TURN это часто нормально до первого TURN-запроса).
+
+**2. С шлюза 95.143.188.166 — что порт слушается на LiveKit:**
+```bash
+ss -ulnp | grep 3478
+```
+Должен быть процесс LiveKit на 3478. И что DNAT есть: `sudo iptables -t nat -L PREROUTING -n -v | grep 3478`.
+
+**3. Реальная проверка — TURN allocation:** если в браузере при `iceTransportPolicy: "relay"` в `about:webrtc` виден relay-кандидат и медиа идёт — TURN по 5349 работает. UDP 3478 при схеме «всё через turn.nonza.ru:5349» может не использоваться браузером (TURN over TLS на 5349 достаточен).
+
+Итог: для варианта B (только поддомен) критичен **5349**. UDP 3478 нужен, если клиенты подключаются к TURN по UDP (например, десктопное приложение); для браузера с relay через 5349 достаточно проверить TCP 5349.
+
+---
+
 ## 5. Ошибка «could not establish pc connection» при варианте только TURN
 
 Если фронт с `iceTransportPolicy: "relay"` и в логах LiveKit есть «created TURN password», но участник «removing without connection» — клиент не может достучаться до TURN. Проверить по шагам:

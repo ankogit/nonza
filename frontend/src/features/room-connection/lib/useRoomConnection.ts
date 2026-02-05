@@ -174,6 +174,10 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       }
 
       try {
+        console.log("[nonza] Connecting to LiveKit with iceTransportPolicy: relay", {
+          connectUrl,
+          rtcConfig: { iceTransportPolicy: "relay" },
+        });
         await livekitRoom.connect(connectUrl, tokenResponse.token, {
           rtcConfig: { iceTransportPolicy: "relay" },
         });
