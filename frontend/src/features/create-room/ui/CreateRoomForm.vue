@@ -6,20 +6,6 @@
 
     <form @submit.prevent="handleSubmit" class="create-room-form__content">
       <div class="create-room-form__input-group">
-        <label for="roomName" class="create-room-form__label">
-          Название комнаты <span class="required">*</span>
-        </label>
-        <input
-          id="roomName"
-          v-model="formData.name"
-          type="text"
-          placeholder="Введите название комнаты"
-          class="create-room-form__input"
-          required
-        />
-      </div>
-
-      <div class="create-room-form__input-group">
         <label class="create-room-form__label">
           Тип комнаты <span class="required">*</span>
         </label>
@@ -139,8 +125,11 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const formData = ref<CreateRoomRequest & { expires_in?: string }>({
-  name: "",
+function randomRoomName(): string {
+  return `Room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const formData = ref<Omit<CreateRoomRequest, "name"> & { expires_in?: string }>({
   room_type: "conference_hall" as RoomType,
   is_temporary: true,
   expires_in: "",
@@ -175,11 +164,7 @@ const roomTypes = [
   },
 ];
 
-const canSubmit = computed(() => {
-  return (
-    formData.value.name.trim().length > 0 && formData.value.room_type.length > 0
-  );
-});
+const canSubmit = computed(() => formData.value.room_type.length > 0);
 
 const handleSubmit = async () => {
   if (!canSubmit.value) return;
@@ -189,7 +174,7 @@ const handleSubmit = async () => {
 
   try {
     const submitData: CreateRoomRequest = {
-      name: formData.value.name.trim(),
+      name: randomRoomName(),
       room_type: formData.value.room_type,
       is_temporary: formData.value.is_temporary,
       expires_in: formData.value.expires_in || undefined,

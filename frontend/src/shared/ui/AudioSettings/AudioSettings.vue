@@ -91,6 +91,28 @@
 
     <div class="settings-section">
       <h3 class="settings-section-title">Звуковые уведомления</h3>
+      <div class="settings-item">
+        <label class="settings-label">Общая громкость</label>
+        <div class="settings-master-volume-row">
+          <input
+            type="range"
+            class="volume-slider settings-master-volume"
+            min="0"
+            max="100"
+            step="5"
+            :value="Math.round(notificationSounds.masterVolume.value * 100)"
+            aria-label="Общая громкость уведомлений"
+            @input="
+              notificationSounds.setMasterVolume(
+                Number(($event.target as HTMLInputElement).value) / 100
+              )
+            "
+          />
+          <span class="settings-master-volume-value">
+            {{ Math.round(notificationSounds.masterVolume.value * 100) }}%
+          </span>
+        </div>
+      </div>
       <div
         v-for="eventId in notificationSounds.eventIds"
         :key="eventId"
@@ -451,5 +473,23 @@ onUnmounted(() => {
 
 .settings-notification-row .pixel-switch {
   flex: 1;
+}
+
+.settings-master-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-master-volume {
+  flex: 1;
+}
+
+.settings-master-volume-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #bab1a8;
+  min-width: 40px;
+  text-align: right;
 }
 </style>
