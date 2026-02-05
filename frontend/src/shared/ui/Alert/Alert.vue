@@ -1,7 +1,10 @@
 <template>
   <div
     class="pixel-alert"
-    :class="[`pixel-alert--${variant}`, { 'pixel-alert--dismissible': dismissible }]"
+    :class="[
+      `pixel-alert--${variant}`,
+      { 'pixel-alert--dismissible': dismissible },
+    ]"
     role="alert"
   >
     <span v-if="$slots.title" class="pixel-alert__title">
@@ -32,7 +35,7 @@ withDefaults(
   {
     variant: "info",
     dismissible: false,
-  },
+  }
 );
 
 const emit = defineEmits<{

@@ -14,44 +14,162 @@
   flex-shrink: 0;
 }
 
-.pi--small { --pi-size: 20px; }
-.pi--large { --pi-size: 32px; }
+.pi--small {
+  --pi-size: 20px;
+}
 
-.pi-fullscreen { background-position: calc(-0 * var(--pi-size)) 0; }
-.pi-mic-on { background-position: calc(-1 * var(--pi-size)) 0; }
-.pi-mic-off { background-position: calc(-2 * var(--pi-size)) 0; }
-.pi-mic-off-2 { background-position: calc(-3 * var(--pi-size)) 0; }
-.pi-headphones-on { background-position: calc(-4 * var(--pi-size)) 0; }
-.pi-headphones-off { background-position: calc(-5 * var(--pi-size)) 0; }
-.pi-video-on { background-position: calc(-6 * var(--pi-size)) 0; }
-.pi-video-off { background-position: calc(-7 * var(--pi-size)) 0; }
-.pi-logo { background-position: calc(-8 * var(--pi-size)) 0; }
-.pi-up { background-position: calc(-9 * var(--pi-size)) 0; }
-.pi-down { background-position: calc(-10 * var(--pi-size)) 0; }
-.pi-right { background-position: calc(-11 * var(--pi-size)) 0; }
-.pi-left { background-position: calc(-12 * var(--pi-size)) 0; }
-.pi-close { background-position: calc(-13 * var(--pi-size)) 0; }
-.pi-screen-on { background-position: calc(-14 * var(--pi-size)) 0; }
-.pi-screen-off { background-position: calc(-15 * var(--pi-size)) 0; }
-.pi-hangup { background-position: calc(-16 * var(--pi-size)) 0; }
-.pi-leader { background-position: calc(-17 * var(--pi-size)) 0; }
-.pi-hand { background-position: calc(-18 * var(--pi-size)) 0; }
-.pi-connection-none { background-position: calc(-19 * var(--pi-size)) 0; }
-.pi-connection-bad { background-position: calc(-20 * var(--pi-size)) 0; }
-.pi-connection-medium { background-position: calc(-21 * var(--pi-size)) 0; }
-.pi-connection-good { background-position: calc(-22 * var(--pi-size)) 0; }
-.pi-conference { background-position: calc(-23 * var(--pi-size)) 0; }
-.pi-round-table { background-position: calc(-24 * var(--pi-size)) 0; }
-.pi-people { background-position: calc(-25 * var(--pi-size)) 0; }
-.pi-volume-high { background-position: calc(-26 * var(--pi-size)) 0; }
-.pi-volume-medium { background-position: calc(-27 * var(--pi-size)) 0; }
-.pi-volume-off { background-position: calc(-28 * var(--pi-size)) 0; }
-.pi-settings { background-position: calc(-29 * var(--pi-size)) 0; }
-.pi-lock-closed { background-position: calc(-30 * var(--pi-size)) 0; }
-.pi-lock-open { background-position: calc(-31 * var(--pi-size)) 0; }
-.pi-burger { background-position: calc(-32 * var(--pi-size)) 0; }
-.pi-refresh { background-position: calc(-33 * var(--pi-size)) 0; }
-.pi-reload { background-position: calc(-34 * var(--pi-size)) 0; }
-.pi-document { background-position: calc(-35 * var(--pi-size)) 0; }
-.pi-message { background-position: calc(-36 * var(--pi-size)) 0; }
-.pi-check { background-position: calc(-37 * var(--pi-size)) 0; }
+.pi--large {
+  --pi-size: 32px;
+}
+
+.pi-fullscreen {
+  background-position: calc(-0 * var(--pi-size)) 0;
+}
+
+.pi-mic-on {
+  background-position: calc(-1 * var(--pi-size)) 0;
+}
+
+.pi-mic-off {
+  background-position: calc(-2 * var(--pi-size)) 0;
+}
+
+.pi-mic-off-2 {
+  background-position: calc(-3 * var(--pi-size)) 0;
+}
+
+.pi-headphones-on {
+  background-position: calc(-4 * var(--pi-size)) 0;
+}
+
+.pi-headphones-off {
+  background-position: calc(-5 * var(--pi-size)) 0;
+}
+
+.pi-video-on {
+  background-position: calc(-6 * var(--pi-size)) 0;
+}
+
+.pi-video-off {
+  background-position: calc(-7 * var(--pi-size)) 0;
+}
+
+.pi-logo {
+  background-position: calc(-8 * var(--pi-size)) 0;
+}
+
+.pi-up {
+  background-position: calc(-9 * var(--pi-size)) 0;
+}
+
+.pi-down {
+  background-position: calc(-10 * var(--pi-size)) 0;
+}
+
+.pi-right {
+  background-position: calc(-11 * var(--pi-size)) 0;
+}
+
+.pi-left {
+  background-position: calc(-12 * var(--pi-size)) 0;
+}
+
+.pi-close {
+  background-position: calc(-13 * var(--pi-size)) 0;
+}
+
+.pi-screen-on {
+  background-position: calc(-14 * var(--pi-size)) 0;
+}
+
+.pi-screen-off {
+  background-position: calc(-15 * var(--pi-size)) 0;
+}
+
+.pi-hangup {
+  background-position: calc(-16 * var(--pi-size)) 0;
+}
+
+.pi-leader {
+  background-position: calc(-17 * var(--pi-size)) 0;
+}
+
+.pi-hand {
+  background-position: calc(-18 * var(--pi-size)) 0;
+}
+
+.pi-connection-none {
+  background-position: calc(-19 * var(--pi-size)) 0;
+}
+
+.pi-connection-bad {
+  background-position: calc(-20 * var(--pi-size)) 0;
+}
+
+.pi-connection-medium {
+  background-position: calc(-21 * var(--pi-size)) 0;
+}
+
+.pi-connection-good {
+  background-position: calc(-22 * var(--pi-size)) 0;
+}
+
+.pi-conference {
+  background-position: calc(-23 * var(--pi-size)) 0;
+}
+
+.pi-round-table {
+  background-position: calc(-24 * var(--pi-size)) 0;
+}
+
+.pi-people {
+  background-position: calc(-25 * var(--pi-size)) 0;
+}
+
+.pi-volume-high {
+  background-position: calc(-26 * var(--pi-size)) 0;
+}
+
+.pi-volume-medium {
+  background-position: calc(-27 * var(--pi-size)) 0;
+}
+
+.pi-volume-off {
+  background-position: calc(-28 * var(--pi-size)) 0;
+}
+
+.pi-settings {
+  background-position: calc(-29 * var(--pi-size)) 0;
+}
+
+.pi-lock-closed {
+  background-position: calc(-30 * var(--pi-size)) 0;
+}
+
+.pi-lock-open {
+  background-position: calc(-31 * var(--pi-size)) 0;
+}
+
+.pi-burger {
+  background-position: calc(-32 * var(--pi-size)) 0;
+}
+
+.pi-refresh {
+  background-position: calc(-33 * var(--pi-size)) 0;
+}
+
+.pi-reload {
+  background-position: calc(-34 * var(--pi-size)) 0;
+}
+
+.pi-document {
+  background-position: calc(-35 * var(--pi-size)) 0;
+}
+
+.pi-message {
+  background-position: calc(-36 * var(--pi-size)) 0;
+}
+
+.pi-check {
+  background-position: calc(-37 * var(--pi-size)) 0;
+}

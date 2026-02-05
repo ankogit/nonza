@@ -13,7 +13,12 @@
       @change="onChange"
     />
     <span class="pixel-checkbox__box" aria-hidden="true">
-      <PixelIcon v-if="modelValue" name="check" :size="14" class="pixel-checkbox__check" />
+      <PixelIcon
+        v-if="modelValue"
+        name="check"
+        :size="14"
+        class="pixel-checkbox__check"
+      />
     </span>
     <span v-if="$slots.default" class="pixel-checkbox__label">
       <slot />
@@ -32,7 +37,7 @@ withDefaults(
   }>(),
   {
     disabled: false,
-  },
+  }
 );
 
 const emit = defineEmits<{
@@ -80,9 +85,7 @@ function onChange(e: Event) {
 
 .pixel-checkbox__input:focus-visible + .pixel-checkbox__box {
   border-color: #2980b9;
-  box-shadow:
-    2px 2px 0 0 rgba(0, 0, 0, 0.3),
-    inset 0 0 0 2px #2980b9;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3), inset 0 0 0 2px #2980b9;
 }
 
 .pixel-checkbox__input:checked + .pixel-checkbox__box {

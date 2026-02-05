@@ -6,6 +6,8 @@
 
 turn.nonza.ru указывает на 95.143.188.166, поэтому на шлюзе нужно пробросить **TCP 5349** на **10.50.0.103:5349**, иначе снаружи будет Connection refused.
 
+Если **docker-compose (coturn)** крутится на **10.50.0.103** (на одной машине с nginx), в конфигах nginx stream используй **127.0.0.1:5349**; relay UDP 49152–49200 на шлюзе пробрасывай на **10.50.0.103**. Если coturn на 10.50.0.118 — relay на 10.50.0.118, в nginx — IP этого хоста.
+
 ## Условие
 
 На 95.143.188.166 должен быть включён **IP forwarding** и пакеты с внешнего интерфейса должны маршрутизироваться к 10.50.0.118 (в одной сети или через маршрут).
@@ -48,6 +50,9 @@ sudo iptables -t nat -A PREROUTING -i $EXT_IF -p tcp --dport 5349 -j DNAT --to-d
 # Проброс UDP 3478
 sudo iptables -t nat -A PREROUTING -i $EXT_IF -p udp --dport 3478 -j DNAT --to-destination 10.50.0.118:3478
 
+# Проброс UDP 49152-49200 (coturn relay). Если coturn на 10.50.0.103 — замени на 10.50.0.103.
+sudo iptables -t nat -A PREROUTING -i $EXT_IF -p udp --dport 49152:49200 -j DNAT --to-destination 10.50.0.118
+
 # Проброс UDP 50000-50100 (диапазон)
 sudo iptables -t nat -A PREROUTING -i $EXT_IF -p udp --dport 50000:50100 -j DNAT --to-destination 10.50.0.118
 
@@ -56,9 +61,11 @@ sudo iptables -A FORWARD -i $EXT_IF -p tcp --dport 5349 -d 10.50.0.103 -j ACCEPT
 sudo iptables -A FORWARD -o $EXT_IF -p tcp -s 10.50.0.103 --sport 5349 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p tcp --dport 7881 -d 10.50.0.118 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p udp --dport 3478 -d 10.50.0.118 -j ACCEPT
+sudo iptables -A FORWARD -i $EXT_IF -p udp --dport 49152:49200 -d 10.50.0.118 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p udp --dport 50000:50100 -d 10.50.0.118 -j ACCEPT
 sudo iptables -A FORWARD -o $EXT_IF -p tcp -s 10.50.0.118 --sport 7881 -j ACCEPT
 sudo iptables -A FORWARD -o $EXT_IF -p udp -s 10.50.0.118 --sport 3478 -j ACCEPT
+sudo iptables -A FORWARD -o $EXT_IF -p udp -s 10.50.0.118 --sport 49152:49200 -j ACCEPT
 sudo iptables -A FORWARD -o $EXT_IF -p udp -s 10.50.0.118 --sport 50000:50100 -j ACCEPT
 ```
 
@@ -92,11 +99,22 @@ sudo iptables-save | sudo tee /etc/iptables.rules
 
 ## Если 95.143.188.166 и 10.50.0.118 — один и тот же хост
 
-Тогда это не проброс, а просто **открытие портов в файрволе** (трафик приходит сразу на этот сервер):
+Тогда это не проброс, а просто **открытие портов в файрволе** (трафик приходит сразу на этот сервер). Команды **на этом же хосте**:
 
 ```bash
 sudo ufw allow 7881/tcp
 sudo ufw allow 3478/udp
+sudo ufw allow 49152:49200/udp
 sudo ufw allow 50000:50100/udp
 sudo ufw reload
 ```
+
+---
+
+## Если шлюз и приложение — разные хосты (iptables на шлюзе)
+
+Тогда **ufw** нужен на **хосте, где крутится сервис**, чтобы он принимал проброшенный трафик:
+
+- **UDP 49152:49200** — на хосте, где запущен **coturn** (10.50.0.103 или 10.50.0.118):  
+  `sudo ufw allow 49152:49200/udp && sudo ufw reload`
+- Остальные порты (7881, 3478, 50000–50100) — на хосте **10.50.0.118** (LiveKit), если он не тот же, что coturn.
