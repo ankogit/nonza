@@ -6,11 +6,17 @@ type GenerateTokenRequest struct {
 	ParticipantName string `json:"participant_name"`
 }
 
+type ICEServer struct {
+	URLs       []string `json:"urls"`
+	Username   string   `json:"username,omitempty"`
+	Credential string   `json:"credential,omitempty"`
+}
+
 type TokenResponse struct {
-	Token         string `json:"token"`
-	URL           string `json:"url"`
-	RoomName      string `json:"room_name"`
-	ParticipantID string `json:"participant_id"`
-	// EncryptionKey is set only for E2EE-enabled rooms (base64 key material).
-	EncryptionKey string `json:"encryption_key,omitempty"`
+	Token         string       `json:"token"`
+	URL           string       `json:"url"`
+	RoomName      string       `json:"room_name"`
+	ParticipantID string       `json:"participant_id"`
+	EncryptionKey string       `json:"encryption_key,omitempty"`
+	IceServers    []ICEServer  `json:"ice_servers,omitempty"`
 }

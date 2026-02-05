@@ -7,6 +7,7 @@ import (
 	"nonza/backend/internal/service"
 	"nonza/backend/internal/transport/websocket"
 	"nonza/backend/internal/webrtc/livekit"
+	"nonza/backend/internal/webrtc/turn"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -77,6 +78,19 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 				response.EncryptionKey = key
 			}
 		}
+	}
+
+	if h.Config.TURNURL != "" && h.Config.TURNSecret != "" {
+		ttl := h.Config.TURNTTL
+		if ttl <= 0 {
+			ttl = 86400
+		}
+		username, credential := turn.LongTermCredentials(h.Config.TURNSecret, ttl)
+		response.IceServers = []tokenDto.ICEServer{{
+			URLs:       []string{h.Config.TURNURL},
+			Username:   username,
+			Credential: credential,
+		}}
 	}
 
 	// Optionally broadcast event about new participant joining

@@ -27,10 +27,17 @@ export interface RoomTokenRequest {
   participant_identity?: string;
 }
 
+export interface RTCIceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
 export interface RoomTokenResponse {
   token: string;
   url: string;
   room_name?: string;
   participant_id?: string;
   encryption_key?: string;
+  ice_servers?: RTCIceServer[];
 }

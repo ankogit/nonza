@@ -40,8 +40,6 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
-      - "5349:5349"
-      - "3478:3478/udp"
       - "50000-50100:50000-50100/udp"
     volumes:
       - ./deploy/livekit-config.yaml:/etc/livekit.yaml
@@ -49,6 +47,22 @@ services:
       redis:
         condition: service_healthy
     command: --config /etc/livekit.yaml
+    networks:
+      - nonza-network
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: nonza-coturn
+    ports:
+      - "5349:5349"
+      - "3478:3478/udp"
+      - "3478:3478"
+      - "49152-65535:49152-65535/udp"
+    volumes:
+      - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
+    env_file:
+      - ./backend/.env
+    command: ["sh", "-c", "turnserver -c /etc/coturn/turnserver.conf --static-auth-secret=$$TURN_SECRET"]
     networks:
       - nonza-network
 

@@ -173,13 +173,20 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         await livekitRoom.setE2EEEnabled(true);
       }
 
+      const iceServers = tokenResponse.ice_servers?.length
+        ? tokenResponse.ice_servers.map((s) => ({
+            urls: Array.isArray(s.urls) ? s.urls : [s.urls],
+            username: s.username,
+            credential: s.credential,
+          }))
+        : undefined;
+      const rtcConfig: RTCConfiguration = {
+        iceTransportPolicy: "relay",
+        ...(iceServers && { iceServers }),
+      };
       try {
-        console.log("[nonza] Connecting to LiveKit with iceTransportPolicy: relay", {
-          connectUrl,
-          rtcConfig: { iceTransportPolicy: "relay" },
-        });
         await livekitRoom.connect(connectUrl, tokenResponse.token, {
-          rtcConfig: { iceTransportPolicy: "relay" },
+          rtcConfig,
         });
       } catch (connectError) {
         console.error("LiveKit connection error:", connectError);

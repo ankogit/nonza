@@ -17,6 +17,12 @@ type Config struct {
 	WebRTCAPIKey    string `envconfig:"WEBRTC_API_KEY"`
 	WebRTCAPISecret string `envconfig:"WEBRTC_API_SECRET"`
 
+	// Внешний TURN (coturn): URL для клиента (turns:turn.nonza.ru:5349) и секрет для HMAC long-term credential.
+	// Если TURN_URL пустой — ice_servers в ответ токена не добавляются.
+	TURNURL    string `envconfig:"TURN_URL"`
+	TURNSecret string `envconfig:"TURN_SECRET"`
+	TURNTTL    int    `envconfig:"TURN_TTL" default:"86400"`
+
 	AudioCodec        string `envconfig:"AUDIO_CODEC" default:"opus"`
 	AudioBitrate      int    `envconfig:"AUDIO_BITRATE" default:"32000"`
 	AudioSampleRate   int    `envconfig:"AUDIO_SAMPLE_RATE" default:"48000"`

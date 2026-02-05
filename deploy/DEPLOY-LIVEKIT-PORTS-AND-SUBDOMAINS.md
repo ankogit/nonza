@@ -113,6 +113,18 @@ turn:
 
 После правок перезапустить LiveKit и nginx.
 
+**Вариант B2: TURN на 443 (когда клиент получает turns:turn.nonza.ru:443)**
+
+Если при `external_tls: true` LiveKit отдаёт клиенту порт **443** (а nginx слушает TURN на 5349), в webrtc-internals будет ошибка 701. Решение — принимать TURN на **443** для turn.nonza.ru.
+
+**Если у turn.nonza.ru свой IP** (отдельный от meet/ws/api): на этом IP только stream на 443, HTTP не трогаем. Конфиг `deploy/nginx-stream-turn-443-only.conf` — один server с `listen 443 ssl` и proxy_pass на 10.50.0.118:5349. Подключить в streams-enabled, на шлюзе пробросить 443 на этот IP.
+
+**Если turn.nonza.ru и meet/ws/api на одном IP и конфиги сайтов менять нельзя:** единственный вариант без правок — **второй IP для turn.nonza.ru**. Выделить на машине ещё один IP (или отдельный хост), в DNS направить turn.nonza.ru на этот IP, на нём слушать только stream 443 по конфигу `deploy/nginx-stream-turn-443-only.conf`. Остальные сайты на первом IP:443 не трогаем.
+
+Если второй IP невозможен — остаётся вариант с внешним TURN (coturn и т.п.) и подстановкой iceServers с бэкенда в клиенте (см. пункт 5 в разделе «could not establish pc connection»).
+
+Шлюз 95.143.188.166 обычно уже пробрасывает 443; для второго IP на шлюзе добавить DNAT 443 → второй_IP:443 (или проброс на тот хост, где слушает turn).
+
 ---
 
 ## 3. Что проверить
@@ -166,6 +178,25 @@ ss -ulnp | grep 3478
 
 Итог: для варианта B (только поддомен) критичен **5349**. UDP 3478 нужен, если клиенты подключаются к TURN по UDP (например, десктопное приложение); для браузера с relay через 5349 достаточно проверить TCP 5349.
 
+### Цепочка 95.143.188.166 → 10.50.0.103 (nginx) → 10.50.0.118 (LiveKit)
+
+Чтобы убедиться, что трафик доходит до LiveKit:
+
+1. **На хосте с nginx (10.50.0.103)** — доходит ли до LiveKit (без TLS, plain TCP):
+   ```bash
+   nc -zv 10.50.0.118 5349
+   ```
+   Ожидание: `Connection to 10.50.0.118 5349 port [tcp/*] succeeded!`  
+   Таймаут или `Connection refused` — на 10.50.0.118 порт 5349 не слушается (проверить проброс в docker-compose и что контейнер livekit запущен с `5349:5349`).
+
+2. **На хосте с LiveKit (10.50.0.118)** — слушает ли кто-то 5349:
+   ```bash
+   ss -tlnp | grep 5349
+   ```
+   Должна быть строка с портом 5349 (процесс docker-proxy или livekit).
+
+3. **Снаружи** уже проверено: `openssl s_client -connect turn.nonza.ru:5349` — TLS до nginx работает. Если шаг 1 с 10.50.0.103 на 10.50.0.118 не проходит, nginx принимает клиента, но `proxy_pass` на LiveKit не доходит.
+
 ---
 
 ## 5. Ошибка «could not establish pc connection» при варианте только TURN
@@ -190,6 +221,11 @@ ss -ulnp | grep 3478
 
 4. **Фронт собран и задеплоен с relay**  
    Убедись, что на meet.nonza.ru отдаётся последняя сборка, в которой при подключении к комнате передаётся `rtcConfig: { iceTransportPolicy: "relay" }`. Иначе браузер может пытаться сначала прямые порты и падать по таймауту.
+
+5. **Клиент получает turns:turn.nonza.ru:443 вместо 5349**  
+   При `external_tls: true` LiveKit может отдавать клиенту TURN URL с портом **443** (см. config-sample: «if not using LB, tls_port needs to be set to 443»). У нас nginx слушает TURN на **5349**, поэтому в chrome://webrtc-internals видно `turns:turn.nonza.ru:443` и ошибку 701. Решения:
+   - **Вариант A:** поднять TURN на **443** для turn.nonza.ru (отдельный stream‑блок на 443 по SNI для turn.nonza.ru, proxy на 10.50.0.118:5349). Тогда рекламируемый порт совпадёт с реальным. На том же IP, где на 443 уже висит HTTP (meet/ws), нужна маршрутизация по SNI (stream `ssl_preread` + map по `$ssl_preread_server_name`).
+   - **Вариант B:** отключить встроенный TURN в LiveKit, поднять свой TURN (например coturn или STUNner), отдавать клиенту список ICE-серверов с бэкенда (urls, username, credential) и передавать его в `rtcConfig.iceServers` при подключении — как в кейсах с GKE/STUNner (отключить TURN в LiveKit, инжектить ICE servers с бэкенда) (клиент инжектит ICE servers, 100% подключений). Тогда креды и порт полностью под твоим контролем.
 
 ---
 
@@ -229,6 +265,25 @@ ss -ulnp | grep 3478
 4. **Файрвол на этом же хосте:** входящий TCP 5349 должен быть разрешён (ufw allow 5349/tcp и т.п.).
 
 Если turn.nonza.ru указывает на **95.143.188.166**, а nginx с stream для TURN стоит на **другой** машине (например, где отдаётся meet.nonza.ru), то на 95.143.188.166 порт 5349 не слушается — нужно либо повесить turn.nonza.ru на IP той машины, где реально слушает nginx stream, либо поднять такой же stream на 95.143.188.166.
+
+---
+
+## Внешний TURN (coturn), креды с бэкенда
+
+Встроенный TURN в LiveKit отключён. TURN — **coturn** в Docker; бэкенд генерирует HMAC-креды и отдаёт **ice_servers** в ответе на запрос токена; фронт подставляет их в **rtcConfig.iceServers** при подключении к комнате.
+
+**Что настроено:**
+- `deploy/livekit-config.yaml` — секция turn закомментирована.
+- `docker-compose.yml` — сервис **coturn** (порты 5349, 3478, relay 49152–65535), конфиг `deploy/coturn.conf`, секрет из `backend/.env` (TURN_SECRET).
+- Бэкенд: при наличии **TURN_URL** и **TURN_SECRET** в .env добавляет в ответ токена поле **ice_servers** (urls, username, credential; long-term credential по HMAC).
+- Фронт: при наличии **ice_servers** в ответе передаёт их в **rtcConfig** при **room.connect()** и **iceTransportPolicy: "relay"**.
+
+**В backend/.env задать:**
+- **TURN_URL** — URL для клиента, например `turns:turn.nonza.ru:5349`.
+- **TURN_SECRET** — общий секрет с coturn (тот же, что в coturn; минимум 32 символа).
+- По желанию **TURN_TTL** — время жизни креда в секундах (по умолчанию 86400).
+
+**Инфраструктура:** nginx по-прежнему проксирует turn.nonza.ru:5349 на хост с приложением (10.50.0.118); на нём на 5349 слушает контейнер coturn. Проброс портов на шлюзе (95.143.188.166 → 10.50.0.103:5349) не менять.
 
 ---
 
