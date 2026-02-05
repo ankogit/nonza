@@ -40,6 +40,7 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+      - "3478:3478/udp"
       - "50000-50100:50000-50100/udp"
     volumes:
       - ./deploy/livekit-config.yaml:/etc/livekit.yaml

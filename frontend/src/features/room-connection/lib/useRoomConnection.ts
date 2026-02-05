@@ -173,9 +173,10 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         await livekitRoom.setE2EEEnabled(true);
       }
 
-      // Connect with proper error handling
       try {
-        await livekitRoom.connect(connectUrl, tokenResponse.token);
+        await livekitRoom.connect(connectUrl, tokenResponse.token, {
+          rtcConfig: { iceTransportPolicy: "relay" },
+        });
       } catch (connectError) {
         console.error("LiveKit connection error:", connectError);
         const errorMessage =

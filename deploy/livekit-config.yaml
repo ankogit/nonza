@@ -4,10 +4,15 @@ rtc:
   port_range_start: 50000
   port_range_end: 50100
   use_external_ip: false
+  node_ip: "95.143.188.166"
 keys:
   devkey: devsecret
 redis:
   address: redis:6379
 turn:
-  enabled: false
+  enabled: true
+  udp_port: 3478
+  tls_port: 5349
+  domain: turn.nonza.ru
+  external_tls: true
 log_level: info
