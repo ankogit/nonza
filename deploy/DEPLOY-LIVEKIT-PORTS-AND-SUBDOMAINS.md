@@ -125,6 +125,70 @@ turn:
 
 ---
 
+## 5. Ошибка «could not establish pc connection» при варианте только TURN
+
+Если фронт с `iceTransportPolicy: "relay"` и в логах LiveKit есть «created TURN password», но участник «removing without connection» — клиент не может достучаться до TURN. Проверить по шагам:
+
+1. **Куда смотрит turn.nonza.ru**  
+   `turn.nonza.ru` в DNS должен указывать на хост, где **реально слушает nginx stream** на порту 5349 (тот же сервер, где висят meet/ws, или отдельный). Если turn.nonza.ru указывает на 95.143.188.166, а nginx с stream для TURN стоит на другой машине — порт 5349 на 95.143.188.166 будет закрыт и соединение оборвётся.
+
+2. **Порт 5349 открыт на хосте с nginx**  
+   На сервере, куда приходит трафик на turn.nonza.ru (тот, где в nginx включён `stream` для 5349), во входящих правилах файрвола должен быть открыт **TCP 5349**.  
+   Проверка с другого хоста (например, с Mac, с которого заходишь в Safari):
+   ```bash
+   nc -zv turn.nonza.ru 5349
+   # или
+   openssl s_client -connect turn.nonza.ru:5349
+   ```
+   Должно установиться соединение (для openssl — TLS handshake). Таймаут или «Connection refused» — порт закрыт или nginx не слушает 5349.
+
+3. **Nginx stream включён и перезапущен**  
+   Конфиг из `nginx-turn-stream.conf` должен лежать в **streams-enabled** (не в sites-enabled), в главном nginx.conf на верхнем уровне должен быть `stream { include streams-enabled/*.conf; }`. После правок: `nginx -t && systemctl reload nginx`.
+
+4. **Фронт собран и задеплоен с relay**  
+   Убедись, что на meet.nonza.ru отдаётся последняя сборка, в которой при подключении к комнате передаётся `rtcConfig: { iceTransportPolicy: "relay" }`. Иначе браузер может пытаться сначала прямые порты и падать по таймауту.
+
+---
+
+## 6. «Connection refused» на turn.nonza.ru:5349
+
+Если `nc -zv turn.nonza.ru 5349` даёт **Connection refused** — до хоста пакеты доходят, но на 5349 ничего не слушает. Проверить на **том сервере, на который смотрит DNS turn.nonza.ru**:
+
+1. **Куда резолвится turn.nonza.ru:**
+   ```bash
+   dig +short turn.nonza.ru
+   # или
+   host turn.nonza.ru
+   ```
+   Запомни IP (например, тот же, что у meet, или 95.143.188.166).
+
+2. **На этом хосте — слушает ли кто-то 5349:**
+   ```bash
+   sudo ss -tlnp | grep 5349
+   # или
+   sudo netstat -tlnp | grep 5349
+   ```
+   Должна быть строка с nginx. Если пусто — nginx stream для 5349 не загружен или не перезапущен.
+
+3. **Конфиг stream в nginx:**
+   - Файл с блоком `server { listen 5349 ssl; ... }` должен лежать в **streams-enabled** (не в sites-enabled).
+   - В **nginx.conf** на верхнем уровне (рядом с `http {}`) должен быть:
+     ```nginx
+     stream {
+       include streams-enabled/*.conf;
+     }
+     ```
+   - Проверка и перезагрузка:
+     ```bash
+     sudo nginx -t && sudo systemctl reload nginx
+     ```
+
+4. **Файрвол на этом же хосте:** входящий TCP 5349 должен быть разрешён (ufw allow 5349/tcp и т.п.).
+
+Если turn.nonza.ru указывает на **95.143.188.166**, а nginx с stream для TURN стоит на **другой** машине (например, где отдаётся meet.nonza.ru), то на 95.143.188.166 порт 5349 не слушается — нужно либо повесить turn.nonza.ru на IP той машины, где реально слушает nginx stream, либо поднять такой же stream на 95.143.188.166.
+
+---
+
 ## 4. Другие варианты
 
 | Вариант | Суть | Когда уместно |

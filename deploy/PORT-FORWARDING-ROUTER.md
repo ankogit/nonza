@@ -1,6 +1,10 @@
-# Проброс портов на 95.143.188.166 → 10.50.0.118
+# Проброс портов на шлюзе 95.143.188.166
 
-Если **95.143.188.166** — это шлюз/роутер (Linux), а **10.50.0.118** — сервер с LiveKit за ним, проброс настраивается на хосте **95.143.188.166** через iptables.
+**95.143.188.166** — шлюз в интернет. За ним:
+- **10.50.0.118** — LiveKit (порты 7881, 3478, 50000–50100)
+- **10.50.0.103** — nginx (в т.ч. stream для TURN на 5349)
+
+turn.nonza.ru указывает на 95.143.188.166, поэтому на шлюзе нужно пробросить **TCP 5349** на **10.50.0.103:5349**, иначе снаружи будет Connection refused.
 
 ## Условие
 
@@ -38,13 +42,18 @@ EXT_IF=eth0
 # Проброс TCP 7881
 sudo iptables -t nat -A PREROUTING -i $EXT_IF -p tcp --dport 7881 -j DNAT --to-destination 10.50.0.118:7881
 
+# Проброс TCP 5349 (TURN) на nginx 10.50.0.103
+sudo iptables -t nat -A PREROUTING -i $EXT_IF -p tcp --dport 5349 -j DNAT --to-destination 10.50.0.103:5349
+
 # Проброс UDP 3478
 sudo iptables -t nat -A PREROUTING -i $EXT_IF -p udp --dport 3478 -j DNAT --to-destination 10.50.0.118:3478
 
 # Проброс UDP 50000-50100 (диапазон)
 sudo iptables -t nat -A PREROUTING -i $EXT_IF -p udp --dport 50000:50100 -j DNAT --to-destination 10.50.0.118
 
-# Разрешить форвард для этих портов (чтобы ответы шли обратно)
+# Разрешить форвард (чтобы ответы шли обратно)
+sudo iptables -A FORWARD -i $EXT_IF -p tcp --dport 5349 -d 10.50.0.103 -j ACCEPT
+sudo iptables -A FORWARD -o $EXT_IF -p tcp -s 10.50.0.103 --sport 5349 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p tcp --dport 7881 -d 10.50.0.118 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p udp --dport 3478 -d 10.50.0.118 -j ACCEPT
 sudo iptables -A FORWARD -i $EXT_IF -p udp --dport 50000:50100 -d 10.50.0.118 -j ACCEPT
