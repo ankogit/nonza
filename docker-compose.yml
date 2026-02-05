@@ -57,7 +57,7 @@ services:
       - "5349:5349"
       - "3478:3478/udp"
       - "3478:3478"
-      - "49152-65535:49152-65535/udp"
+      - "49152-49200:49152-49200/udp"
     volumes:
       - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
     env_file:
