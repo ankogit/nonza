@@ -87,6 +87,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		}
 	}
 
+	// If TURNURL is unset, clients use LiveKit's built-in TURN from the join response.
 	if h.Config.TURNURL != "" && h.Config.TURNSecret != "" {
 		secret := normalizeTURNSecret(h.Config.TURNSecret)
 		if secret != "" {

@@ -1,18 +1,25 @@
 <template>
-  <div class="dashboard bg-dark">
+  <div class="dashboard bg-dark grain-overlay">
     <div class="room-header bg-dark-20">
       <div class="room-info color-white font-bebas">
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
         <div
-          v-if="!previewMode && (connectionStatus === 'warning' || connectionStatus === 'bad')"
+          v-if="
+            !previewMode &&
+            (connectionStatus === 'warning' || connectionStatus === 'bad')
+          "
           class="connection-indicator"
           :class="`connection-indicator--${connectionStatus}`"
           :title="connectionLabel"
         >
           <PixelIcon
-            :name="connectionStatus === 'bad' ? 'connection-bad' : 'connection-medium'"
+            :name="
+              connectionStatus === 'bad'
+                ? 'connection-bad'
+                : 'connection-medium'
+            "
             variant="small"
           />
           <span class="connection-indicator__label">{{ connectionLabel }}</span>
@@ -22,7 +29,12 @@
           :room="livekitRoom"
           :show-label="true"
         />
-        <Button variant="default" size="small" title="Настройки" @click="handleSettings">
+        <Button
+          variant="default"
+          size="small"
+          title="Настройки"
+          @click="handleSettings"
+        >
           <PixelIcon name="settings" variant="large" />
         </Button>
       </div>
@@ -32,12 +44,14 @@
       <div class="call-grid">
         <VideoParticipant
           v-for="p in roundTableParticipants"
-          :key="`${participantsKey}-${p.identity}-${props.getDisplayName?.(p) ?? p.name ?? p.identity}`"
+          :key="`${participantsKey}-${p.identity}-${
+            props.getDisplayName?.(p) ?? p.name ?? p.identity
+          }`"
           :participant="p"
           :participant-name="
             isLocal(p)
               ? props.participantName
-              : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
+              : props.getDisplayName?.(p) ?? p.name ?? p.identity
           "
           :is-speaking="speakingIdentitySet.has(p.identity)"
           :show-full-size="roundTableParticipants.length > 1"
@@ -166,9 +180,9 @@
             :participant-name="
               isLocal(fullscreenParticipant)
                 ? props.participantName
-                : (props.getDisplayName?.(fullscreenParticipant) ??
+                : props.getDisplayName?.(fullscreenParticipant) ??
                   fullscreenParticipant.name ??
-                  fullscreenParticipant.identity)
+                  fullscreenParticipant.identity
             "
             :is-speaking="
               fullscreenParticipant
@@ -318,7 +332,7 @@ const { connectionStatus, connectionLabel } =
   useConnectionIndicator(livekitRoomRef);
 
 const { replicaByParticipant, sendReplica } = useParticipantReplica(
-  computed(() => props.livekitRoom),
+  computed(() => props.livekitRoom)
 );
 
 const isDocumentOpen = ref(false);
@@ -384,7 +398,7 @@ watch(
       room.off(RoomEvent.ActiveSpeakersChanged, handler);
     };
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 // Обработка изменения метаданных участников (включая имя)
@@ -395,7 +409,7 @@ watch(
 
     const handleMetadataChanged = (
       _metadata: string | undefined,
-      _participant: RemoteParticipant | LocalParticipant,
+      _participant: RemoteParticipant | LocalParticipant
     ) => {
       participantsKey.value++;
     };
@@ -406,7 +420,7 @@ watch(
       room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
     };
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 const isLocal = (p: LocalParticipant | RemoteParticipant) =>
@@ -434,7 +448,10 @@ const {
   toggleAudio,
   toggleScreenShare,
   switchAudioInputDevice,
-} = useMediaControl(localParticipant, computed(() => props.livekitRoom));
+} = useMediaControl(
+  localParticipant,
+  computed(() => props.livekitRoom)
+);
 
 const handleDisconnect = () => {
   emit("disconnect");
@@ -471,7 +488,7 @@ watch(
       initialParticipantName.value = name;
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 function handleSettings() {
@@ -506,7 +523,7 @@ async function handleSaveSettings() {
           // Показываем пользователю предупреждение
           alert(
             "Не удалось обновить имя для других участников. " +
-              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене.",
+              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене."
           );
         }
       }
@@ -566,7 +583,7 @@ function handleModalClose() {
   if (hasUnsavedSettingsChanges.value) {
     if (
       confirm(
-        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?",
+        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?"
       )
     ) {
       handleCancelSettings();
