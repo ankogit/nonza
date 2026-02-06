@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"net/http"
 	"nonza/backend/internal/config"
 	tokenDto "nonza/backend/internal/dto/tokens"
@@ -14,6 +13,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+func normalizeTURNSecret(s string) string {
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	return strings.TrimSpace(s)
+}
 
 type TokensHandler struct {
 	Services *service.Services
@@ -83,8 +88,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 	}
 
 	if h.Config.TURNURL != "" && h.Config.TURNSecret != "" {
-		fmt.Println("TURNSecret", h.Config.TURNSecret)
-		secret := strings.TrimSpace(h.Config.TURNSecret)
+		secret := normalizeTURNSecret(h.Config.TURNSecret)
 		if secret != "" {
 			ttl := h.Config.TURNTTL
 			if ttl <= 0 {
