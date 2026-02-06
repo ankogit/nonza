@@ -22,8 +22,13 @@ case "${1:-}" in
     iptables -t nat -D PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "PREROUTING rule removed."
     iptables -t nat -D OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "OUTPUT rule removed."
     ;;
+  check|status)
+    echo "NAT PREROUTING and OUTPUT (look for $HOST_PUBLIC_IP $PORT_RANGE -> $COTURN_IP):"
+    iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null
+    iptables -t nat -L OUTPUT -n -v --line-numbers 2>/dev/null
+    ;;
   *)
-    echo "Usage: $0 add | del"
+    echo "Usage: $0 add | del | check"
     echo "Env: TURN_HOST_PUBLIC_IP ($HOST_PUBLIC_IP), TURN_COTURN_CONTAINER_IP ($COTURN_IP)"
     exit 1
     ;;
