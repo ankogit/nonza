@@ -9,8 +9,7 @@ keys:
   devkey: SjhHHIUvnFKcZrODPlmaKvOUImzOjpWHxuuvyIYF
 redis:
   address: redis:6379
-# TURN отключён — используется внешний coturn, креды отдаёт бэкенд в токене
-# turn:
-#   enabled: true
-#   ...
+turn:
+  enabled: true
+  udp_port: 3479
 log_level: info
