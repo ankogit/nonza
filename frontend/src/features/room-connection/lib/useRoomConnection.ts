@@ -191,7 +191,6 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
           })
         : undefined;
       const rtcConfig: RTCConfiguration = {
-        iceTransportPolicy: "relay",
         ...(iceServers && { iceServers }),
       };
       try {
