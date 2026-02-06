@@ -61,6 +61,7 @@ services:
     volumes:
       - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
       - ./deploy/coturn-entrypoint.sh:/entrypoint.sh
+      - ./deploy/keys:/etc/coturn/certs:ro
     env_file:
       - ./backend/.env
     command: ["sh", "/entrypoint.sh"]
