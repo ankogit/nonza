@@ -48,8 +48,7 @@ services:
         condition: service_healthy
     command: --config /etc/livekit.yaml
     networks:
-      nonza-network:
-        ipv4_address: 172.18.0.5
+      - nonza-network
 
   coturn:
     image: coturn/coturn:latest
@@ -67,8 +66,7 @@ services:
       - ./backend/.env
     command: ["sh", "/entrypoint.sh"]
     networks:
-      nonza-network:
-        ipv4_address: 172.18.0.4
+      - nonza-network
 
   backend:
     build:
@@ -113,7 +111,3 @@ volumes:
 networks:
   nonza-network:
     driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.18.0.0/24

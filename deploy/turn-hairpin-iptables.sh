@@ -3,7 +3,7 @@
 # Запускать на хосте, где крутятся Docker, coturn и LiveKit (root или sudo).
 # IP и диапазон портов должны совпадать с coturn.conf и docker-compose (external-ip, min-port/max-port).
 
-HOST_PUBLIC_IP="${TURN_HOST_PUBLIC_IP:-95.143.188.166}"
+HOST_PUBLIC_IP="${TURN_HOST_PUBLIC_IP:-155.212.181.137}"
 COTURN_IP="${TURN_COTURN_CONTAINER_IP:-172.18.0.4}"
 PORT_RANGE="49152:49200"
 # Доп. источники для SNAT (LiveKit на другом хосте): через запятую, напр. 10.50.0.103
