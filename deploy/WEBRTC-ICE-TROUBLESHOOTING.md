@@ -89,6 +89,8 @@ sudo ./deploy/turn-hairpin-iptables.sh save
 
 Удалить: `sudo ./deploy/turn-hairpin-iptables.sh del`.
 
+**Всё ещё failed, в coturn «peer 172.18.0.4»:** браузер шлёт CREATE_PERMISSION по адресу из кандидата LiveKit. Если в SDP попал внутренний IP (172.18.0.x), то после SNAT coturn видит 95.143.188.166 и не совпадает с разрешённым 172.x. Нужно, чтобы LiveKit отдавал клиенту только публичный IP. В `deploy/livekit-config.yaml` уже стоит `node_ip: "95.143.188.166"`. Попробуй временно выставить `use_external_ip: false` (оставив `node_ip`): тогда LiveKit не будет делать STUN-обнаружение и может отдавать только `node_ip`. Перезапусти LiveKit и проверь звонок снова. Если станет хуже (клиенты с других сетей перестанут подключаться), верни `use_external_ip: true`.
+
 ## 401 Unauthorized от TURN (coturn)
 
 В логах coturn: `check_stun_auth: Cannot find credentials of user <timestamp:ttl>` — запрос доходит, но coturn не принимает креды. При `use-auth-secret` это почти всегда **разный секрет у backend и coturn**.
