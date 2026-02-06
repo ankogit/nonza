@@ -145,9 +145,11 @@ const props = defineProps<{
 const apiBaseURL = props.apiBaseURL || "http://localhost:8000";
 const livekitURL = props.livekitURL || "ws://localhost:7880";
 
-// Get room code from URL if provided
 const urlParams = new URLSearchParams(window.location.search);
 const urlCode = urlParams.get("code");
+const forceRelay = ["1", "true"].includes(
+  urlParams.get("relay")?.toLowerCase() ?? ""
+);
 
 const shortCode = ref(props.defaultShortCode || urlCode || "");
 const participantName = ref(
@@ -193,7 +195,9 @@ const handleConnect = async () => {
   const code = shortCode.value.trim();
 
   try {
-    await connect(code, name, livekitURL);
+    await connect(code, name, livekitURL, {
+      ...(forceRelay && { iceTransportPolicy: "relay" }),
+    });
     room.value = connectionState.value.room;
     setRoomShortCode(code);
   } catch (err) {

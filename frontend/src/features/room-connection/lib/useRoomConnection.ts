@@ -63,7 +63,8 @@ export interface UseRoomConnectionReturn {
   connect: (
     shortCode: string,
     participantName: string,
-    livekitUrl: string
+    livekitUrl: string,
+    options?: { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] }
   ) => Promise<void>;
   reconnect: () => Promise<void>;
   disconnect: () => void;
@@ -85,6 +86,9 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const lastShortCode = ref<string>("");
   const lastParticipantName = ref<string>("");
   const lastLivekitUrl = ref<string>("");
+  const lastConnectOptions = ref<
+    { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] } | undefined
+  >(undefined);
 
   const updateParticipants = (
     updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void
@@ -125,7 +129,8 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const connect = async (
     shortCode: string,
     participantName: string,
-    livekitUrl: string
+    livekitUrl: string,
+    options?: { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] }
   ): Promise<void> => {
     if (state.value.isConnecting || state.value.isConnected) {
       throw new Error("Already connecting or connected");
@@ -192,6 +197,9 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         : undefined;
       const rtcConfig: RTCConfiguration = {
         ...(iceServers && { iceServers }),
+        ...(options?.iceTransportPolicy && {
+          iceTransportPolicy: options.iceTransportPolicy,
+        }),
       };
       try {
         await livekitRoom.connect(connectUrl, tokenResponse.token, {
@@ -216,6 +224,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       lastShortCode.value = shortCode;
       lastParticipantName.value = participantName;
       lastLivekitUrl.value = livekitUrl;
+      lastConnectOptions.value = options;
 
       setupEventListeners(livekitRoom);
       setLiveKitTransportMaxListeners(livekitRoom);
@@ -263,7 +272,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     }
     state.value.error = null;
     try {
-      await connect(code, name, url);
+      await connect(code, name, url, lastConnectOptions.value);
     } catch (err) {
       state.value.error =
         err instanceof Error ? err.message : "Не удалось переподключиться";
