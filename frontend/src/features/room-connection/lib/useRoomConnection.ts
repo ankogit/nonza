@@ -178,11 +178,12 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       }
 
       const iceServers = tokenResponse.ice_servers?.length
-        ? tokenResponse.ice_servers.map((s) => ({
-            urls: Array.isArray(s.urls) ? s.urls : [s.urls],
-            username: s.username,
-            credential: s.credential,
-          }))
+        ? tokenResponse.ice_servers.map((s) => {
+            const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+            const username = s.username ?? (s as { Username?: string }).Username;
+            const credential = s.credential ?? (s as { Credential?: string }).Credential;
+            return { urls, ...(username && credential && { username, credential }) };
+          })
         : undefined;
       const rtcConfig: RTCConfiguration = {
         iceTransportPolicy: "relay",

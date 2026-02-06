@@ -1,6 +1,8 @@
 #!/bin/sh
+set -e
+CONF="/etc/coturn/turnserver.conf"
 if [ -n "$TURN_USE_AUTH" ] && [ -n "$TURN_SECRET" ]; then
-  exec turnserver -c /etc/coturn/turnserver.conf --static-auth-secret="${TURN_SECRET}"
+  exec turnserver -c "$CONF" --static-auth-secret="$TURN_SECRET"
 else
-  exec turnserver -c /etc/coturn/turnserver.conf
+  exec turnserver -c "$CONF"
 fi
