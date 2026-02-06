@@ -1,0 +1,1 @@
+exec turnserver -c /etc/coturn/turnserver.conf --static-auth-secret="${TURN_SECRET}"

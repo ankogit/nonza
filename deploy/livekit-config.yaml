@@ -6,7 +6,7 @@ rtc:
   use_external_ip: true
   node_ip: "95.143.188.166"
 keys:
-  devkey: devsecret
+  devkey: SjhHHIUvnFKcZrODPlmaKvOUImzOjpWHxuuvyIYF
 redis:
   address: redis:6379
 # TURN отключён — используется внешний coturn, креды отдаёт бэкенд в токене

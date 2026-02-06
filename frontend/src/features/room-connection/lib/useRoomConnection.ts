@@ -11,7 +11,11 @@ import {
   type RoomOptions,
 } from "livekit-client";
 import e2eeWorkerUrl from "livekit-client/e2ee-worker?url";
-import { normalizeLiveKitUrl, isValidToken, playNotificationSound } from "@shared/lib";
+import {
+  normalizeLiveKitUrl,
+  isValidToken,
+  playNotificationSound,
+} from "@shared/lib";
 import type { RoomTokenResponse } from "@entities/room";
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -59,7 +63,7 @@ export interface UseRoomConnectionReturn {
   connect: (
     shortCode: string,
     participantName: string,
-    livekitUrl: string,
+    livekitUrl: string
   ) => Promise<void>;
   reconnect: () => Promise<void>;
   disconnect: () => void;
@@ -83,7 +87,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const lastLivekitUrl = ref<string>("");
 
   const updateParticipants = (
-    updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void,
+    updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void
   ) => {
     const next = new Map(state.value.participants) as Map<
       string,
@@ -103,7 +107,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     const participants = state.value.participants;
     const local = state.value.livekitRoom?.localParticipant;
     const result = Array.from(participants.values()).filter(
-      (p) => p !== local,
+      (p) => p !== local
     ) as RemoteParticipant[];
     void version;
     return result;
@@ -111,7 +115,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
   /** Display name for UI: uses reactive participantNames so other clients see name updates */
   const getDisplayName = (
-    participant: RemoteParticipant | LocalParticipant,
+    participant: RemoteParticipant | LocalParticipant
   ): string => {
     const fromMap = state.value.participantNames[participant.identity];
     if (fromMap !== undefined && fromMap !== "") return fromMap;
@@ -121,7 +125,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const connect = async (
     shortCode: string,
     participantName: string,
-    livekitUrl: string,
+    livekitUrl: string
   ): Promise<void> => {
     if (state.value.isConnecting || state.value.isConnected) {
       throw new Error("Already connecting or connected");
@@ -140,7 +144,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         shortCode,
         {
           participant_name: participantName,
-        },
+        }
       );
 
       // Validate token
@@ -197,7 +201,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         throw new Error(
           `Failed to connect to LiveKit: ${errorMessage}. ` +
             `Please check: 1) LiveKit server is running at ${connectUrl}, ` +
-            `2) Token is valid, 3) Network connectivity`,
+            `2) Token is valid, 3) Network connectivity`
         );
       }
 
@@ -279,7 +283,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     if (room.localParticipant) {
       initialParticipants.set(
         room.localParticipant.identity,
-        room.localParticipant,
+        room.localParticipant
       );
     }
     state.value.participants = initialParticipants;
@@ -289,7 +293,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     });
 
     const setupParticipantListeners = (
-      participant: RemoteParticipant | LocalParticipant,
+      participant: RemoteParticipant | LocalParticipant
     ) => {
       participant.on(ParticipantEvent.ParticipantMetadataChanged, () => {
         nextTick(() => {
@@ -311,7 +315,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
               map.set(participant.identity, participant);
             });
           });
-        },
+        }
       );
     };
 
@@ -327,14 +331,14 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
     const setParticipantDisplayName = (
       participant: RemoteParticipant | LocalParticipant,
-      name: string,
+      name: string
     ) => {
       state.value.participantNames[participant.identity] = name;
     };
 
     const handleRoomMetadataChanged = (
       _metadata: string | undefined,
-      participant: RemoteParticipant | LocalParticipant,
+      participant: RemoteParticipant | LocalParticipant
     ) => {
       const newName = participant.name ?? "";
       setParticipantDisplayName(participant, newName);
@@ -346,7 +350,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
     const handleRoomNameChanged = (
       name: string,
-      participant: RemoteParticipant | LocalParticipant,
+      participant: RemoteParticipant | LocalParticipant
     ) => {
       nextTick(() => {
         setParticipantDisplayName(participant, name);
@@ -368,6 +372,11 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       } else if (s === ConnectionState.Connected) {
         state.value.isReconnecting = false;
       } else if (s === ConnectionState.Disconnected) {
+        try {
+          room.disconnect();
+        } catch {
+          // room may already be disconnecting
+        }
         state.value.isConnected = false;
         state.value.livekitRoom = null;
         state.value.isReconnecting = true;
@@ -398,7 +407,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
             map.set(participant.identity, participant);
           });
         });
-      },
+      }
     );
 
     room.on(
@@ -411,7 +420,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
             map.delete(participant.identity);
           });
         });
-      },
+      }
     );
 
     // Batch track publish/unpublish: один updateParticipants на nextTick вместо N при быстрых событиях.
@@ -426,7 +435,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       pendingBump.clear();
     };
     const bumpParticipant = (
-      participant: RemoteParticipant | LocalParticipant,
+      participant: RemoteParticipant | LocalParticipant
     ) => {
       pendingBump.set(participant.identity, participant);
       if (!bumpScheduled) {
@@ -446,13 +455,13 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       bumpParticipant(participant);
     });
     room.on(RoomEvent.TrackUnpublished, (_pub, participant) =>
-      bumpParticipant(participant),
+      bumpParticipant(participant)
     );
     room.on(RoomEvent.LocalTrackPublished, (_pub, participant) =>
-      bumpParticipant(participant),
+      bumpParticipant(participant)
     );
     room.on(RoomEvent.LocalTrackUnpublished, (_pub, participant) =>
-      bumpParticipant(participant),
+      bumpParticipant(participant)
     );
   };
 
@@ -461,7 +470,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   });
 
   const stateComputed = computed(
-    () => state.value,
+    () => state.value
   ) as unknown as ComputedRef<RoomConnectionState>;
 
   return {

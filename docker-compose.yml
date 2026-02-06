@@ -60,9 +60,10 @@ services:
       - "49152-49200:49152-49200/udp"
     volumes:
       - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
+      - ./deploy/coturn-entrypoint.sh:/entrypoint.sh
     env_file:
       - ./backend/.env
-    command: ["sh", "-c", "turnserver -c /etc/coturn/turnserver.conf --static-auth-secret=$$TURN_SECRET"]
+    command: ["sh", "/entrypoint.sh"]
     networks:
       - nonza-network
 
