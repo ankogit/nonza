@@ -15,17 +15,37 @@ case "${1:-}" in
     iptables -t nat -A PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP"
     iptables -t nat -C OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null || \
     iptables -t nat -A OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP"
-    echo "Hairpin rules added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP (PREROUTING br+, PREROUTING, OUTPUT)"
+    case "$COTURN_IP" in
+      10.*|192.168.*)
+        iptables -t nat -C POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null || \
+        iptables -t nat -A POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP"
+        echo "Hairpin rules added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP + SNAT (peer will see $HOST_PUBLIC_IP)"
+        ;;
+      *)
+        echo "Hairpin rules added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP (PREROUTING br+, PREROUTING, OUTPUT)"
+        ;;
+    esac
     ;;
   del)
     iptables -t nat -D PREROUTING -i br+ -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "PREROUTING br+ rule removed."
     iptables -t nat -D PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "PREROUTING rule removed."
     iptables -t nat -D OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "OUTPUT rule removed."
+    case "$COTURN_IP" in
+      10.*|192.168.*)
+        iptables -t nat -D POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null && echo "POSTROUTING SNAT rule removed."
+        ;;
+    esac
     ;;
   check|status)
-    echo "NAT PREROUTING and OUTPUT (look for $HOST_PUBLIC_IP $PORT_RANGE -> $COTURN_IP):"
+    echo "NAT PREROUTING, OUTPUT (look for $HOST_PUBLIC_IP $PORT_RANGE -> $COTURN_IP):"
     iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null
     iptables -t nat -L OUTPUT -n -v --line-numbers 2>/dev/null
+    case "$COTURN_IP" in
+      10.*|192.168.*)
+        echo "POSTROUTING (SNAT for hairpin peer):"
+        iptables -t nat -L POSTROUTING -n -v --line-numbers 2>/dev/null
+        ;;
+    esac
     ;;
   save)
     if command -v netfilter-persistent >/dev/null 2>&1; then
