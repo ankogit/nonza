@@ -70,11 +70,11 @@ Relay-кандидат клиента — `95.x.x.x:49177`. LiveKit шлёт STU
 | Публичный IP на том же хосте, что и Docker | Хост с Docker | 172.18.0.4 (IP контейнера coturn) |
 | Публичный IP на шлюзе (95.143.188.166), хост с Docker за NAT (10.50.0.118) | **Шлюз 95.143.188.166** | **10.50.0.118** (хост с coturn) |
 
-У тебя: шлюз 95.143.188.166, хост с coturn/LiveKit — 10.50.0.118. Правила вешать **на шлюз**, DNAT на 10.50.0.118. Скрипт при `COTURN_IP=10.x` добавляет ещё **SNAT**: трафик «с 10.50.0.118 на 10.50.0.118» (hairpin) уходит с источником 95.143.188.166, чтобы coturn видел peer 95.143.188.166 и совпадал с CREATE_PERMISSION (иначе ICE-пара остаётся failed).
+У тебя: шлюз 95.143.188.166, coturn на 10.50.0.118, LiveKit/nginx на 10.50.0.103. Правила — **на шлюз**. DNAT на 10.50.0.118. Скрипт при `COTURN_IP=10.x` добавляет **SNAT**: источник трафика на 10.50.0.118:49152–49200 подменяется на 95.143.188.166, чтобы coturn видел peer 95.143.188.166 (иначе ICE failed). Если LiveKit на **другом** хосте (10.50.0.103), задай его IP в `TURN_HAIRPIN_SNAT_SOURCE_IPS`:
 
 ```bash
 # На шлюзе 95.143.188.166:
-sudo TURN_COTURN_CONTAINER_IP=10.50.0.118 ./deploy/turn-hairpin-iptables.sh add
+sudo TURN_COTURN_CONTAINER_IP=10.50.0.118 TURN_HAIRPIN_SNAT_SOURCE_IPS=10.50.0.103 ./deploy/turn-hairpin-iptables.sh add
 sudo ./deploy/turn-hairpin-iptables.sh save
 ```
 

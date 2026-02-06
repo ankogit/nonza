@@ -6,6 +6,8 @@
 HOST_PUBLIC_IP="${TURN_HOST_PUBLIC_IP:-95.143.188.166}"
 COTURN_IP="${TURN_COTURN_CONTAINER_IP:-172.18.0.4}"
 PORT_RANGE="49152:49200"
+# Доп. источники для SNAT (LiveKit на другом хосте): через запятую, напр. 10.50.0.103
+SNAT_SOURCES="${TURN_HAIRPIN_SNAT_SOURCE_IPS:-}"
 
 case "${1:-}" in
   add)
@@ -19,6 +21,10 @@ case "${1:-}" in
       10.*|192.168.*)
         iptables -t nat -C POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null || \
         iptables -t nat -A POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP"
+        for src in $(echo "$SNAT_SOURCES" | tr ', ' ' \n' | grep -v '^$'); do
+          iptables -t nat -C POSTROUTING -s "$src" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null || \
+          iptables -t nat -A POSTROUTING -s "$src" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP"
+        done
         echo "Hairpin rules added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP + SNAT (peer will see $HOST_PUBLIC_IP)"
         ;;
       *)
@@ -33,6 +39,9 @@ case "${1:-}" in
     case "$COTURN_IP" in
       10.*|192.168.*)
         iptables -t nat -D POSTROUTING -s "$COTURN_IP" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null && echo "POSTROUTING SNAT rule removed."
+        for src in $(echo "$SNAT_SOURCES" | tr ', ' ' \n' | grep -v '^$'); do
+          iptables -t nat -D POSTROUTING -s "$src" -d "$COTURN_IP" -p udp --dport "$PORT_RANGE" -j SNAT --to-source "$HOST_PUBLIC_IP" 2>/dev/null && echo "POSTROUTING SNAT $src removed."
+        done
         ;;
     esac
     ;;
@@ -61,6 +70,7 @@ case "${1:-}" in
   *)
     echo "Usage: $0 add | del | check | save"
     echo "Env: TURN_HOST_PUBLIC_IP ($HOST_PUBLIC_IP), TURN_COTURN_CONTAINER_IP ($COTURN_IP)"
+    echo "      TURN_HAIRPIN_SNAT_SOURCE_IPS (e.g. 10.50.0.103 if LiveKit on another host)"
     exit 1
     ;;
 esac
