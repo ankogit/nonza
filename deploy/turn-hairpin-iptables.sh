@@ -27,8 +27,19 @@ case "${1:-}" in
     iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null
     iptables -t nat -L OUTPUT -n -v --line-numbers 2>/dev/null
     ;;
+  save)
+    if command -v netfilter-persistent >/dev/null 2>&1; then
+      netfilter-persistent save && echo "Rules saved (netfilter-persistent)."
+    elif [ -d /etc/iptables ]; then
+      iptables-save > /etc/iptables/rules.v4 2>/dev/null && echo "Rules saved to /etc/iptables/rules.v4" || echo "Run: sudo iptables-save | sudo tee /etc/iptables/rules.v4"
+    else
+      echo "Save rules manually after add, e.g.:"
+      echo "  Debian/Ubuntu: sudo apt install iptables-persistent && sudo netfilter-persistent save"
+      echo "  Or: sudo iptables-save | sudo tee /etc/iptables.rules"
+    fi
+    ;;
   *)
-    echo "Usage: $0 add | del | check"
+    echo "Usage: $0 add | del | check | save"
     echo "Env: TURN_HOST_PUBLIC_IP ($HOST_PUBLIC_IP), TURN_COTURN_CONTAINER_IP ($COTURN_IP)"
     exit 1
     ;;

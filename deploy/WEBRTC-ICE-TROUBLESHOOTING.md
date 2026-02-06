@@ -79,7 +79,7 @@ sudo iptables -t nat -A PREROUTING -d 95.143.188.166 -p udp --dport 49152:49200 
 sudo iptables -t nat -A OUTPUT -d 95.143.188.166 -p udp --dport 49152:49200 -j DNAT --to-destination 172.18.0.4
 ```
 
-Чтобы правила не пропали после перезагрузки: `iptables-persistent` / `netfilter-persistent` или скрипт при старте.
+Чтобы правила не пропали после перезагрузки, после `add` выполни: `sudo ./deploy/turn-hairpin-iptables.sh save` (если установлен `iptables-persistent` / `netfilter-persistent`). Или настрой восстановление правил при старте (скрипт с `iptables-restore` или сервис).
 
 Удалить: `sudo ./deploy/turn-hairpin-iptables.sh del`.
 
