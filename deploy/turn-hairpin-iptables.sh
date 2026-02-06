@@ -1,4 +1,4 @@
-git#!/bin/sh
+#!/bin/sh
 # Hairpin для TURN relay: трафик на свой публичный IP:49152-49200 перенаправить в контейнер coturn.
 # Запускать на хосте, где крутятся Docker, coturn и LiveKit (root или sudo).
 # IP и диапазон портов должны совпадать с coturn.conf и docker-compose (external-ip, min-port/max-port).
