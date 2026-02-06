@@ -3,9 +3,12 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # false + node_ip: только 95.x в кандидатах; иначе может появиться 172.18.0.x, CREATE_PERMISSION не совпадёт с SNAT.
   use_external_ip: false
   node_ip: "95.143.188.166"
+  ips:
+    excludes:
+      - 172.16.0.0/12
+      - 10.0.0.0/8
 keys:
   devkey: SjhHHIUvnFKcZrODPlmaKvOUImzOjpWHxuuvyIYF
 redis:

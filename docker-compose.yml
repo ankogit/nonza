@@ -48,7 +48,8 @@ services:
         condition: service_healthy
     command: --config /etc/livekit.yaml
     networks:
-      - nonza-network
+      nonza-network:
+        ipv4_address: 172.18.0.5
 
   coturn:
     image: coturn/coturn:latest
