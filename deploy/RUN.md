@@ -34,14 +34,18 @@ make up
 
 ```bash
 cd /path/to/nonza
+sudo sh deploy/turn-hairpin-iptables.sh add
+```
+
+Если появляется `command not found` при `sudo ./deploy/...`, скорее всего в файле CRLF — убери их и сделай скрипт исполняемым:
+
+```bash
+sed -i 's/\r$//' deploy/turn-hairpin-iptables.sh
+chmod +x deploy/turn-hairpin-iptables.sh
 sudo ./deploy/turn-hairpin-iptables.sh add
 ```
 
-Либо полный путь к скрипту (подставь свой каталог репозитория):
-
-```bash
-sudo /home/infra/data/nonza/deploy/turn-hairpin-iptables.sh add
-```
+Либо всегда запускать через `sh` (shebang не нужен): `sudo sh deploy/turn-hairpin-iptables.sh add`.
 
 Чтобы правило сохранялось после перезагрузки: `sudo apt install iptables-persistent` и после добавления правила: `sudo netfilter-persistent save`.
 

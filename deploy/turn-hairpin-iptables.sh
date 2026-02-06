@@ -10,12 +10,14 @@ PORT_RANGE="49152:49200"
 case "${1:-}" in
   add)
     iptables -t nat -C PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null || \
-    iptables -t nat -A PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP"
-    echo "Hairpin rule added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP"
+    iptables -t nat -I PREROUTING 1 -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP"
+    iptables -t nat -C OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null || \
+    iptables -t nat -A OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP"
+    echo "Hairpin rules added: $HOST_PUBLIC_IP:$PORT_RANGE -> $COTURN_IP (PREROUTING + OUTPUT)"
     ;;
   del)
-    iptables -t nat -D PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && \
-    echo "Hairpin rule removed." || echo "Rule not found or already removed."
+    iptables -t nat -D PREROUTING -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "PREROUTING rule removed."
+    iptables -t nat -D OUTPUT -d "$HOST_PUBLIC_IP" -p udp --dport "$PORT_RANGE" -j DNAT --to-destination "$COTURN_IP" 2>/dev/null && echo "OUTPUT rule removed."
     ;;
   *)
     echo "Usage: $0 add | del"
