@@ -132,6 +132,7 @@ func (h *Handler) initRoomsRoutes(api *gin.RouterGroup) {
 	{
 		rooms.GET("/:shortCode", roomHandler.GetByShortCode)
 		rooms.GET("/id/:id", roomHandler.GetByID)
+		rooms.PATCH("/:shortCode/conference-hall-leader", roomHandler.UpdateConferenceHallLeader)
 	}
 }
 

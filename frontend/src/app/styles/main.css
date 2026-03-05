@@ -1,5 +1,6 @@
 @import './design.css';
 @import './pixel-icons.css';
+@import './room-fullscreen.css';
 
 :root {
   --color-primary: #e74c3c;

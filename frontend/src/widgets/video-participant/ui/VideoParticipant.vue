@@ -10,6 +10,7 @@
     :has-speaking-permission="hasSpeakingPermission"
     :show-full-size="showFullSize"
     :replica-text="replicaText"
+    :pip="false"
     @full-size="emit('full-size')"
   />
 </template>

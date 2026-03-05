@@ -4,7 +4,10 @@
     :class="[
       { 'player--speaking': isSpeaking },
       mode === 'list' && 'player--list',
+      (pip === true) && 'player--pip',
     ]"
+    :style="pip === true ? pipStyle : undefined"
+    @pointerdown="pip === true ? onPipPointerDown : undefined"
   >
     <template v-if="mode === 'grid'">
       <div
@@ -72,23 +75,21 @@
           <span
             v-if="leaderHand.isLeader"
             v-memo="[leaderHand.isLeader]"
-            class="indicator default"
+            class="indicator warning"
             title="Лидер"
           >
             <PixelIcon name="leader" variant="small" />
           </span>
         </div>
         <div class="right">
-          <template v-memo="[mode, hasRaisedHand]">
-            <slot v-if="mode === 'list'" name="actions" />
-            <span
-              v-if="hasRaisedHand"
-              class="indicator warning"
-              title="Поднята рука"
-            >
-              <PixelIcon name="hand" variant="small" />
-            </span>
-          </template>
+          <slot v-if="mode === 'list'" name="actions" />
+          <span
+            v-if="hasRaisedHand"
+            class="indicator warning"
+            title="Поднята рука"
+          >
+            <PixelIcon name="hand" variant="small" />
+          </span>
           <MicIndicator
             ref="micIndicatorRef"
             :is-audio-enabled="isAudioEnabled"
@@ -105,6 +106,26 @@
         </div>
       </div>
     </div>
+    <template v-if="pip === true">
+      <div
+        data-pip-resize-handle
+        class="player-pip-resize"
+        title="Изменить размер"
+        @pointerdown.stop="onPipResize?.(($event as PointerEvent))"
+      />
+      <Button
+        v-if="onPipClose"
+        class="player-pip-close"
+        size="small"
+        variant="default"
+        icon-size="28px"
+        aria-label="Скрыть"
+        title="Скрыть миниатюру"
+        @click.stop="onPipClose"
+      >
+        <PixelIcon name="close" variant="small" />
+      </Button>
+    </template>
   </div>
 </template>
 
@@ -115,7 +136,7 @@ import type {
   LocalParticipant,
   RemoteAudioTrack,
 } from "livekit-client";
-import { PixelIcon } from "@shared/ui";
+import { Button, PixelIcon } from "@shared/ui";
 import FullscreenIcon from "./FullscreenIcon.vue";
 import MicIndicator from "./MicIndicator.vue";
 import ReplicaBlock from "./ReplicaBlock.vue";
@@ -138,6 +159,11 @@ const props = withDefaults(
     showFullSize?: boolean;
     isAudioEnabled?: boolean;
     replicaText?: string;
+    pip?: boolean;
+    pipStyle?: { left: string; top: string; width: string; height: string };
+    onPipDrag?: (e: PointerEvent) => void;
+    onPipResize?: (e: PointerEvent) => void;
+    onPipClose?: () => void;
   }>(),
   {
     participant: null,
@@ -147,10 +173,18 @@ const props = withDefaults(
     hasRaisedHand: false,
     hasSpeakingPermission: false,
     showFullSize: false,
+    pip: false,
   },
 );
 
 const emit = defineEmits<{ "full-size": [] }>();
+
+function onPipPointerDown(e: PointerEvent) {
+  if ((e.target as HTMLElement).closest("button")) return;
+  if ((e.target as HTMLElement).closest("[data-pip-resize-handle]")) return;
+  e.preventDefault();
+  props.onPipDrag?.(e);
+}
 
 const nameReplica = ref({
   participantName: props.participantName ?? "",
@@ -339,5 +373,55 @@ watch(
   height: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.player--pip {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid #444;
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5);
+  background: #1a1a1a;
+  min-width: 160px;
+  min-height: 90px;
+  width: auto;
+  height: auto;
+  cursor: move;
+}
+
+.player--pip .player-menu {
+  flex-shrink: 0;
+}
+
+.player--pip .player-avatar {
+  flex: 1;
+  min-height: 0;
+}
+
+.player-pip-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  height: 28px;
+  z-index: 10;
+  cursor: nwse-resize;
+  background: #333;
+  pointer-events: auto;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+.player-pip-resize:hover {
+  background: #555;
+}
+
+.player-pip-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  pointer-events: auto;
 }
 </style>

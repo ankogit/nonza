@@ -14,37 +14,43 @@ type CreateRoomRequest struct {
 }
 
 type RoomResponse struct {
-	ID              string     `json:"id"`
-	OrganizationID  string     `json:"organization_id"`
-	Name            string     `json:"name"`
-	ShortCode       *string    `json:"short_code"`
-	RoomType        string     `json:"room_type"`
-	IsTemporary     bool       `json:"is_temporary"`
-	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
-	LiveKitRoomName string     `json:"livekit_room_name"`
-	E2EEEnabled     bool       `json:"e2ee_enabled"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID                       string     `json:"id"`
+	OrganizationID           string     `json:"organization_id"`
+	Name                     string     `json:"name"`
+	ShortCode                *string    `json:"short_code"`
+	RoomType                 string     `json:"room_type"`
+	IsTemporary              bool       `json:"is_temporary"`
+	ExpiresAt                *time.Time `json:"expires_at,omitempty"`
+	LiveKitRoomName          string     `json:"livekit_room_name"`
+	E2EEEnabled              bool       `json:"e2ee_enabled"`
+	ConferenceHallLeaderID   *string    `json:"conference_hall_leader_id"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
 func ToRoomResponse(room *models.Room) RoomResponse {
 	e2ee := false
+	var conferenceHallLeaderID *string
 	if room.Settings != nil {
 		if v, ok := room.Settings["e2ee_enabled"].(bool); ok {
 			e2ee = v
 		}
+		if v, ok := room.Settings["conference_hall_leader_id"].(string); ok && v != "" {
+			conferenceHallLeaderID = &v
+		}
 	}
 	return RoomResponse{
-		ID:              room.ID.String(),
-		OrganizationID:  room.OrganizationID.String(),
-		Name:            room.Name,
-		ShortCode:       room.ShortCode,
-		RoomType:        string(room.RoomType),
-		IsTemporary:     room.IsTemporary,
-		ExpiresAt:       room.ExpiresAt,
-		LiveKitRoomName: room.LiveKitRoomName,
-		E2EEEnabled:     e2ee,
-		CreatedAt:       room.CreatedAt,
-		UpdatedAt:       room.UpdatedAt,
+		ID:                     room.ID.String(),
+		OrganizationID:         room.OrganizationID.String(),
+		Name:                   room.Name,
+		ShortCode:              room.ShortCode,
+		RoomType:               string(room.RoomType),
+		IsTemporary:            room.IsTemporary,
+		ExpiresAt:              room.ExpiresAt,
+		LiveKitRoomName:        room.LiveKitRoomName,
+		E2EEEnabled:            e2ee,
+		ConferenceHallLeaderID: conferenceHallLeaderID,
+		CreatedAt:              room.CreatedAt,
+		UpdatedAt:              room.UpdatedAt,
 	}
 }

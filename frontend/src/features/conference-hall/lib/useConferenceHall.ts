@@ -28,6 +28,10 @@ export function useConferenceHall(
   participantName: () => string,
   livekitRoom: () => LiveKitRoom | null,
   onStateChange?: (state: ConferenceHallState) => void,
+  options?: {
+    initialLeaderIdentity?: () => string | null;
+    onLeaderChange?: (leaderIdentity: string | null) => void;
+  },
 ) {
   const state = ref<ConferenceHallState>({
     leaderIdentity: null,
@@ -35,6 +39,8 @@ export function useConferenceHall(
     raisedHands: [],
     speakingPermissions: [],
   });
+
+  const stateSynced = ref(false);
 
   // Broadcast current state to all participants via LiveKit DataChannel
   const broadcastState = () => {
@@ -100,9 +106,26 @@ export function useConferenceHall(
             if (receivedState.leaderIdentity !== undefined) {
               state.value.leaderIdentity = receivedState.leaderIdentity;
             }
+            const local = localParticipant();
+            if (
+              local &&
+              receivedState.leaderIdentity !== undefined &&
+              receivedState.leaderIdentity === local.identity
+            ) {
+              options?.onLeaderChange?.(state.value.leaderIdentity);
+            }
 
             if (Array.isArray(receivedState.raisedHands)) {
-              state.value.raisedHands = [...receivedState.raisedHands];
+              const nextRaised = [...receivedState.raisedHands];
+              const local = localParticipant();
+              if (
+                local &&
+                state.value.raisedHands.includes(local.identity) &&
+                !nextRaised.includes(local.identity)
+              ) {
+                nextRaised.push(local.identity);
+              }
+              state.value.raisedHands = nextRaised;
             }
 
             if (Array.isArray(receivedState.speakingPermissions)) {
@@ -111,6 +134,7 @@ export function useConferenceHall(
               ];
             }
 
+            stateSynced.value = true;
             updateParticipants();
           });
         } else if (data.type === "request_state") {
@@ -144,9 +168,15 @@ export function useConferenceHall(
     // Request state after a short delay to ensure room is ready
     if (room.state === "connected") {
       setTimeout(requestState, 500);
+      setTimeout(() => {
+        stateSynced.value = true;
+      }, 1200);
     } else {
       room.once("connected", () => {
         setTimeout(requestState, 500);
+        setTimeout(() => {
+          stateSynced.value = true;
+        }, 1200);
       });
     }
 
@@ -162,6 +192,7 @@ export function useConferenceHall(
   watch(
     livekitRoom,
     (room) => {
+      stateSynced.value = false;
       if (cleanupDataChannel) {
         cleanupDataChannel();
         cleanupDataChannel = null;
@@ -235,6 +266,7 @@ export function useConferenceHall(
     });
 
     state.value.participants = participants;
+    state.value = { ...state.value };
     onStateChange?.(state.value);
   };
 
@@ -316,6 +348,7 @@ export function useConferenceHall(
   const transferLeadership = (participantIdentity: string) => {
     if (!isLeader.value) return;
     state.value.leaderIdentity = participantIdentity;
+    options?.onLeaderChange?.(state.value.leaderIdentity);
     // Remove from raised hands and speaking permissions
     const raisedIndex = state.value.raisedHands.indexOf(participantIdentity);
     if (raisedIndex > -1) {
@@ -333,25 +366,50 @@ export function useConferenceHall(
 
   // Update when participants change
   const watchParticipants = () => {
-    updateParticipants();
-    // If leader left, assign new leader
     const local = localParticipant();
     const remotes = remoteParticipants();
+    const presentIdentities = new Set<string>();
+    if (local) presentIdentities.add(local.identity);
+    remotes.forEach((p) => presentIdentities.add(p.identity));
 
-    if (state.value.leaderIdentity) {
-      const leaderExists =
-        local?.identity === state.value.leaderIdentity ||
-        remotes.some((p) => p.identity === state.value.leaderIdentity);
-      if (!leaderExists) {
+    if (
+      !state.value.leaderIdentity &&
+      options?.initialLeaderIdentity?.()
+    ) {
+      state.value.leaderIdentity = options.initialLeaderIdentity()!;
+      options?.onLeaderChange?.(state.value.leaderIdentity);
+    }
+
+    state.value.raisedHands = state.value.raisedHands.filter((id) =>
+      presentIdentities.has(id),
+    );
+    state.value.speakingPermissions =
+      state.value.speakingPermissions.filter((id) =>
+        presentIdentities.has(id),
+      );
+
+    updateParticipants();
+
+    if (!state.value.leaderIdentity) {
+      const fromRoom = options?.initialLeaderIdentity?.();
+      if (fromRoom) {
+        state.value.leaderIdentity = fromRoom;
+        options?.onLeaderChange?.(state.value.leaderIdentity);
+      } else {
         initializeLeader();
+        options?.onLeaderChange?.(state.value.leaderIdentity);
       }
     } else {
-      initializeLeader();
+      const leaderExists = presentIdentities.has(state.value.leaderIdentity);
+      if (!leaderExists) {
+        // Лидер вышел — не назначаем нового, ждём его возвращения
+      }
     }
   };
 
   return {
     state: computed(() => state.value),
+    stateSynced: computed(() => stateSynced.value),
     isLeader,
     leader,
     participantsWithRaisedHands,

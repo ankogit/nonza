@@ -82,7 +82,7 @@ const handleCreateRoom = async (data: CreateRoomRequest) => {
         name: data.name,
         short_code: "abc-defg-hij",
         room_type: data.room_type,
-        is_temporary: data.is_temporary ?? true,
+        is_temporary: data.is_temporary ?? false,
         expires_at: null,
         livekit_room_name: "mock-room",
         e2ee_enabled: data.e2ee_enabled ?? false,

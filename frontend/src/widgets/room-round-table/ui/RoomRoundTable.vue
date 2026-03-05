@@ -51,7 +51,7 @@
           :participant-name="
             isLocal(p)
               ? props.participantName
-              : props.getDisplayName?.(p) ?? p.name ?? p.identity
+              : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
           "
           :is-speaking="speakingIdentitySet.has(p.identity)"
           :show-full-size="roundTableParticipants.length > 1"
@@ -169,20 +169,30 @@
     <Teleport to="body">
       <div
         v-if="fullscreenParticipant"
-        class="round-table-fullscreen"
+        class="room-fullscreen grain-overlay"
         role="dialog"
         aria-label="Во весь экран"
         @click.self="closeFullscreen"
       >
-        <div class="round-table-fullscreen__video">
+        <Button
+          variant="default"
+          size="small"
+          class="room-fullscreen__close"
+          title="Закрыть полноэкранный режим"
+          aria-label="Закрыть"
+          @click="closeFullscreen"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+        <div class="room-fullscreen__video">
           <VideoParticipant
             :participant="fullscreenParticipant"
             :participant-name="
               isLocal(fullscreenParticipant)
                 ? props.participantName
-                : props.getDisplayName?.(fullscreenParticipant) ??
+                : (props.getDisplayName?.(fullscreenParticipant) ??
                   fullscreenParticipant.name ??
-                  fullscreenParticipant.identity
+                  fullscreenParticipant.identity)
             "
             :is-speaking="
               fullscreenParticipant
@@ -196,15 +206,138 @@
             "
           />
         </div>
-        <Button
-          variant="default"
-          class="round-table-fullscreen__close"
-          title="Закрыть"
-          aria-label="Закрыть"
-          @click="closeFullscreen"
+        <div
+          v-if="
+            showFullscreenSelfPiP &&
+            fullscreenSelfPiPVisible &&
+            localParticipant
+          "
+          class="room-fullscreen__pip"
+          :style="fullscreenSelfPiPStyle"
+          @pointerdown="fullscreenSelfPiPDraggable.handlePointerDown"
         >
-          <PixelIcon name="close" variant="large" />
+          <Player
+            mode="grid"
+            :participant="localParticipant"
+            :participant-name="props.participantName"
+            :is-speaking="
+              fullscreenParticipant
+                ? speakingIdentitySet.has(localParticipant.identity)
+                : false
+            "
+            :show-full-size="false"
+            :pip="false"
+            :replica-text="
+              replicaByParticipant[localParticipant?.identity]?.text
+            "
+          />
+          <div
+            data-pip-resize-handle
+            class="room-fullscreen__pip-resize"
+            title="Изменить размер"
+            @pointerdown.stop="
+              fullscreenSelfPiPDraggable.handleResizePointerDown
+            "
+          />
+          <Button
+            class="room-fullscreen__pip-close"
+            variant="default"
+            size="small"
+            icon-size="28px"
+            aria-label="Скрыть"
+            title="Скрыть миниатюру"
+            @click.stop="toggleFullscreenSelfPiPVisible"
+          >
+            <PixelIcon name="close" variant="small" />
+          </Button>
+        </div>
+        <Button
+          v-if="false && showFullscreenSelfPiP && !fullscreenSelfPiPVisible"
+          variant="default"
+          size="small"
+          class="room-fullscreen__show-pip"
+          title="Показать свою миниатюру"
+          @click="toggleFullscreenSelfPiPVisible"
+        >
+          <PixelIcon name="video-on" variant="small" />
+          <span>Показать себя</span>
         </Button>
+        <div
+          class="room-fullscreen__menu menu bg-dark-20"
+          ref="fullscreenMenuRef"
+        >
+          <div class="left">
+            <Button
+              :class="{
+                active: mediaState.isAudioEnabled,
+                default: !mediaState.isAudioEnabled,
+              }"
+              :title="
+                mediaState.isAudioEnabled
+                  ? 'Выключить микрофон'
+                  : 'Включить микрофон'
+              "
+              @click="toggleAudio"
+            >
+              <PixelIcon
+                :name="mediaState.isAudioEnabled ? 'mic-on' : 'mic-off'"
+                variant="large"
+              />
+            </Button>
+            <Button
+              :class="{
+                active: mediaState.isVideoEnabled,
+                default: !mediaState.isVideoEnabled,
+              }"
+              :title="
+                mediaState.isVideoEnabled ? 'Выключить видео' : 'Включить видео'
+              "
+              @click="toggleVideo"
+            >
+              <PixelIcon
+                :name="mediaState.isVideoEnabled ? 'video-on' : 'video-off'"
+                variant="large"
+              />
+            </Button>
+            <Button
+              v-if="!previewMode"
+              :class="{
+                active: mediaState.isScreenSharing,
+                default: !mediaState.isScreenSharing,
+              }"
+              title="Трансляция экрана"
+              @click="toggleScreenShare"
+            >
+              <PixelIcon
+                :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'"
+                variant="large"
+              />
+            </Button>
+            <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+          </div>
+          <div class="center">
+            <Button
+              variant="danger"
+              title="Закончить разговор"
+              @click="handleDisconnect"
+            >
+              <PixelIcon name="hangup" variant="large" />
+            </Button>
+          </div>
+          <div class="right">
+            <Button
+              v-if="props.showDocument"
+              variant="default"
+              :class="{ active: isDocumentOpen }"
+              :title="
+                isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'
+              "
+              @click="toggleDocument"
+            >
+              <PixelIcon name="document" variant="large" />
+            </Button>
+          </div>
+        </div>
       </div>
     </Teleport>
 
@@ -296,9 +429,13 @@ import {
   ReplicaInput,
 } from "@features/participant-replica";
 import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
-import { VideoParticipant } from "@widgets/video-participant";
+import { VideoParticipant, Player } from "@widgets/video-participant";
 import { CollaborativeDocument } from "@widgets/collaborative-document";
-import { setParticipantName, getStoredAudioInputDevice } from "@shared/lib";
+import {
+  setParticipantName,
+  getStoredAudioInputDevice,
+  useDraggablePiP,
+} from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@entities/room";
 import { RoomEvent } from "livekit-client";
@@ -332,7 +469,7 @@ const { connectionStatus, connectionLabel } =
   useConnectionIndicator(livekitRoomRef);
 
 const { replicaByParticipant, sendReplica } = useParticipantReplica(
-  computed(() => props.livekitRoom)
+  computed(() => props.livekitRoom),
 );
 
 const isDocumentOpen = ref(false);
@@ -398,7 +535,7 @@ watch(
       room.off(RoomEvent.ActiveSpeakersChanged, handler);
     };
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Обработка изменения метаданных участников (включая имя)
@@ -409,7 +546,7 @@ watch(
 
     const handleMetadataChanged = (
       _metadata: string | undefined,
-      _participant: RemoteParticipant | LocalParticipant
+      _participant: RemoteParticipant | LocalParticipant,
     ) => {
       participantsKey.value++;
     };
@@ -420,7 +557,7 @@ watch(
       room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
     };
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const isLocal = (p: LocalParticipant | RemoteParticipant) =>
@@ -440,6 +577,7 @@ function handleFullSize(identity: string) {
 
 function closeFullscreen() {
   fullscreenIdentity.value = null;
+  fullscreenSelfPiPVisible.value = true;
 }
 
 const {
@@ -450,8 +588,27 @@ const {
   switchAudioInputDevice,
 } = useMediaControl(
   localParticipant,
-  computed(() => props.livekitRoom)
+  computed(() => props.livekitRoom),
 );
+
+const fullscreenMenuRef = ref<HTMLElement | null>(null);
+const fullscreenSelfPiPVisible = ref(true);
+const fullscreenSelfPiPDraggable = useDraggablePiP(undefined, undefined, {
+  getBottomOffset: () => (fullscreenMenuRef.value?.offsetHeight ?? 88) + 36,
+});
+const showFullscreenSelfPiP = computed(
+  () => fullscreenParticipant.value && !isLocal(fullscreenParticipant.value!),
+);
+const fullscreenSelfPiPStyle = computed(() => ({
+  left: fullscreenSelfPiPDraggable.position.value.x + "px",
+  top: fullscreenSelfPiPDraggable.position.value.y + "px",
+  width: fullscreenSelfPiPDraggable.size.value.width + "px",
+  height: fullscreenSelfPiPDraggable.size.value.height + "px",
+}));
+
+function toggleFullscreenSelfPiPVisible() {
+  fullscreenSelfPiPVisible.value = !fullscreenSelfPiPVisible.value;
+}
 
 const handleDisconnect = () => {
   emit("disconnect");
@@ -488,7 +645,7 @@ watch(
       initialParticipantName.value = name;
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function handleSettings() {
@@ -523,7 +680,7 @@ async function handleSaveSettings() {
           // Показываем пользователю предупреждение
           alert(
             "Не удалось обновить имя для других участников. " +
-              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене."
+              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене.",
           );
         }
       }
@@ -583,7 +740,7 @@ function handleModalClose() {
   if (hasUnsavedSettingsChanges.value) {
     if (
       confirm(
-        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?"
+        "У вас есть несохраненные изменения. Вы уверены, что хотите закрыть?",
       )
     ) {
       handleCancelSettings();
@@ -652,148 +809,4 @@ function handleModalClose() {
   }
 }
 
-.round-table-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.round-table-fullscreen__video {
-  width: 100%;
-  height: 100%;
-}
-
-.round-table-fullscreen__video :deep(.player) {
-  width: 100%;
-  height: 100%;
-}
-
-.round-table-fullscreen__close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
-.settings-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.settings-section-title {
-  margin: 0;
-  font-family: "Bebas Neue", sans-serif;
-  font-size: 1.2rem;
-  font-weight: 400;
-  color: #bab1a8;
-  letter-spacing: 0.02em;
-  border-bottom: 2px solid #333;
-  padding-bottom: 8px;
-}
-
-.settings-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #ccc;
-}
-
-.settings-input-group {
-  display: flex;
-  gap: 8px;
-}
-
-.settings-input {
-  flex: 1;
-  padding: 12px;
-  border: 2px solid #444;
-  background: #1a1a1a;
-  color: white;
-  font-size: 16px;
-  outline: none;
-  transition: none;
-  font-family: inherit;
-}
-
-.settings-input:focus {
-  border-color: #2980b9;
-  box-shadow: inset 0 0 0 2px #2980b9;
-}
-
-.settings-code {
-  padding: 12px;
-  background: #2a2a2a;
-  border: 2px solid #444;
-  color: #bab1a8;
-  font-family: "Bebas Neue", sans-serif;
-  font-size: 1.2rem;
-  letter-spacing: 0.1em;
-  text-align: center;
-}
-
-.settings-checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: #ccc;
-  cursor: pointer;
-}
-
-.settings-checkbox {
-  /* размер и вид задаёт .checkbox-pixel в design.css */
-}
-
-.settings-checkbox-label span:not(.settings-status) {
-  flex: 1;
-}
-
-.settings-status {
-  font-size: 12px;
-  padding: 4px 8px;
-  background: #333;
-  border: 2px solid #444;
-  color: #999;
-}
-
-.settings-status.active {
-  background: #0ead61;
-  color: #fff;
-  border-color: #0ead61;
-}
-
-.button--has-changes {
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
 </style>

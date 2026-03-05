@@ -21,6 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: nonza-redis-dev
+    hostname: redis
     ports:
       - "6379:6379"
     volumes:
@@ -42,7 +43,7 @@ services:
       - "7882:7882/udp"
       - "50000-50100:50000-50100/udp"
     volumes:
-      - ./deploy/livekit-config.yaml:/etc/livekit.yaml
+      - ./deploy/livekit-config.dev.yaml:/etc/livekit.yaml
     depends_on:
       redis:
         condition: service_healthy

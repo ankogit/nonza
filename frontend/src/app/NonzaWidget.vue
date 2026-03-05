@@ -87,6 +87,7 @@
       <RoomConferenceHall
         v-if="room.room_type === 'conference_hall'"
         :room="room"
+        :room-api="roomApi"
         :livekit-room="connectionState.livekitRoom as any"
         :local-participant="localParticipant as any"
         :remote-participants="remoteParticipants"
@@ -118,8 +119,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRoomConnection } from "@features/room-connection";
+import { useScreenWakeLock } from "@shared/lib";
 import { RoomConferenceHall } from "@widgets/room-conference-hall";
 import { RoomRoundTable } from "@widgets/room-round-table";
 import { RoomApi } from "@entities/room";
@@ -181,6 +183,30 @@ const {
 const isConnecting = computed(() => connectionState.value.isConnecting);
 const isConnected = computed(() => connectionState.value.isConnected);
 const isReconnecting = computed(() => connectionState.value.isReconnecting);
+
+const inCall = computed(
+  () =>
+    isConnected.value &&
+    !!room.value &&
+    !!connectionState.value.livekitRoom
+);
+
+const wakeLock = useScreenWakeLock({ active: () => inCall.value });
+watch(
+  inCall,
+  (active) => {
+    if (active) wakeLock.requestLock();
+    else wakeLock.releaseLock();
+  },
+  { immediate: true }
+);
+onMounted(() => {
+  document.addEventListener("visibilitychange", wakeLock.onVisibilityChange);
+});
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", wakeLock.onVisibilityChange);
+  wakeLock.releaseLock();
+});
 
 const canConnect = computed(
   () =>

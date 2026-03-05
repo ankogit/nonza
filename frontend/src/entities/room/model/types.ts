@@ -10,6 +10,7 @@ export interface Room {
   expires_at: string | null;
   livekit_room_name: string;
   e2ee_enabled: boolean;
+  conference_hall_leader_id?: string | null;
   created_at: string;
   updated_at: string;
 }

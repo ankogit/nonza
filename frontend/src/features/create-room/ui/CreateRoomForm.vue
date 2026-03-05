@@ -131,7 +131,7 @@ function randomRoomName(): string {
 
 const formData = ref<Omit<CreateRoomRequest, "name"> & { expires_in?: string }>({
   room_type: "conference_hall" as RoomType,
-  is_temporary: true,
+  is_temporary: false,
   expires_in: "",
   e2ee_enabled: true,
 });

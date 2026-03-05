@@ -32,4 +32,14 @@ export class RoomApi {
       participant_id: data.participant_identity,
     });
   }
+
+  async updateConferenceHallLeader(
+    shortCode: string,
+    leaderIdentity: string | null,
+  ): Promise<Room> {
+    return this.client.patch<Room>(
+      `/api/v1/rooms/${shortCode}/conference-hall-leader`,
+      { leader_identity: leaderIdentity },
+    );
+  }
 }

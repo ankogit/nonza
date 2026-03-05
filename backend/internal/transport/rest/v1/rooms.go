@@ -78,6 +78,48 @@ func (h *RoomsHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room))
 }
 
+func (h *RoomsHandler) UpdateConferenceHallLeader(c *gin.Context) {
+	shortCode := c.Param("shortCode")
+	if shortCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "short_code required"})
+		return
+	}
+
+	var req struct {
+		LeaderIdentity *string `json:"leader_identity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	room, err := h.Services.Rooms.GetByShortCode(shortCode)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
+		return
+	}
+
+	newSettings := make(models.JSONB)
+	if room.Settings != nil {
+		for k, v := range room.Settings {
+			newSettings[k] = v
+		}
+	}
+	if req.LeaderIdentity != nil && *req.LeaderIdentity != "" {
+		newSettings["conference_hall_leader_id"] = *req.LeaderIdentity
+	} else {
+		delete(newSettings, "conference_hall_leader_id")
+	}
+	room.Settings = newSettings
+
+	if err := h.Services.Rooms.Update(room); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update room"})
+		return
+	}
+
+	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room))
+}
+
 func (h *RoomsHandler) GetByOrganizationID(c *gin.Context) {
 	// Use "id" param (same as organizations routes) to avoid route conflict
 	orgID, err := uuid.Parse(c.Param("id"))

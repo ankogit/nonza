@@ -18,6 +18,25 @@ import {
 } from "@shared/lib";
 import type { RoomTokenResponse } from "@entities/room";
 
+const PARTICIPANT_ID_STORAGE_KEY = "nonza:participant_id";
+
+function getStoredParticipantId(shortCode: string): string | null {
+  try {
+    return localStorage.getItem(`${PARTICIPANT_ID_STORAGE_KEY}:${shortCode}`);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredParticipantId(shortCode: string, participantId: string): void {
+  try {
+    localStorage.setItem(
+      `${PARTICIPANT_ID_STORAGE_KEY}:${shortCode}`,
+      participantId,
+    );
+  } catch {}
+}
+
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -145,12 +164,18 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       state.value.room = room;
 
       // Get token
+      const storedParticipantId = getStoredParticipantId(shortCode);
       const tokenResponse: RoomTokenResponse = await roomApi.getToken(
         shortCode,
         {
           participant_name: participantName,
+          participant_identity: storedParticipantId ?? undefined,
         }
       );
+
+      if (tokenResponse.participant_id) {
+        setStoredParticipantId(shortCode, tokenResponse.participant_id);
+      }
 
       // Validate token
       if (!isValidToken(tokenResponse.token)) {

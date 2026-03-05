@@ -1,18 +1,25 @@
 <template>
-  <div class="conference-hall dashboard bg-dark">
+  <div class="conference-hall dashboard bg-dark grain-overlay">
     <div class="room-header bg-dark-20">
       <div class="room-info color-white font-bebas">
         <h2>Room #{{ room?.short_code ?? room?.id ?? room?.name ?? "—" }}</h2>
       </div>
       <div class="room-indicators">
         <div
-          v-if="!previewMode && (connectionStatus === 'warning' || connectionStatus === 'bad')"
+          v-if="
+            !previewMode &&
+            (connectionStatus === 'warning' || connectionStatus === 'bad')
+          "
           class="connection-indicator"
           :class="`connection-indicator--${connectionStatus}`"
           :title="connectionLabel"
         >
           <PixelIcon
-            :name="connectionStatus === 'bad' ? 'connection-bad' : 'connection-medium'"
+            :name="
+              connectionStatus === 'bad'
+                ? 'connection-bad'
+                : 'connection-medium'
+            "
             variant="small"
           />
           <span class="connection-indicator__label">{{ connectionLabel }}</span>
@@ -23,7 +30,12 @@
           :show-label="true"
         />
         <div class="right">
-          <Button variant="default" size="small" title="Настройки" @click="handleSettings">
+          <Button
+            variant="default"
+            size="small"
+            title="Настройки"
+            @click="handleSettings"
+          >
             <PixelIcon name="settings" variant="large" />
           </Button>
         </div>
@@ -32,7 +44,10 @@
 
     <div class="conference-hall__content">
       <div class="conference-hall__main">
-        <div v-if="leaderParticipant" class="conference-hall__leader">
+        <div
+          v-if="conferenceHall.stateSynced && leaderParticipant"
+          class="conference-hall__leader"
+        >
           <VideoParticipant
             :participant="resolveParticipant(leaderParticipant)"
             :participant-name="
@@ -64,8 +79,8 @@
           </div>
         </div>
         <div v-else class="conference-hall__placeholder">
-          <span class="conference-hall__placeholder-text"
-            >Waiting for speaker...</span
+          <span class="conference-hall__placeholder-text font-bebas"
+            >Ожидание лидера...</span
           >
         </div>
       </div>
@@ -140,7 +155,10 @@
                     : (props.getDisplayName?.(p) ?? p.name ?? p.identity)
                 "
                 :is-speaking="speakingIdentitySet.has(p.identity)"
-                :is-leader="getParticipantState(p.identity)?.isLeader ?? false"
+                :is-leader="
+                  conferenceHall.stateSynced &&
+                  (getParticipantState(p.identity)?.isLeader ?? false)
+                "
                 :has-raised-hand="
                   getParticipantState(p.identity)?.hasRaisedHand ?? false
                 "
@@ -276,17 +294,36 @@
           <PixelIcon name="hangup" variant="large" />
         </Button>
       </div>
+      <div class="right">
+        <Button
+          variant="default"
+          title="Закрыть полноэкранный режим"
+          aria-label="Закрыть"
+          @click="closeFullscreen"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+      </div>
     </div>
 
     <Teleport to="body">
       <div
         v-if="fullscreenParticipant"
-        class="conference-hall-fullscreen"
+        class="room-fullscreen grain-overlay"
         role="dialog"
         aria-label="Во весь экран"
         @click.self="closeFullscreen"
       >
-        <div class="conference-hall-fullscreen__video">
+        <Button
+          variant="default"
+          class="room-fullscreen__close"
+          title="Закрыть полноэкранный режим"
+          aria-label="Закрыть"
+          @click="closeFullscreen"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+        <div class="room-fullscreen__video">
           <VideoParticipant
             :participant="resolveParticipant(fullscreenParticipant)"
             :participant-name="
@@ -300,19 +337,91 @@
               speakingIdentitySet.has(fullscreenParticipant.identity)
             "
             :is-leader="
+              conferenceHall.stateSynced &&
               conferenceHall.leader.value?.identity ===
-              fullscreenParticipant.identity
+                fullscreenParticipant.identity
+            "
+            :replica-text="
+              replicaByParticipant[fullscreenParticipant.identity]?.text
             "
           />
         </div>
-        <Button
-          class="conference-hall-fullscreen__close"
-          title="Закрыть"
-          aria-label="Закрыть"
-          @click="closeFullscreen"
-        >
-          <PixelIcon name="close" variant="large" />
-        </Button>
+        <div class="room-fullscreen__menu menu bg-dark-20">
+          <div class="left">
+            <Button
+              v-if="!previewMode && !conferenceHall.isLeader.value"
+              :class="{ warning: hasRaisedHand, default: !hasRaisedHand }"
+              :title="hasRaisedHand ? 'Опустить руку' : 'Поднять руку'"
+              @click="handleRaiseHand"
+            >
+              <PixelIcon name="hand" variant="large" />
+            </Button>
+            <Button
+              :class="{
+                active: mediaState.isAudioEnabled,
+                danger: !mediaState.isAudioEnabled,
+              }"
+              :disabled="!canSpeak"
+              :title="
+                canSpeak
+                  ? mediaState.isAudioEnabled
+                    ? 'Выключить микрофон'
+                    : 'Включить микрофон'
+                  : 'Дождитесь разрешения от лидера говорить'
+              "
+              @click="handleToggleAudio"
+            >
+              <PixelIcon
+                :name="mediaState.isAudioEnabled ? 'mic-on' : 'mic-off'"
+                variant="large"
+              />
+            </Button>
+            <Button
+              v-if="!previewMode && conferenceHall.isLeader.value"
+              :class="{
+                active: mediaState.isVideoEnabled,
+                danger: !mediaState.isVideoEnabled,
+              }"
+              :title="
+                mediaState.isVideoEnabled ? 'Выключить видео' : 'Включить видео'
+              "
+              @click="toggleVideo"
+            >
+              <PixelIcon
+                :name="mediaState.isVideoEnabled ? 'video-on' : 'video-off'"
+                variant="large"
+              />
+            </Button>
+            <Button
+              v-if="!previewMode && conferenceHall.isLeader.value"
+              :class="{
+                active: mediaState.isScreenSharing,
+                danger: !mediaState.isScreenSharing,
+              }"
+              title="Трансляция экрана"
+              @click="toggleScreenShare"
+            >
+              <PixelIcon
+                :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'"
+                variant="large"
+              />
+            </Button>
+            <ReplicaInput
+              v-if="!previewMode"
+              @submit="sendReplica"
+              :max-length="32"
+            />
+          </div>
+          <div class="center">
+            <Button
+              variant="danger"
+              title="Закончить разговор"
+              @click="handleDisconnect"
+            >
+              <PixelIcon name="hangup" variant="large" />
+            </Button>
+          </div>
+        </div>
       </div>
     </Teleport>
 
@@ -382,7 +491,11 @@
           :class="{ 'button--has-changes': hasUnsavedSettingsChanges }"
           @click="handleSaveSettings"
         >
-          <PixelIcon v-if="hasUnsavedSettingsChanges" name="document" variant="small" />
+          <PixelIcon
+            v-if="hasUnsavedSettingsChanges"
+            name="document"
+            variant="small"
+          />
           Сохранить
         </Button>
       </template>
@@ -404,7 +517,7 @@ import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { setParticipantName, getStoredAudioInputDevice } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
-import type { Room as RoomEntity } from "@entities/room";
+import type { Room as RoomEntity, RoomApi } from "@entities/room";
 import { RoomEvent, Track } from "livekit-client";
 import type {
   Room as LiveKitRoom,
@@ -414,6 +527,7 @@ import type {
 
 const props = defineProps<{
   room: RoomEntity | null;
+  roomApi?: RoomApi | null;
   livekitRoom: LiveKitRoom | null;
   localParticipant?: LocalParticipant | null;
   remoteParticipants?: RemoteParticipant[];
@@ -466,6 +580,17 @@ const conferenceHall = useConferenceHall(
   () => remoteParticipants.value,
   () => props.participantName,
   () => props.livekitRoom,
+  undefined,
+  {
+    initialLeaderIdentity: () =>
+      props.room?.conference_hall_leader_id ?? null,
+    onLeaderChange: (leaderIdentity) => {
+      const code = props.room?.short_code;
+      if (code && props.roomApi) {
+        props.roomApi.updateConferenceHallLeader(code, leaderIdentity).catch(() => {});
+      }
+    },
+  },
 );
 
 const { replicaByParticipant, sendReplica } = useParticipantReplica(
@@ -631,7 +756,10 @@ const {
   toggleAudio,
   toggleScreenShare,
   switchAudioInputDevice,
-} = useMediaControl(localParticipant, computed(() => props.livekitRoom));
+} = useMediaControl(
+  localParticipant,
+  computed(() => props.livekitRoom),
+);
 
 /** При потере права говорить — выключаем микрофон */
 const prevCanSpeak = ref(canSpeak.value);
@@ -977,150 +1105,5 @@ function handleModalClose() {
   min-width: 36px;
   min-height: 36px;
   font-size: 0.875rem;
-}
-
-.conference-hall-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.conference-hall-fullscreen__video {
-  width: 100%;
-  height: 100%;
-}
-
-.conference-hall-fullscreen__video :deep(.player) {
-  width: 100%;
-  height: 100%;
-}
-
-.conference-hall-fullscreen__close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
-.settings-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.settings-section-title {
-  margin: 0;
-  font-family: "Bebas Neue", sans-serif;
-  font-size: 1.2rem;
-  font-weight: 400;
-  color: #bab1a8;
-  letter-spacing: 0.02em;
-  border-bottom: 2px solid #333;
-  padding-bottom: 8px;
-}
-
-.settings-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #ccc;
-}
-
-.settings-input-group {
-  display: flex;
-  gap: 8px;
-}
-
-.settings-input {
-  flex: 1;
-  padding: 12px;
-  border: 2px solid #444;
-  background: #1a1a1a;
-  color: white;
-  font-size: 16px;
-  outline: none;
-  transition: none;
-  font-family: inherit;
-}
-
-.settings-input:focus {
-  border-color: #2980b9;
-  box-shadow: inset 0 0 0 2px #2980b9;
-}
-
-.settings-code {
-  padding: 12px;
-  background: #2a2a2a;
-  border: 2px solid #444;
-  color: #bab1a8;
-  font-family: "Bebas Neue", sans-serif;
-  font-size: 1.2rem;
-  letter-spacing: 0.1em;
-  text-align: center;
-}
-
-.settings-checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: #ccc;
-  cursor: pointer;
-}
-
-.settings-checkbox {
-  /* размер и вид задаёт .checkbox-pixel в design.css */
-}
-
-.settings-checkbox-label span:not(.settings-status) {
-  flex: 1;
-}
-
-.settings-status {
-  font-size: 12px;
-  padding: 4px 8px;
-  background: #333;
-  border: 2px solid #444;
-  color: #999;
-}
-
-.settings-status.active {
-  background: #0ead61;
-  color: #fff;
-  border-color: #0ead61;
-}
-
-.button--has-changes {
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
 }
 </style>
