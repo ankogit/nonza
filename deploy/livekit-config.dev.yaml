@@ -5,8 +5,15 @@ rtc:
   port_range_end: 50100
   use_external_ip: false
   allow_tcp_fallback: true
+  # Клиент на хосте (например Tauri) должен получать 127.0.0.1 в ICE, иначе pc connection не установится при LiveKit в Docker
+  node_ip: 127.0.0.1
+  enable_loopback_candidate: true
 keys:
   devkey: SjhHHIUvnFKcZrODPlmaKvOUImzOjpWHxuuvyIYF
+webhook:
+  api_key: devkey
+  urls:
+    - http://host.docker.internal:8000/api/v1/webhooks/livekit
 redis:
   address: redis:6379
 turn:

@@ -51,23 +51,24 @@ services:
     networks:
       - nonza-network
 
-  coturn:
-    image: coturn/coturn:latest
-    container_name: nonza-coturn
-    ports:
-      - "5349:5349"
-      - "3478:3478/udp"
-      - "3478:3478"
-      - "49152-49200:49152-49200/udp"
-    volumes:
-      - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
-      - ./deploy/coturn-entrypoint.sh:/entrypoint.sh
-      - ./deploy/keys:/etc/coturn/certs:ro
-    env_file:
-      - ./backend/.env
-    command: ["sh", "/entrypoint.sh"]
-    networks:
-      - nonza-network
+  # core (закомментировано)
+  # coturn:
+  #   image: coturn/coturn:latest
+  #   container_name: nonza-coturn
+  #   ports:
+  #     - "5349:5349"
+  #     - "3478:3478/udp"
+  #     - "3478:3478"
+  #     - "49152-49200:49152-49200/udp"
+  #   volumes:
+  #     - ./deploy/coturn.conf:/etc/coturn/turnserver.conf
+  #     - ./deploy/coturn-entrypoint.sh:/entrypoint.sh
+  #     - ./deploy/keys:/etc/coturn/certs:ro
+  #   env_file:
+  #     - ./backend/.env
+  #   command: ["sh", "/entrypoint.sh"]
+  #   networks:
+  #     - nonza-network
 
   backend:
     build:
@@ -89,14 +90,32 @@ services:
       - nonza-network
     restart: unless-stopped
 
-  frontend:
+  frontend-rooms:
     build:
-      context: ./frontend
+      context: ./apps/meet
       dockerfile: Dockerfile
       args:
+        VITE_APP: rooms
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
-    container_name: nonza-frontend
+    container_name: nonza-frontend-rooms
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - nonza-network
+    restart: unless-stopped
+
+  frontend-meets:
+    build:
+      context: ./apps/meet
+      dockerfile: Dockerfile
+      args:
+        VITE_APP: meets
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+    container_name: nonza-frontend-meets
     ports:
       - "3000:80"
     depends_on:

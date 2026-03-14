@@ -1,0 +1,35 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "build:app": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "build:tauri": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "src-tauri/target/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:rooms": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:tauri": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "type-check": {
+      "dependsOn": ["^build"]
+    }
+  }
+}

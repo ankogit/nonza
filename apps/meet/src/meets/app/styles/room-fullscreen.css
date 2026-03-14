@@ -1,0 +1,250 @@
+/* Общие стили fullscreen и PiP для комнат (Round Table, Conference Hall) */
+
+.room-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-fullscreen.grain-overlay::after {
+  z-index: 10001;
+}
+
+.room-fullscreen__video {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-fullscreen__video .player {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-fullscreen__video .player .player-avatar {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-fullscreen__video .player .player-avatar video {
+  object-fit: contain;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.room-fullscreen__video .player .player-menu {
+  flex-shrink: 0;
+}
+
+.room-fullscreen__video .player .player-menu .left,
+.room-fullscreen__video .player .player-menu__identity {
+  overflow: visible;
+}
+
+.room-fullscreen__pip {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: 2px solid #444;
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5);
+  background: #1a1a1a;
+  cursor: move;
+}
+
+.room-fullscreen__pip .player {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.room-fullscreen__pip .player .player-avatar video {
+  object-fit: cover;
+}
+
+.room-fullscreen__pip .player .player-menu .left,
+.room-fullscreen__pip .player .player-menu__identity {
+  overflow: visible;
+}
+
+.room-fullscreen__pip-resize {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 13px;
+  height: 13px;
+  z-index: 10;
+  cursor: nwse-resize;
+  pointer-events: auto;
+  border: 2px #eee solid;
+}
+
+.room-fullscreen__pip-resize:hover {
+  background: #555;
+}
+
+.room-fullscreen__pip-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.room-fullscreen__show-pip {
+  position: fixed;
+  left: 16px;
+  bottom: 88px;
+  z-index: 10000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-fullscreen__menu {
+  flex-shrink: 0;
+  position: static;
+}
+
+.room-fullscreen__close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10001;
+}
+
+/* Общие стили модалки настроек комнаты */
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 400;
+  color: #bab1a8;
+  letter-spacing: 0.02em;
+  border-bottom: 2px solid #333;
+  padding-bottom: 8px;
+}
+
+.settings-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.settings-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #444;
+  background: #1a1a1a;
+  color: white;
+  font-size: 16px;
+  outline: none;
+  transition: none;
+  font-family: inherit;
+}
+
+.settings-input:focus {
+  border-color: #2980b9;
+  box-shadow: inset 0 0 0 2px #2980b9;
+}
+
+.settings-code {
+  padding: 12px;
+  background: #2a2a2a;
+  border: 2px solid #444;
+  color: #bab1a8;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.settings-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.settings-checkbox {
+  /* размер и вид задаёт .checkbox-pixel в design.css */
+}
+
+.settings-checkbox-label span:not(.settings-status) {
+  flex: 1;
+}
+
+.settings-status {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #333;
+  border: 2px solid #444;
+  color: #999;
+}
+
+.settings-status.active {
+  background: #0ead61;
+  color: #fff;
+  border-color: #0ead61;
+}
+
+.button--has-changes {
+  animation: settings-pulse 2s ease-in-out infinite;
+}
+
+@keyframes settings-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+}

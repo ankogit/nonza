@@ -1,0 +1,930 @@
+/* Design system: dashboard, room, call grid, player, menu, indicators */
+
+@font-face {
+  font-family: "Bebas Neue";
+  src: url("/fonts/bebasneuecyrillic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-bebas {
+  font-family: "Bebas Neue", sans-serif;
+}
+
+@property --hue {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 60;
+}
+
+@keyframes bg-dark-flow {
+
+  0%,
+  100% {
+    --hue: 60;
+  }
+
+  50% {
+    --hue: 210;
+  }
+}
+
+.bg-dark {
+  --hue: 60;
+  background: linear-gradient(180deg,
+      hsl(var(--hue), 11%, 14%) -33.84%,
+      #1b1f1a 100%);
+  animation: bg-dark-flow 15s linear infinite;
+}
+
+.grain-overlay {
+  position: relative;
+}
+
+.grain-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("https://mandarinshow.ru/assets/img/test.png");
+  background-repeat: repeat;
+  pointer-events: none;
+  z-index: 10001;
+}
+
+.bg-dark-20 {
+  background: #00000020;
+}
+
+.bg-dark-40 {
+  background: #00000040;
+}
+
+.color-white {
+  color: #bab1a8;
+}
+
+.bg-dark-blur-90 {
+  background: #14141490;
+  backdrop-filter: blur(2.5px);
+}
+
+.dashboard {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.room-info {
+  display: block;
+  padding: 20px;
+}
+
+.room-indicators {
+  padding: 5px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-back {
+  flex-shrink: 0;
+}
+
+/* Menu (нижняя панель): слева — микро/видео/трансляция, центр — закончить, справа — настройки */
+.menu {
+  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+}
+
+.menu .left,
+.menu .right,
+.menu .center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+}
+
+.menu .center {
+  flex: 0 0 auto;
+}
+
+/* Buttons — стили перенесены в компонент Button.vue */
+
+/* Pixel-art checkboxes */
+.checkbox-pixel {
+  appearance: none;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 3px solid #444;
+  background: #1a1a1a;
+  border-radius: 0;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.checkbox-pixel:hover:not(:disabled) {
+  border-color: #555;
+  background: #252525;
+}
+
+.checkbox-pixel:checked {
+  background: #2980b9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center/14px 14px no-repeat;
+  border-color: #3a9ae0;
+}
+
+.checkbox-pixel:checked:hover:not(:disabled) {
+  border-color: #4aa8f0;
+  background-color: #3498db;
+}
+
+.checkbox-pixel:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Квадрат с галочкой: чекбокс и индикатор выбора (room-type-card, Checkbox) */
+.check-box {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #444;
+  background: #1a1a1a;
+  color: #fff;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.check-box--checked {
+  border-color: #3a91c9;
+  background: #2980b9;
+}
+
+.check-box .pi {
+  display: block;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+/* Pixel-art selects */
+.select-pixel {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 36px 10px 12px;
+  border: 3px solid #444;
+  background: #1a1a1a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bab1a8' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 10px center / 20px 20px no-repeat;
+  color: #bab1a8;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: none;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.select-pixel:hover:not(:disabled) {
+  border-color: #555;
+  background-color: #252525;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bab1a8' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 10px center;
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+}
+
+.select-pixel:focus {
+  border-color: #2980b9;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3), inset 0 0 0 2px #2980b9;
+}
+
+.select-pixel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select-pixel option {
+  background: #1a1a1a;
+  color: #bab1a8;
+}
+
+/* Indicators (mic/status dots) */
+.indicator {
+  position: relative;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #457fb3;
+  border: 3px solid rgba(0, 0, 0, 0.125);
+}
+
+.indicator.danger {
+  background: #e2534b;
+}
+
+.indicator.warning {
+  background: #ffc866;
+}
+
+.indicator.default {
+  background: #333333;
+}
+
+.indicator.success {
+  background: #0ead61;
+}
+
+/* Call grid — как в примере: flex row wrap, gap 20px, justify-content center */
+.call-grid {
+  padding-top: 20px;
+  padding-bottom: 100px;
+  /* место под нижнее меню */
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  align-content: flex-start;
+}
+
+/* Layout: app padding and rounded container */
+.padding-app {
+  padding: 20px;
+}
+
+.border-radius-app {
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+/* Organization column (left sidebar on org page) */
+.organization {
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 340px;
+  min-width: 0;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.organization-header {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex: 0 0 56px;
+  min-height: 56px;
+  padding: 0 24px;
+  background: #2980b9;
+  box-shadow: 0 1px 0 #141414, inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: background 0.15s ease;
+}
+
+.rooms-list {
+  flex: 1 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 13px;
+}
+
+.organization > div.rooms-list {
+  flex: 2 1;
+  min-height: 55vh;
+}
+
+.rooms-list-header {
+  margin-top: 20px;
+  padding: 0 0 4px;
+  flex-shrink: 0;
+}
+
+.rooms-list-header:first-child {
+  margin-top: 0;
+}
+
+.rooms-list-scroll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rooms-list-header h5 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 30px;
+}
+
+.room {
+  display: flex;
+  flex-direction: column;
+}
+
+.room-button {
+  width: 100%;
+  padding: 8px 12px 10px;
+  cursor: pointer;
+  text-align: left;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  background: #333333;
+  color: #e0e0e0;
+  font: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.room-button:hover {
+  background-color: #444444;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.room--active .room-button {
+  background-color: #2980b9;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.room--active .room-button:hover {
+  background-color: #3a91c9;
+}
+
+.room-button__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.room-button__indicators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.room-button__indicators .indicator--trigger {
+  flex-shrink: 0;
+}
+
+.room-button__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.room-button__type {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.room-button .room-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.room-button .room-code {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 0;
+}
+
+.room-button--create {
+  background: transparent !important;
+  border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.room-button--create:hover {
+  border-color: #0ead61 !important;
+  color: #0ead61 !important;
+  background: rgba(14, 173, 97, 0.15) !important;
+}
+
+.organization-header-name {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #fff;
+  word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+
+.organization-header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.organization-header-settings,
+.organization-header-invite {
+  flex-shrink: 0;
+}
+
+.rooms-list-loading {
+  padding: 8px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.rooms-list-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.room-participant {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.room-participant__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.room-participant__avatar {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: "Bebas Neue", sans-serif;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+.room-participant__avatar--in-call {
+  box-shadow: 0 0 0 3px #ffc866;
+}
+
+.room-participant__avatar--online {
+  box-shadow: 0 0 0 3px #0ead61;
+}
+
+.room-participant__avatar--offline {
+  box-shadow: 0 0 0 3px #e2534b;
+}
+
+.room-participant-status-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  border-width: 0;
+  flex-shrink: 0;
+}
+
+.room-participant-role {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.organization-footer {
+  position: relative;
+  flex: 0 0 70px;
+  margin-top: auto;
+  padding: 0 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.organization-footer-avatar {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary, #2980b9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: "Bebas Neue", sans-serif;
+  color: #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.organization-footer-avatar:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.organization-footer-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.organization-footer-username {
+  font-size: 0.9rem;
+  font-weight: 300;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.organization-footer-colors {
+  position: absolute;
+  left: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1;
+  height: fit-content;
+}
+
+.organization-footer--colors-expanded .organization-footer-details {
+  filter: blur(4px);
+}
+
+.organization-footer-colors--expanded {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.organization-footer-colors--expanded .organization-footer-color:not(.organization-footer-color--trigger) {
+  animation: organization-footer-color-in 0.15s ease-out;
+}
+
+@keyframes organization-footer-color-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.organization-footer-color {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 2px solid #444;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.organization-footer-color:hover:not(:disabled) {
+  filter: brightness(1.15);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.organization-footer-color--active {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.organization-footer-color--reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.organization-footer-controls {
+  flex-shrink: 0;
+}
+
+.room-info-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.room-participants-list {
+  padding: 4px 0 2px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+
+
+.room-participants-list .player-menu {
+  position: relative;
+}
+
+.player--list {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+}
+
+/* Player card */
+.player {
+  width: 256px;
+  height: 256px;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0px 5px 10px 2px rgb(0 0 0 / 12%);
+  transition: all 0.5s ease;
+}
+
+.player-avatar {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-menu {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.player-menu-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.player-menu-inner--me {
+  background: radial-gradient(
+      circle at 0 0,
+      rgba(226, 83, 75, 0.1),
+      transparent 60%
+    ),
+    rgba(255, 255, 255, 0.04);
+}
+
+.player-menu .left,
+.player-menu .right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-name {
+  font-family: "Bebas Neue", sans-serif;
+  color: #bab1a8;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+/* Full-size button on player (expand) */
+.button-full-size {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  fill: #fff;
+  filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.25));
+  opacity: 0.4;
+  transition: all 0.01s;
+}
+
+.button-full-size:hover {
+  opacity: 0.7;
+  scale: 1.05;
+}
+
+/* Кнопка-индикатор: кликабельная, выглядит как .indicator */
+.indicator--trigger {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 3px solid rgba(0, 0, 0, 0.125);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+}
+
+.indicator--trigger:hover {
+  opacity: 0.9;
+}
+
+.volume-slider {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+}
+
+.indicator-trigger {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.indicator-trigger:hover {
+  opacity: 0.9;
+}
+
+/* Notes area (below grid, above menu) */
+.notes {
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+/* Horizontal rule */
+.HR {
+  background-color: var(--mc-core-grey-4, #444);
+  box-shadow: 0 -0.125rem #00000040;
+  height: 0.125rem;
+  width: 100%;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border: none;
+}
+
+/* Mobile: нижнее меню и шапка */
+@media (max-width: 768px) {
+
+  .room-info,
+  .room-indicators {
+    padding: 12px;
+  }
+
+  .menu .left,
+  .menu .right,
+  .menu .center {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+
+  .menu .left {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  /* Кнопки меню компактнее */
+  .menu .button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-width: 2px;
+  }
+
+  .menu {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .call-grid {
+    padding-bottom: 100px;
+  }
+}
+
+/* Очень узкий экран: ещё компактнее */
+@media (max-width: 480px) {
+
+  .menu .left,
+  .menu .right,
+  .menu .center {
+    padding: 8px 6px;
+    gap: 6px;
+  }
+
+  .menu .button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+
+@media (max-width: 480px) {
+  .full-page {
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
