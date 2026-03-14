@@ -7,22 +7,34 @@ import (
 )
 
 type Repositories struct {
-	Organizations    Organizations
-	Rooms            Rooms
-	MeetingDocuments MeetingDocuments
-	Participants     Participants
+	Users               Users
+	Organizations       Organizations
+	OrganizationMembers OrganizationMembers
+	Invites             Invites
+	Rooms               Rooms
+	RoomGroups          RoomGroups
+	MeetingDocuments    MeetingDocuments
+	Participants        Participants
 }
 
 func NewRepositories(db *gorm.DB) *Repositories {
+	usersRepo := postgresDB.NewUsersRepository(db)
 	orgRepo := postgresDB.NewOrganizationsRepository(db)
+	orgMembersRepo := postgresDB.NewOrganizationMembersRepository(db)
+	invitesRepo := postgresDB.NewInvitesRepository(db)
 	roomRepo := postgresDB.NewRoomsRepository(db)
+	roomGroupsRepo := postgresDB.NewRoomGroupsRepository(db)
 	docRepo := postgresDB.NewMeetingDocumentsRepository(db)
 	partRepo := postgresDB.NewParticipantsRepository(db)
 
 	return &Repositories{
-		Organizations:    orgRepo,
-		Rooms:            roomRepo,
-		MeetingDocuments: docRepo,
-		Participants:     partRepo,
+		Users:               usersRepo,
+		Organizations:       orgRepo,
+		OrganizationMembers: orgMembersRepo,
+		Invites:             invitesRepo,
+		Rooms:               roomRepo,
+		RoomGroups:          roomGroupsRepo,
+		MeetingDocuments:    docRepo,
+		Participants:        partRepo,
 	}
 }

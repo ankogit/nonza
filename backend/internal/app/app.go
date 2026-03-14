@@ -83,6 +83,7 @@ func Run(cfg *config.Config) error {
 	repositories := repository.NewRepositories(db)
 	services := service.NewServices(service.Deps{
 		Repositories: repositories,
+		Config:       cfg,
 	})
 
 	restHandler := rest.NewHandler(services, redisCli, repositories.Rooms, cfg.DocumentTTL)

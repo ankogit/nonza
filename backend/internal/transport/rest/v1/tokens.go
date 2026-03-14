@@ -53,13 +53,33 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		return
 	}
 
+	allowAnonymous := false
+	if room.Settings != nil {
+		if v, ok := room.Settings["allow_anonymous_join"].(bool); ok {
+			allowAnonymous = v
+		}
+	}
+	if !allowAnonymous {
+		userID, _ := c.Get("user_id")
+		uid, _ := userID.(string)
+		if uid == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "room does not allow anonymous join"})
+			return
+		}
+		ok, err := h.Services.Organizations.UserCanAccess(room.OrganizationID, uid)
+		if err != nil || !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+			return
+		}
+	}
+
 	participantID := req.ParticipantID
 	if participantID == "" {
 		participantID = uuid.New().String()
 	}
 
 	token, err := h.LiveKit.GenerateAccessToken(
-		room.LiveKitRoomName,
+		room.LiveKitRoomName(),
 		participantID,
 		req.ParticipantName,
 	)
@@ -76,7 +96,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 	response := tokenDto.TokenResponse{
 		Token:         token,
 		URL:           livekitURL,
-		RoomName:      room.LiveKitRoomName,
+		RoomName:      room.LiveKitRoomName(),
 		ParticipantID: participantID,
 	}
 	if room.Settings != nil {
@@ -107,7 +127,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 	// Optionally broadcast event about new participant joining
 	if h.WSHub != nil {
 		// Get room ID from room (you may need to adjust this based on your room model)
-		roomID := room.LiveKitRoomName // or room.ID.String() if you want to use UUID
+		roomID := room.LiveKitRoomName()
 		h.WSHub.BroadcastToRoom(roomID, websocket.Message{
 			Type:   "participant_joining",
 			RoomID: roomID,

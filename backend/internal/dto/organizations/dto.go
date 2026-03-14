@@ -29,3 +29,11 @@ func ToOrganizationResponse(org *models.Organization) OrganizationResponse {
 		UpdatedAt:   org.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
+
+type OrganizationMemberResponse struct {
+	UserID string  `json:"user_id"`
+	Role   string  `json:"role"`
+	Email  string  `json:"email,omitempty"`
+	Name   string  `json:"name,omitempty"`
+	Color  *string `json:"color,omitempty"`
+}

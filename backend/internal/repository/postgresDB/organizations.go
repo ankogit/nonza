@@ -51,6 +51,27 @@ func (r *OrganizationsRepository) GetByID(id uuid.UUID) (*models.Organization, e
 	return &org, nil
 }
 
+func (r *OrganizationsRepository) List() ([]*models.Organization, error) {
+	var orgs []*models.Organization
+	err := r.db.Order("created_at DESC").Find(&orgs).Error
+	if err != nil {
+		return nil, err
+	}
+	return orgs, nil
+}
+
+func (r *OrganizationsRepository) ListByUserID(userID string) ([]*models.Organization, error) {
+	var orgs []*models.Organization
+	err := r.db.Where("owner_id = ?", userID).
+		Or("id IN (SELECT organization_id FROM organization_members WHERE user_id = ?)", userID).
+		Order("created_at DESC").
+		Find(&orgs).Error
+	if err != nil {
+		return nil, err
+	}
+	return orgs, nil
+}
+
 func (r *OrganizationsRepository) Update(org *models.Organization) error {
 	return r.db.Save(org).Error
 }

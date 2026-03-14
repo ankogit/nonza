@@ -8,11 +8,12 @@ import (
 )
 
 type Rooms interface {
-	Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool) (*models.Room, error)
+	Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool, roomGroupID *uuid.UUID, allowAnonymousJoin bool) (*models.Room, error)
 	GetByID(id uuid.UUID) (*models.Room, error)
 	GetByShortCode(shortCode string) (*models.Room, error)
 	GetByOrganizationID(orgID uuid.UUID) ([]models.Room, error)
 	Update(room *models.Room) error
+	UpdateOrder(orgID uuid.UUID, roomIDs []uuid.UUID) error
 	Delete(id uuid.UUID) error
 	DeleteExpired() error
 	GetExpired() ([]models.Room, error)

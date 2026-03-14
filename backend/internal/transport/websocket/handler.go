@@ -85,6 +85,60 @@ func (h *Handler) HandleWebSocket(c *gin.Context) {
 	client.send <- data
 }
 
+const orgParticipantsRoomPrefix = "org:"
+
+// HandleOrgParticipantsWS handles WebSocket connections for org-level participant updates.
+// Query: org_id (required), user_id (required).
+// Clients receive events with type "participants_changed" when someone joins/leaves a room in that org.
+func (h *Handler) HandleOrgParticipantsWS(c *gin.Context) {
+	orgID := c.Query("org_id")
+	userID := c.Query("user_id")
+
+	if orgID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "org_id is required"})
+		return
+	}
+
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+		return
+	}
+
+	roomID := orgParticipantsRoomPrefix + orgID
+	log.Printf("[ws] org participants connect org_id=%s room_id=%s user_id=%s", orgID, roomID, userID)
+
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("WebSocket org participants upgrade error: %v", err)
+		return
+	}
+
+	client := &Client{
+		hub:        h.hub,
+		conn:       conn,
+		send:       make(chan []byte, 256),
+		sendBinary: make(chan []byte, 256),
+		roomID:     roomID,
+		userID:     userID,
+	}
+
+	client.hub.register <- client
+	go client.writePump()
+	go client.readPump()
+
+	welcomeMsg := Message{
+		Type:   "connected",
+		RoomID: roomID,
+		UserID: userID,
+		Payload: map[string]interface{}{
+			"channel": "org_participants",
+			"org_id":  orgID,
+		},
+	}
+	data, _ := json.Marshal(welcomeMsg)
+	client.send <- data
+}
+
 // BroadcastEvent allows sending custom events to a room
 func (h *Handler) BroadcastEvent(roomID string, eventType string, payload interface{}) error {
 	message := Message{

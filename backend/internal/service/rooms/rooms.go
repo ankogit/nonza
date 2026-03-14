@@ -12,6 +12,13 @@ import (
 	"github.com/google/uuid"
 )
 
+func bucketKey(roomGroupID *uuid.UUID) string {
+	if roomGroupID == nil {
+		return ""
+	}
+	return roomGroupID.String()
+}
+
 const e2eeKeySize = 32
 
 type roomsService struct {
@@ -19,7 +26,7 @@ type roomsService struct {
 	orgRepo repository.Organizations
 }
 
-func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool) (*models.Room, error) {
+func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool, roomGroupID *uuid.UUID, allowAnonymousJoin bool) (*models.Room, error) {
 	if _, err := s.orgRepo.GetByID(orgID); err != nil {
 		return nil, fmt.Errorf("organization not found: %w", err)
 	}
@@ -31,8 +38,6 @@ func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.Room
 		shortCode = room.GenerateShortCode()
 		existingRoom, err = s.repo.GetByShortCode(shortCode)
 	}
-
-	livekitRoomName := fmt.Sprintf("room-%s", uuid.New().String())
 
 	var expiresAt *time.Time
 	if isTemporary && expiresIn != nil {
@@ -49,17 +54,28 @@ func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.Room
 		settings["e2ee_enabled"] = true
 		settings["encryption_key"] = base64.StdEncoding.EncodeToString(keyBytes)
 	}
+	if allowAnonymousJoin {
+		settings["allow_anonymous_join"] = true
+	}
+
+	position, err := s.repo.GetMaxPosition(orgID, roomGroupID)
+	if err != nil {
+		return nil, fmt.Errorf("get max position: %w", err)
+	}
 
 	newRoom := &models.Room{
+		ID:              uuid.New(),
 		OrganizationID:  orgID,
 		Name:            name,
 		ShortCode:       &shortCode,
 		RoomType:        roomType,
 		IsTemporary:     isTemporary,
 		ExpiresAt:       expiresAt,
-		LiveKitRoomName: livekitRoomName,
 		Settings:        settings,
+		RoomGroupID:     roomGroupID,
+		Position:        position,
 	}
+	newRoom.LiveKitRoomNameCol = "room-" + newRoom.ID.String()
 
 	if err := s.repo.Create(newRoom); err != nil {
 		return nil, err
@@ -94,4 +110,29 @@ func (s *roomsService) DeleteExpired() error {
 
 func (s *roomsService) GetExpired() ([]models.Room, error) {
 	return s.repo.GetExpired()
+}
+
+func (s *roomsService) UpdateOrder(orgID uuid.UUID, roomIDs []uuid.UUID) error {
+	if len(roomIDs) == 0 {
+		return nil
+	}
+	roomByID := make(map[uuid.UUID]*models.Room)
+	for _, id := range roomIDs {
+		room, err := s.repo.GetByID(id)
+		if err != nil || room == nil || room.OrganizationID != orgID {
+			return fmt.Errorf("room %s not found or wrong org", id)
+		}
+		roomByID[id] = room
+	}
+	idxByBucket := make(map[string]int)
+	for _, id := range roomIDs {
+		room := roomByID[id]
+		k := bucketKey(room.RoomGroupID)
+		pos := idxByBucket[k]
+		idxByBucket[k] = pos + 1
+		if err := s.repo.UpdatePosition(room.ID, pos); err != nil {
+			return fmt.Errorf("update position for room %s: %w", id, err)
+		}
+	}
+	return nil
 }

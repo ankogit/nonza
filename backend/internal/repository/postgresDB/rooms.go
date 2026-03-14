@@ -49,7 +49,9 @@ func (r *RoomsRepository) GetBySlug(slug string) (*models.Room, error) {
 
 func (r *RoomsRepository) GetByOrganizationID(orgID uuid.UUID) ([]models.Room, error) {
 	var rooms []models.Room
-	err := r.db.Where("organization_id = ?", orgID).Find(&rooms).Error
+	err := r.db.Where("organization_id = ?", orgID).
+		Order("position ASC, id ASC").
+		Find(&rooms).Error
 	return rooms, err
 }
 
@@ -72,4 +74,24 @@ func (r *RoomsRepository) GetExpired() ([]models.Room, error) {
 	now := time.Now()
 	err := r.db.Where("expires_at IS NOT NULL AND expires_at < ?", now).Find(&rooms).Error
 	return rooms, err
+}
+
+func (r *RoomsRepository) UnsetGroupIDForGroup(groupID uuid.UUID) error {
+	return r.db.Model(&models.Room{}).Where("room_group_id = ?", groupID).Update("room_group_id", nil).Error
+}
+
+func (r *RoomsRepository) GetMaxPosition(orgID uuid.UUID, roomGroupID *uuid.UUID) (int, error) {
+	var max int
+	q := r.db.Model(&models.Room{}).Where("organization_id = ?", orgID)
+	if roomGroupID == nil {
+		q = q.Where("room_group_id IS NULL")
+	} else {
+		q = q.Where("room_group_id = ?", *roomGroupID)
+	}
+	err := q.Select("COALESCE(MAX(position), -1)").Scan(&max).Error
+	return max + 1, err
+}
+
+func (r *RoomsRepository) UpdatePosition(roomID uuid.UUID, position int) error {
+	return r.db.Model(&models.Room{}).Where("id = ?", roomID).Update("position", position).Error
 }

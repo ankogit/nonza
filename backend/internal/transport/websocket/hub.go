@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,31 +45,60 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			var userJoinedMsg map[string]interface{}
+			var orgOnlineMsg map[string]interface{}
+			var orgUserOnlineBroadcast map[string]interface{}
 			if client.roomID != "" {
 				if h.rooms[client.roomID] == nil {
 					h.rooms[client.roomID] = make(map[*Client]bool)
 				}
 				h.rooms[client.roomID][client] = true
+				log.Printf("[ws] client joined room=%s user_id=%s", client.roomID, client.userID)
 
-				// Prepare user_joined message; send after unlock to avoid deadlock (broadcastToRoomExcluding takes RLock)
-				userJoinedMsg = map[string]interface{}{
-					"type":    "user_joined",
-					"room_id": client.roomID,
-					"user_id": client.userID,
-					"payload": map[string]interface{}{
-						"user_id": client.userID,
+				if strings.HasPrefix(client.roomID, "org:") {
+					userIDs := make([]string, 0, len(h.rooms[client.roomID]))
+					for c := range h.rooms[client.roomID] {
+						userIDs = append(userIDs, c.userID)
+					}
+					orgOnlineMsg = map[string]interface{}{
+						"type": "org_online_users",
+						"payload": map[string]interface{}{
+							"user_ids": userIDs,
+						},
+					}
+					orgUserOnlineBroadcast = map[string]interface{}{
+						"type": "org_user_online",
+						"payload": map[string]interface{}{
+							"user_id": client.userID,
+						},
+					}
+				} else {
+					userJoinedMsg = map[string]interface{}{
+						"type":    "user_joined",
 						"room_id": client.roomID,
-					},
+						"user_id": client.userID,
+						"payload": map[string]interface{}{
+							"user_id": client.userID,
+							"room_id": client.roomID,
+						},
+					}
 				}
-
-				// Load document state from Redis for new client (async, doesn't block registration)
-				go h.loadDocumentForClient(client)
 			}
 			h.mu.Unlock()
 
-			// Notify existing participants (outside lock to avoid deadlock)
+			if orgOnlineMsg != nil {
+				data, _ := json.Marshal(orgOnlineMsg)
+				select {
+				case client.send <- data:
+				default:
+					log.Printf("[ws] org_online_users send channel full for user %s", client.userID)
+				}
+			}
+			if orgUserOnlineBroadcast != nil {
+				_ = h.broadcastToRoomExcluding(client.roomID, orgUserOnlineBroadcast, client)
+			}
 			if userJoinedMsg != nil {
-				h.broadcastToRoomExcluding(client.roomID, userJoinedMsg, client)
+				go h.loadDocumentForClient(client)
+				_ = h.broadcastToRoomExcluding(client.roomID, userJoinedMsg, client)
 			}
 			log.Printf("Client registered. Total clients: %d", len(h.clients))
 
@@ -76,6 +106,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			roomID := client.roomID
 			userID := client.userID
+			isOrgChannel := strings.HasPrefix(roomID, "org:")
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
@@ -92,11 +123,16 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 			log.Printf("Client unregistered. Total clients: %d", len(h.clients))
-			
-			// Notify other clients in the room about disconnection
-			// This helps them clean up stale awareness states
-			if roomID != "" {
-				h.broadcastToRoomExcluding(roomID, Message{
+
+			if isOrgChannel {
+				_ = h.BroadcastToRoom(roomID, map[string]interface{}{
+					"type": "org_user_offline",
+					"payload": map[string]interface{}{
+						"user_id": userID,
+					},
+				})
+			} else if roomID != "" {
+				_ = h.broadcastToRoomExcluding(roomID, Message{
 					Type:   "user_left",
 					RoomID: roomID,
 					UserID: userID,
@@ -141,8 +177,16 @@ func (h *Hub) broadcastToRoomExcluding(roomID string, message interface{}, exclu
 	roomClients, ok := h.rooms[roomID]
 	if !ok {
 		h.mu.RUnlock()
+		log.Printf("[ws] BroadcastToRoom room=%q: no subscribers", roomID)
 		return nil
 	}
+	n := 0
+	for c := range roomClients {
+		if c != excludeClient {
+			n++
+		}
+	}
+	log.Printf("[ws] BroadcastToRoom room=%q: %d subscriber(s)", roomID, n)
 	data, err := json.Marshal(message)
 	if err != nil {
 		h.mu.RUnlock()
