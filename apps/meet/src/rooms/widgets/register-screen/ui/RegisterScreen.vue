@@ -149,9 +149,6 @@ async function submit() {
   flex-shrink: 0;
   width: 120px;
   height: 120px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #2a2a2a;
 }
 
 .register-screen__logo-circle :deep(.app-logo) {
