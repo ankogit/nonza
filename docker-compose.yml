@@ -79,6 +79,12 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      # Внутренний URL для вызовов LiveKit API (ListParticipants и т.д.)
+      WEBRTC_URL: ${WEBRTC_URL:-http://livekit:7880}
+      # Публичный WSS для браузера. Обязательно задать в production (HTTPS → только wss).
+      # Пример: в backend/.env добавить WEBRTC_PUBLIC_URL=wss://ws.nonza.ru
+      WEBRTC_PUBLIC_URL: ${WEBRTC_PUBLIC_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -1312,7 +1312,8 @@ const inCallUserIds = computed(() => {
   const set = new Set<string>();
   for (const room of rooms.value ?? []) {
     for (const p of room.participants ?? []) {
-      set.add(p.identity);
+      const id = p.identity?.toLowerCase?.() ?? p.identity;
+      if (id) set.add(id);
     }
   }
   return set;
@@ -1667,6 +1668,9 @@ function refreshRoomsParticipants() {
 }
 
 let refreshParticipantsTimeout: ReturnType<typeof setTimeout> | null = null;
+const INITIAL_PARTICIPANTS_REFRESH_DELAY_MS = 2500;
+let initialParticipantsRefreshTimeout: ReturnType<typeof setTimeout> | null =
+  null;
 
 function scheduleRefreshRoomsParticipants() {
   if (refreshParticipantsTimeout) clearTimeout(refreshParticipantsTimeout);
@@ -2022,6 +2026,11 @@ onMounted(async () => {
   loadMembers();
   if (props.orgId) {
     connectOrgWs();
+    if (initialParticipantsRefreshTimeout) clearTimeout(initialParticipantsRefreshTimeout);
+    initialParticipantsRefreshTimeout = setTimeout(() => {
+      initialParticipantsRefreshTimeout = null;
+      refreshRoomsParticipants();
+    }, INITIAL_PARTICIPANTS_REFRESH_DELAY_MS);
   }
 });
 
@@ -2029,6 +2038,10 @@ onUnmounted(() => {
   if (refreshParticipantsTimeout) {
     clearTimeout(refreshParticipantsTimeout);
     refreshParticipantsTimeout = null;
+  }
+  if (initialParticipantsRefreshTimeout) {
+    clearTimeout(initialParticipantsRefreshTimeout);
+    initialParticipantsRefreshTimeout = null;
   }
   disconnectOrgWs();
 });

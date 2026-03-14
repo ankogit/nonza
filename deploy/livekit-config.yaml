@@ -7,6 +7,10 @@ rtc:
   allow_tcp_fallback: true
 keys:
   devkey: SjhHHIUvnFKcZrODPlmaKvOUImzOjpWHxuuvyIYF
+webhook:
+  api_key: devkey
+  urls:
+    - http://backend:8000/api/v1/webhooks/livekit
 redis:
   address: redis:6379
 turn:
