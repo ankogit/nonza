@@ -1,5 +1,5 @@
 import { inject } from "vue";
-import { getApiBaseURL, useAppConfig } from "@shared/lib";
+import { useAppConfig } from "@shared/lib";
 import { ApiClient } from "./client";
 
 const API_CLIENT_INJECT_KEY = "apiClient";

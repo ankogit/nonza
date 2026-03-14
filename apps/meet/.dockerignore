@@ -5,3 +5,8 @@ dist
 .env.local
 .env.development
 .env.*.local
+src-tauri/target
+src-tauri/gen
+.turbo
+coverage
+*.log
