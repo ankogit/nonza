@@ -8,6 +8,7 @@ import (
 	"nonza/backend/internal/pkg/orgroles"
 	"nonza/backend/internal/service"
 	invitesService "nonza/backend/internal/service/invites"
+	"nonza/backend/internal/transport/websocket"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,10 +16,11 @@ import (
 
 type InvitesHandler struct {
 	Services *service.Services
+	WsHub    *websocket.Hub
 }
 
-func NewInvitesHandler(services *service.Services) *InvitesHandler {
-	return &InvitesHandler{Services: services}
+func NewInvitesHandler(services *service.Services, wsHub *websocket.Hub) *InvitesHandler {
+	return &InvitesHandler{Services: services, WsHub: wsHub}
 }
 
 func (h *InvitesHandler) Create(c *gin.Context) {
@@ -93,11 +95,20 @@ func (h *InvitesHandler) Accept(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required to accept invite"})
 		return
 	}
+	inv, err := h.Services.Invites.GetByToken(token)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
+		return
+	}
+	if time.Now().After(inv.ExpiresAt) {
+		c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
+		return
+	}
 	var req struct {
 		Color *string `json:"color"`
 	}
 	_ = c.ShouldBindJSON(&req)
-	err := h.Services.Invites.Accept(token, userID, req.Color)
+	err = h.Services.Invites.Accept(token, userID, req.Color)
 	if err != nil {
 		if err == invitesService.ErrInviteExpired {
 			c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
@@ -113,6 +124,9 @@ func (h *InvitesHandler) Accept(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+inv.OrganizationID.String(), map[string]interface{}{"type": "org_members_changed"})
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "accepted"})
 }

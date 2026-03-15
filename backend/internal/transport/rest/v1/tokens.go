@@ -1,7 +1,10 @@
 package v1
 
 import (
+	"log"
 	"net/http"
+	"time"
+
 	"nonza/backend/internal/config"
 	tokenDto "nonza/backend/internal/dto/tokens"
 	"nonza/backend/internal/service"
@@ -41,17 +44,20 @@ func NewTokensHandler(services *service.Services, cfg *config.Config, wsHub inte
 }
 
 func (h *TokensHandler) GenerateToken(c *gin.Context) {
+	start := time.Now()
 	var req tokenDto.GenerateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	t0 := time.Now()
 	room, err := h.Services.Rooms.GetByShortCode(req.ShortCode)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "room not found"})
 		return
 	}
+	log.Printf("[tokens] GetByShortCode %s: %v", req.ShortCode, time.Since(t0))
 
 	allowAnonymous := false
 	if room.Settings != nil {
@@ -66,11 +72,13 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "room does not allow anonymous join"})
 			return
 		}
+		t1 := time.Now()
 		ok, err := h.Services.Organizations.UserCanAccess(room.OrganizationID, uid)
 		if err != nil || !ok {
 			c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
 			return
 		}
+		log.Printf("[tokens] UserCanAccess: %v", time.Since(t1))
 	}
 
 	participantID := req.ParticipantID
@@ -78,6 +86,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		participantID = uuid.New().String()
 	}
 
+	t2 := time.Now()
 	token, err := h.LiveKit.GenerateAccessToken(
 		room.LiveKitRoomName(),
 		participantID,
@@ -87,6 +96,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
+	log.Printf("[tokens] GenerateAccessToken: %v", time.Since(t2))
 
 	// Клиенту отдаём публичный URL (wss://), иначе браузер не достучится до ws://livekit:7880
 	livekitURL := h.Config.WebRTCPublicURL
@@ -107,8 +117,8 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		}
 	}
 
-	// If TURNURL is unset, clients use LiveKit's built-in TURN from the join response.
 	if h.Config.TURNURL != "" && h.Config.TURNSecret != "" {
+		t3 := time.Now()
 		secret := normalizeTURNSecret(h.Config.TURNSecret)
 		if secret != "" {
 			ttl := h.Config.TURNTTL
@@ -122,6 +132,7 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 				Credential: credential,
 			}}
 		}
+		log.Printf("[tokens] TURN credentials: %v", time.Since(t3))
 	}
 
 	// Optionally broadcast event about new participant joining
@@ -138,5 +149,6 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		})
 	}
 
+	log.Printf("[tokens] total %v short_code=%s", time.Since(start), req.ShortCode)
 	c.JSON(http.StatusOK, response)
 }

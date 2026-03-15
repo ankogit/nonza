@@ -1,16 +1,19 @@
 package v1
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
+
 	roomDto "nonza/backend/internal/dto/rooms"
 	"nonza/backend/internal/models"
 	"nonza/backend/internal/pkg/orgroles"
 	"nonza/backend/internal/service"
 	"nonza/backend/internal/transport/websocket"
 	"nonza/backend/internal/webrtc/livekit"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -96,6 +99,9 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.JSON(http.StatusCreated, roomDto.ToRoomResponse(room, nil))
 }
 
@@ -410,25 +416,34 @@ func (h *RoomsHandler) GetByOrganizationID(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	response := make([]roomDto.RoomWithParticipantsResponse, len(rooms))
-
 	for i, r := range rooms {
-		resp := roomDto.RoomWithParticipantsResponse{
+		response[i] = roomDto.RoomWithParticipantsResponse{
 			RoomResponse: roomDto.ToRoomResponse(&r, nil),
 			Participants: []roomDto.ParticipantResponse{},
 		}
-		if includeParticipants {
-			participants, err := h.LiveKit.ListParticipants(ctx, r.LiveKitRoomName())
-			if err == nil {
-				resp.Participants = make([]roomDto.ParticipantResponse, len(participants))
-				for j, p := range participants {
-					resp.Participants[j] = roomDto.ParticipantResponse{Identity: p.Identity, Name: p.Name}
+	}
+
+	if includeParticipants {
+		listCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		var wg sync.WaitGroup
+		for i, r := range rooms {
+			wg.Add(1)
+			go func(idx int, roomName string, roomID uuid.UUID) {
+				defer wg.Done()
+				participants, err := h.LiveKit.ListParticipants(listCtx, roomName)
+				if err == nil {
+					response[idx].Participants = make([]roomDto.ParticipantResponse, len(participants))
+					for j, p := range participants {
+						response[idx].Participants[j] = roomDto.ParticipantResponse{Identity: p.Identity, Name: p.Name}
+					}
+					log.Printf("[rooms] room %s livekit_room=%q participants=%d", roomID, roomName, len(participants))
+				} else {
+					log.Printf("[rooms] room %s livekit_room=%q ListParticipants err=%v", roomID, roomName, err)
 				}
-				log.Printf("[rooms] room %s livekit_room=%q participants=%d", r.ID, r.LiveKitRoomName(), len(participants))
-			} else {
-				log.Printf("[rooms] room %s livekit_room=%q ListParticipants err=%v", r.ID, r.LiveKitRoomName(), err)
-			}
+			}(i, r.LiveKitRoomName(), r.ID)
 		}
-		response[i] = resp
+		wg.Wait()
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -476,6 +491,9 @@ func (h *RoomsHandler) UpdateOrder(c *gin.Context) {
 	if err := h.Services.Rooms.UpdateOrder(orgID, roomIDs); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
 	c.Status(http.StatusNoContent)
 }

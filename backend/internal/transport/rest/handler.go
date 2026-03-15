@@ -119,7 +119,7 @@ func (h *Handler) initOrganizationRoomsRoutes(api *gin.RouterGroup, cfg *config.
 }
 
 func (h *Handler) initOrgRoomGroupsRoutes(api *gin.RouterGroup) {
-	roomGroupsHandler := v1.NewRoomGroupsHandler(h.services)
+	roomGroupsHandler := v1.NewRoomGroupsHandler(h.services, h.wsHub)
 	orgRoomGroups := api.Group("/org/:id/room-groups")
 	{
 		orgRoomGroups.GET("", roomGroupsHandler.List)
@@ -130,7 +130,7 @@ func (h *Handler) initOrgRoomGroupsRoutes(api *gin.RouterGroup) {
 }
 
 func (h *Handler) initOrgInvitesRoutes(api *gin.RouterGroup) {
-	invitesHandler := v1.NewInvitesHandler(h.services)
+	invitesHandler := v1.NewInvitesHandler(h.services, h.wsHub)
 	orgInvites := api.Group("/org/:id/invites")
 	{
 		orgInvites.POST("", invitesHandler.Create)
@@ -138,7 +138,7 @@ func (h *Handler) initOrgInvitesRoutes(api *gin.RouterGroup) {
 }
 
 func (h *Handler) initInvitesRoutes(api *gin.RouterGroup) {
-	invitesHandler := v1.NewInvitesHandler(h.services)
+	invitesHandler := v1.NewInvitesHandler(h.services, h.wsHub)
 	invites := api.Group("/invites")
 	{
 		invites.GET("/:token", invitesHandler.GetByToken)

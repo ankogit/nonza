@@ -229,6 +229,7 @@ defineExpose({
   openCallSettings: () => connectedRoomViewRef.value?.openCallSettings?.(),
   updateParticipantColor,
   updateParticipantName,
+  disconnect,
 });
 
 const urlParams = new URLSearchParams(window.location.search);

@@ -203,7 +203,7 @@
                         class="room-button__hangup"
                         aria-label="Завершить звонок"
                         title="Завершить звонок"
-                        @click.stop="joinedRoomShortCode = null"
+                        @click.stop="leaveRoomOrCancelJoin()"
                       >
                         <PixelIcon name="hangup" variant="small" />
                       </Button>
@@ -359,7 +359,7 @@
                             class="room-button__hangup"
                             aria-label="Завершить звонок"
                             title="Завершить звонок"
-                            @click.stop="joinedRoomShortCode = null"
+                            @click.stop="leaveRoomOrCancelJoin()"
                           >
                             <PixelIcon name="hangup" variant="small" />
                           </Button>
@@ -556,7 +556,7 @@
               variant="default"
               size="small"
               class="menu-back"
-              @click="joinedRoomShortCode = null"
+              @click="leaveRoomOrCancelJoin()"
             >
               ← Назад
             </Button>
@@ -1543,6 +1543,13 @@ function handleWidgetDisconnect() {
   joinedRoomShortCode.value = null;
 }
 
+async function leaveRoomOrCancelJoin() {
+  await nonzaWidgetRef.value?.disconnect?.();
+  widgetParticipants.value = [];
+  widgetParticipantsRoomCode.value = null;
+  joinedRoomShortCode.value = null;
+}
+
 function openCallSettings() {
   if (joinedRoomShortCode.value && nonzaWidgetRef.value?.openCallSettings) {
     nonzaWidgetRef.value.openCallSettings();
@@ -1677,7 +1684,7 @@ function scheduleRefreshRoomsParticipants() {
   refreshParticipantsTimeout = setTimeout(() => {
     refreshParticipantsTimeout = null;
     refreshRoomsParticipants();
-  }, 300);
+  }, 100);
 }
 
 function getOrgWsUrl(): string {
@@ -1709,10 +1716,9 @@ function connectOrgWs() {
         const msg = JSON.parse(line);
         console.log("[org-ws] message type=", msg?.type, msg);
         if (msg?.type === "participants_changed") {
-          console.log(
-            "[org-ws] participants_changed -> refreshRoomsParticipants",
-          );
           scheduleRefreshRoomsParticipants();
+        } else if (msg?.type === "rooms_changed") {
+          loadRooms();
         } else if (msg?.type === "org_members_changed") {
           loadMembers();
         } else if (
@@ -1846,7 +1852,7 @@ async function confirmDeleteRoom() {
     showRoomDeleteConfirm.value = false;
     roomSettingsRoom.value = null;
     if (joinedRoomShortCode.value === room.short_code) {
-      joinedRoomShortCode.value = null;
+      await leaveRoomOrCancelJoin();
     }
     rooms.value = rooms.value.filter((r) => r.id !== room.id);
   } catch (e) {

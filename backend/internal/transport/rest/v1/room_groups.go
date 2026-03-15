@@ -2,10 +2,12 @@ package v1
 
 import (
 	"net/http"
+	"strings"
+
 	roomGroupDto "nonza/backend/internal/dto/room_groups"
 	"nonza/backend/internal/pkg/orgroles"
 	"nonza/backend/internal/service"
-	"strings"
+	"nonza/backend/internal/transport/websocket"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -13,10 +15,11 @@ import (
 
 type RoomGroupsHandler struct {
 	Services *service.Services
+	WsHub    *websocket.Hub
 }
 
-func NewRoomGroupsHandler(services *service.Services) *RoomGroupsHandler {
-	return &RoomGroupsHandler{Services: services}
+func NewRoomGroupsHandler(services *service.Services, wsHub *websocket.Hub) *RoomGroupsHandler {
+	return &RoomGroupsHandler{Services: services, WsHub: wsHub}
 }
 
 func (h *RoomGroupsHandler) List(c *gin.Context) {
@@ -92,7 +95,9 @@ func (h *RoomGroupsHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.JSON(http.StatusCreated, roomGroupDto.ToRoomGroupResponse(group))
 }
 
@@ -140,7 +145,9 @@ func (h *RoomGroupsHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.JSON(http.StatusOK, roomGroupDto.ToRoomGroupResponse(group))
 }
 
@@ -172,6 +179,8 @@ func (h *RoomGroupsHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.Status(http.StatusNoContent)
 }

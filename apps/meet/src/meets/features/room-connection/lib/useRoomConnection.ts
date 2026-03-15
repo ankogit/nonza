@@ -114,6 +114,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const lastConnectOptions = ref<
     { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] } | undefined
   >(undefined);
+  const connectAbortedRef = ref(false);
 
   const updateParticipants = (
     updater: (map: Map<string, RemoteParticipant | LocalParticipant>) => void
@@ -163,6 +164,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     }
 
     state.value = { ...state.value, isConnecting: true, error: null };
+    connectAbortedRef.value = false;
 
     try {
       // Get room info
@@ -251,6 +253,15 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         );
       }
 
+      if (connectAbortedRef.value) {
+        try {
+          livekitRoom.disconnect();
+        } catch {
+          // already disconnecting
+        }
+        return;
+      }
+
       state.value = {
         ...state.value,
         livekitRoom,
@@ -301,11 +312,15 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       };
       throw error;
     } finally {
+      connectAbortedRef.value = false;
       state.value = { ...state.value, isConnecting: false };
     }
   };
 
   const disconnect = async (): Promise<void> => {
+    if (state.value.isConnecting) {
+      connectAbortedRef.value = true;
+    }
     if (state.value.livekitRoom) {
       await state.value.livekitRoom.disconnect();
     }
