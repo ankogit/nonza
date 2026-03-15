@@ -63,7 +63,7 @@ func (h *InvitesHandler) Create(c *gin.Context) {
 	if org, _ := h.Services.Organizations.GetByID(orgID); org != nil {
 		inv.Organization.Name = org.Name
 	}
-	c.JSON(http.StatusCreated, inviteDto.ToInviteResponse(inv))
+	c.JSON(http.StatusCreated, inviteDto.ToInviteResponse(inv, false))
 }
 
 func (h *InvitesHandler) GetByToken(c *gin.Context) {
@@ -81,7 +81,11 @@ func (h *InvitesHandler) GetByToken(c *gin.Context) {
 		c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
 		return
 	}
-	c.JSON(http.StatusOK, inviteDto.ToInviteResponse(inv))
+	alreadyMember := false
+	if userID := c.GetString("user_id"); userID != "" {
+		alreadyMember, _ = h.Services.Organizations.UserCanAccess(inv.OrganizationID, userID)
+	}
+	c.JSON(http.StatusOK, inviteDto.ToInviteResponse(inv, alreadyMember))
 }
 
 func (h *InvitesHandler) Accept(c *gin.Context) {

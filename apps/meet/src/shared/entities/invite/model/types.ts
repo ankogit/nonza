@@ -4,4 +4,5 @@ export interface Invite {
   organization_name: string;
   role: string;
   expires_at: string;
+  already_member?: boolean;
 }

@@ -46,4 +46,10 @@ const containerClass = computed(() => ({
   margin-left: auto;
   margin-right: auto;
 }
+
+@media (max-width: 360px) {
+  .screen-layout {
+    padding: 12px;
+  }
+}
 </style>

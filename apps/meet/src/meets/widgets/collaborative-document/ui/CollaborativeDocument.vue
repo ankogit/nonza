@@ -21,7 +21,7 @@
           aria-label="Скачать"
           @click="handleDownload"
         >
-          <PixelIcon name="document" variant="small" />
+          <PixelIcon name="download" variant="small" />
         </Button>
         <div
           v-if="connectionStatus !== 'connected'"
@@ -44,10 +44,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('bold'),
-        }"
+        :variant="editor.isActive('bold') ? 'active' : 'default'"
         title="Жирный"
         aria-label="Жирный"
         @click="editor.chain().focus().toggleBold().run()"
@@ -58,10 +55,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('italic'),
-        }"
+        :variant="editor.isActive('italic') ? 'active' : 'default'"
         title="Курсив"
         aria-label="Курсив"
         @click="editor.chain().focus().toggleItalic().run()"
@@ -72,10 +66,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('strike'),
-        }"
+        :variant="editor.isActive('strike') ? 'active' : 'default'"
         title="Зачеркнутый"
         aria-label="Зачеркнутый"
         @click="editor.chain().focus().toggleStrike().run()"
@@ -87,12 +78,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active': editor.isActive(
-            'heading',
-            { level: 1 },
-          ),
-        }"
+        :variant="editor.isActive('heading', { level: 1 }) ? 'active' : 'default'"
         title="Заголовок 1"
         aria-label="Заголовок 1"
         @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
@@ -103,12 +89,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active': editor.isActive(
-            'heading',
-            { level: 2 },
-          ),
-        }"
+        :variant="editor.isActive('heading', { level: 2 }) ? 'active' : 'default'"
         title="Заголовок 2"
         aria-label="Заголовок 2"
         @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
@@ -119,12 +100,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active': editor.isActive(
-            'heading',
-            { level: 3 },
-          ),
-        }"
+        :variant="editor.isActive('heading', { level: 3 }) ? 'active' : 'default'"
         title="Заголовок 3"
         aria-label="Заголовок 3"
         @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
@@ -136,10 +112,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('bulletList'),
-        }"
+        :variant="editor.isActive('bulletList') ? 'active' : 'default'"
         title="Маркированный список"
         aria-label="Маркированный список"
         @click="editor.chain().focus().toggleBulletList().run()"
@@ -150,10 +123,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('orderedList'),
-        }"
+        :variant="editor.isActive('orderedList') ? 'active' : 'default'"
         title="Нумерованный список"
         aria-label="Нумерованный список"
         @click="editor.chain().focus().toggleOrderedList().run()"
@@ -164,10 +134,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('blockquote'),
-        }"
+        :variant="editor.isActive('blockquote') ? 'active' : 'default'"
         title="Цитата"
         aria-label="Цитата"
         @click="editor.chain().focus().toggleBlockquote().run()"
@@ -178,10 +145,7 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('code'),
-        }"
+        :variant="editor.isActive('code') ? 'active' : 'default'"
         title="Код"
         aria-label="Код"
         @click="editor.chain().focus().toggleCode().run()"
@@ -193,15 +157,12 @@
         type="icon"
         size="small"
         class="collaborative-document__toolbar-button"
-        :class="{
-          'collaborative-document__toolbar-button--active':
-            editor.isActive('link'),
-        }"
+        :variant="editor.isActive('link') ? 'active' : 'default'"
         title="Ссылка"
         aria-label="Ссылка"
         @click="handleLink"
       >
-        <PixelIcon name="document" variant="small" />
+        <PixelIcon name="link" variant="small" />
       </Button>
     </div>
     <div class="collaborative-document__editor-wrapper">
@@ -546,35 +507,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.collaborative-document__toolbar-button {
-  background: transparent;
-  border: 1px solid #444;
-  color: #bab1a8;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-  border-radius: 2px;
-  min-width: 32px;
-  width: auto;
-  height: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.collaborative-document__toolbar-button:hover {
-  border-color: #2980b9;
-  background: #2980b920;
-  color: #fff;
-}
-
-.collaborative-document__toolbar-button--active {
-  background: #2980b9;
-  border-color: #2980b9;
-  color: #fff;
-}
-
 .collaborative-document__toolbar-separator {
   width: 1px;
   height: 20px;
@@ -595,29 +527,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.collaborative-document__button {
-  background: transparent;
-  border: 2px solid #444;
-  color: #bab1a8;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
-  border-radius: 0;
-  width: auto;
-  min-width: auto;
-  height: auto;
-}
-
-.collaborative-document__button:hover {
-  border-color: #2980b9;
-  background: #2980b920;
-}
-
-.collaborative-document__button:active {
-  transform: scale(0.95);
 }
 
 .collaborative-document__status {

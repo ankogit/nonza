@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/images/nonza-icon-m.ico" />
     <link rel="apple-touch-icon" href="/images/nonza-icon-m.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>Nonza Video Call Widget - Dev</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,7 +21,7 @@
     />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app" class="grain-overlay"></div>
     <script type="module" src="/src/main.ts"></script>
     <script>
       // Автоматически включаем режим превью если нет бэкенда

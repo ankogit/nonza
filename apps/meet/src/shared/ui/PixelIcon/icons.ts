@@ -37,6 +37,8 @@ export const PIXEL_ICON_NAMES = [
   "document",
   "message",
   "check",
+  "download",
+  "link",
 ] as const;
 
 export type PixelIconName = (typeof PIXEL_ICON_NAMES)[number];

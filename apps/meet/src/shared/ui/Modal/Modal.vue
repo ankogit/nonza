@@ -93,7 +93,7 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,7 +105,9 @@ onUnmounted(() => {
 .modal-container {
   background: #1f1f1f;
   border: 3px solid #444;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.5), 8px 8px 0 0 rgba(0, 0, 0, 0.3);
+  box-shadow:
+    4px 4px 0 0 rgba(0, 0, 0, 0.5),
+    8px 8px 0 0 rgba(0, 0, 0, 0.3);
   max-width: 90vw;
   max-height: 90vh;
   display: flex;
@@ -114,6 +116,20 @@ onUnmounted(() => {
   min-width: 320px;
   width: 100%;
   max-width: 500px;
+}
+
+@media (max-width: 360px) {
+  .modal-container {
+    min-width: 0;
+    width: 100%;
+    max-width: calc(100vw - 24px);
+  }
+
+  .modal-header,
+  .modal-content,
+  .modal-footer {
+    padding: 14px;
+  }
 }
 
 .modal-header {
@@ -160,7 +176,9 @@ onUnmounted(() => {
 
 .modal-enter-active .modal-container,
 .modal-leave-active .modal-container {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .modal-enter-from,

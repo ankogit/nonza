@@ -1,14 +1,18 @@
 <template>
   <div
-    class="rooms-app padding-app full-page bg-dark grain-overlay"
-    :class="{ 'rooms-app--scroll-root': isScrollRootPage }"
+    class="rooms-app padding-app full-page bg-dark"
+    :class="{
+      'rooms-app--scroll-root': isScrollRootPage,
+      'rooms-app--drawer-open': sidebarDrawerOpen && isMainView,
+    }"
   >
     <div v-if="appStore.showReconnectScreen" class="rooms-app__content">
       <ScreenLayout narrow>
         <div class="reconnect-screen__card">
           <PageHeader title="Ошибка соединения" />
           <p class="reconnect-screen__text">
-            Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.
+            Не удалось связаться с сервером. Проверьте интернет и попробуйте
+            снова.
           </p>
           <div class="reconnect-screen__actions">
             <Button
@@ -23,7 +27,10 @@
         </div>
       </ScreenLayout>
     </div>
-    <div v-else-if="appStore.roomCode && isAuthenticated()" class="rooms-app__room">
+    <div
+      v-else-if="appStore.roomCode && isAuthenticated()"
+      class="rooms-app__room"
+    >
       <NonzaWidget
         :api-client="apiClient"
         :api-base-u-r-l="apiBaseURL"
@@ -52,6 +59,7 @@
       <InviteScreen
         :token="appStore.inviteToken"
         @accepted="handleInviteAccepted"
+        @openOrg="handleInviteOpenOrg"
         @cancel="goToOrganizations"
         @goLogin="goToLoginFromInvite"
       />
@@ -76,14 +84,40 @@
       />
     </div>
     <main v-else-if="isAuthenticated()" class="container border-radius-app">
+      <div
+        v-if="isMainView && sidebarDrawerOpen"
+        class="rooms-app__drawer-overlay"
+        aria-hidden="true"
+        @click="closeSidebarDrawer"
+      />
       <aside class="servers bg-dark-blur-90">
         <OrgPanel
           :organizations="organizations"
           :selected-id="selectedOrgId"
-          @select="selectOrg"
-          @create="appStore.setPage('create-org')"
-          @settings="appStore.setPage('settings')"
-          @go-home="handleOrgBack"
+          @select="
+            (org) => {
+              closeSidebarDrawer();
+              selectOrg(org);
+            }
+          "
+          @create="
+            () => {
+              closeSidebarDrawer();
+              appStore.setPage('create-org');
+            }
+          "
+          @settings="
+            () => {
+              closeSidebarDrawer();
+              appStore.setPage('settings');
+            }
+          "
+          @go-home="
+            () => {
+              closeSidebarDrawer();
+              handleOrgBack();
+            }
+          "
         />
       </aside>
       <OrgScreen
@@ -115,7 +149,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, provide, defineAsyncComponent } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  provide,
+  defineAsyncComponent,
+} from "vue";
 import { storeToRefs } from "pinia";
 import { OrganizationApi } from "@shared/entities";
 import { ApiClient } from "@shared/api";
@@ -187,11 +229,31 @@ const organizationApi = new OrganizationApi(apiClient);
 provide("apiClient", apiClient);
 provide(API_BASE_URL_INJECT_KEY, apiBaseURL);
 provide(LIVEKIT_URL_INJECT_KEY, livekitURL);
+provide("openSidebarDrawer", () => {
+  sidebarDrawerOpen.value = true;
+});
 
 const appStore = useAppStore();
 const orgStore = useOrganizationsStore();
 useMeetingShortcutListener();
 const { organizations, loading, selectedOrgId } = storeToRefs(orgStore);
+
+const sidebarDrawerOpen = ref(false);
+
+const isMainView = computed(
+  () =>
+    isAuthenticated() &&
+    !appStore.showReconnectScreen &&
+    !appStore.roomCode &&
+    !["login", "register", "invite", "create-org", "settings"].includes(
+      appStore.page,
+    ) &&
+    !(appStore.page === "org-settings" && selectedOrgId.value),
+);
+
+function closeSidebarDrawer() {
+  sidebarDrawerOpen.value = false;
+}
 
 const isScrollRootPage = computed(
   () =>
@@ -294,7 +356,8 @@ function handleOrgBack() {
 }
 
 function goToLoginFromInvite() {
-  if (appStore.inviteToken) appStore.setPendingInviteAfterLogin(appStore.inviteToken);
+  if (appStore.inviteToken)
+    appStore.setPendingInviteAfterLogin(appStore.inviteToken);
   appStore.setPage("login");
   replaceState();
 }
@@ -321,6 +384,10 @@ function handleInviteAccepted(orgId: string) {
     .getById(orgId)
     .then((org) => orgStore.addOrganization(org))
     .catch(() => {});
+}
+
+function handleInviteOpenOrg(orgId: string) {
+  handleInviteAccepted(orgId);
 }
 
 function handleAuthSuccess() {
@@ -395,6 +462,7 @@ function loadOrganizations() {
 }
 
 onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
   parseRoute();
   const publicPages = ["login", "register", "invite"];
   if (!isAuthenticated() && !publicPages.includes(appStore.page)) {
@@ -421,6 +489,16 @@ onMounted(() => {
 });
 
 window.addEventListener("popstate", parseRoute);
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape" && sidebarDrawerOpen.value) {
+    sidebarDrawerOpen.value = false;
+  }
+}
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <style scoped>
@@ -465,6 +543,12 @@ window.addEventListener("popstate", parseRoute);
   z-index: 10000;
 }
 
+@media (max-width: 360px) {
+  .rooms-app__content {
+    padding: 12px;
+  }
+}
+
 .rooms-app__room {
   flex: 1;
   min-height: 0;
@@ -499,6 +583,53 @@ window.addEventListener("popstate", parseRoute);
 
 .servers::-webkit-scrollbar {
   display: none;
+}
+
+.rooms-app__drawer-overlay {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .rooms-app__drawer-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+  }
+
+  .servers {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 72px;
+    flex: none;
+    z-index: 10002;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .rooms-app--drawer-open .servers {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .container__org,
+  .vert-container--list {
+    min-width: 0;
+  }
+
+  .vert-container--list {
+    padding: 16px 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .vert-container--list {
+    padding: 12px;
+  }
 }
 
 .vert-container {

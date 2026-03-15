@@ -34,7 +34,17 @@
         <hr class="HR" />
 
         <FormSection label="Участники">
-          <div v-if="membersLoading" class="org-settings-screen__loading">Загрузка…</div>
+          <div v-if="membersLoading" class="org-settings-screen__skeleton">
+            <div
+              v-for="i in 5"
+              :key="i"
+              class="org-settings-screen__skeleton-row"
+            >
+              <Skeleton variant="circle" :width="40" :height="40" />
+              <Skeleton variant="text" width="140px" :height="16" />
+              <Skeleton variant="rect" width="60px" :height="24" />
+            </div>
+          </div>
           <div v-else class="org-settings-screen__members-wrap">
             <ul class="org-settings-screen__members">
               <li
@@ -269,6 +279,7 @@ import {
   PillGroup,
   Badge,
   ContextMenu,
+  Skeleton,
 } from "@shared/ui";
 import type { PillOption } from "@shared/ui";
 import type { ContextMenuItem } from "@shared/ui";
@@ -599,6 +610,30 @@ async function confirmLeave() {
 .org-settings-screen__loading {
   color: #999;
   font-size: 14px;
+}
+
+.org-settings-screen__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 2px solid #444;
+  background: #1a1a1a;
+  padding: 12px;
+}
+
+.org-settings-screen__skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.org-settings-screen__skeleton-row .skeleton:first-child {
+  flex-shrink: 0;
+}
+
+.org-settings-screen__skeleton-row .skeleton:nth-child(2) {
+  flex: 1;
+  min-width: 0;
 }
 
 .org-settings-screen__members-wrap {

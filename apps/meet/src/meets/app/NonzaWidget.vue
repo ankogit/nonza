@@ -563,6 +563,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  min-height: 0;
 }
 
 .nonza-widget__reconnecting-card {
@@ -601,6 +602,20 @@ onMounted(() => {
   border: 2px solid #444;
   border-radius: 0;
   box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 360px) {
+  .nonza-widget__reconnecting,
+  .nonza-widget__connect {
+    padding: 16px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .nonza-widget__reconnecting-card,
+  .nonza-widget__connect-form {
+    padding: 20px;
+  }
 }
 
 .nonza-widget__title {

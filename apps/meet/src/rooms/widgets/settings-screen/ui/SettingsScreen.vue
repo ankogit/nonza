@@ -23,7 +23,12 @@
           />
         </FormSection>
         <FormSection label="Email">
-          <span class="settings-screen__readonly">{{ user?.email ?? "—" }}</span>
+          <Input
+            :model-value="user?.email ?? ''"
+            placeholder="—"
+            aria-label="Email"
+            disabled
+          />
         </FormSection>
         <hr class="HR" />
         <div class="settings-screen__danger">
@@ -144,15 +149,9 @@ function handleLogout() {
   padding: 20px;
   overflow-y: auto;
   color: #bab1a8;
-}
-
-.settings-screen__readonly {
-  font-size: 16px;
-  color: #bab1a8;
-}
-
-.settings-screen__danger {
-  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .settings-screen__danger-title {

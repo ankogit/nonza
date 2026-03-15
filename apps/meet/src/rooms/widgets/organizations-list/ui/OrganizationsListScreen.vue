@@ -1,8 +1,32 @@
 <template>
   <div class="organizations-list">
     <div class="organizations-list__main">
-      <PageHeader title="Организации" />
-      <div v-if="loading" class="organizations-list__loading">Загрузка...</div>
+      <div class="organizations-list__mobile-bar">
+        <button
+          type="button"
+          class="organizations-list__menu-btn"
+          aria-label="Меню"
+          title="Меню"
+          @click="openSidebarDrawer?.()"
+        >
+          <PixelIcon name="burger" variant="small" />
+        </button>
+        <span class="organizations-list__mobile-title">Организации</span>
+      </div>
+      <PageHeader title="Организации" class="organizations-list__header" />
+      <div v-if="loading" class="organizations-list__skeleton">
+        <div
+          v-for="i in 6"
+          :key="i"
+          class="organizations-list__skeleton-card"
+        >
+          <Skeleton variant="circle" :width="44" :height="44" class="organizations-list__skeleton-letter" />
+          <div class="organizations-list__skeleton-lines">
+            <Skeleton variant="text" width="80%" :height="16" />
+            <Skeleton variant="text" width="55%" :height="13" />
+          </div>
+        </div>
+      </div>
       <ListEmpty v-else-if="!organizations.length" message="Нет организаций" />
       <div v-else class="organizations-list__grid">
         <CardTile
@@ -69,8 +93,11 @@
 </template>
 
 <script setup lang="ts">
-import { PageHeader, CardTile, ListEmpty, Button } from "@shared/ui";
+import { inject } from "vue";
+import { PageHeader, CardTile, ListEmpty, Button, Skeleton, PixelIcon } from "@shared/ui";
 import type { Organization } from "@shared/entities";
+
+const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
 
 defineProps<{
   organizations: Organization[];
@@ -109,11 +136,85 @@ function orgLetter(name: string): string {
   min-height: 0;
 }
 
+.organizations-list__mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+
+.organizations-list__menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid #444;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #bab1a8;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.organizations-list__menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #555;
+}
+
+.organizations-list__mobile-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+  color: #bab1a8;
+}
+
+@media (max-width: 480px) {
+  .organizations-list__mobile-bar {
+    display: flex;
+  }
+
+  .organizations-list__header {
+    display: none;
+  }
+}
+
 .organizations-list__loading {
   padding: 48px 0;
   text-align: center;
   color: var(--color-text-secondary);
   font-size: 15px;
+}
+
+.organizations-list__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.organizations-list__skeleton-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.organizations-list__skeleton-letter {
+  flex-shrink: 0;
+}
+
+.organizations-list__skeleton-lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .organizations-list__grid {

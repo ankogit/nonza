@@ -240,7 +240,9 @@ func (h *RoomsHandler) UpdateConferenceHallLeader(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update room"})
 		return
 	}
-
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+room.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, nil))
 }
 
@@ -337,7 +339,9 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update room"})
 		return
 	}
-
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+room.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, nil))
 }
 
@@ -375,7 +379,10 @@ func (h *RoomsHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete room"})
 		return
 	}
-
+	orgID := room.OrganizationID
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
 	c.Status(http.StatusNoContent)
 }
 

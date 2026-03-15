@@ -1,7 +1,15 @@
 <template>
   <ScreenLayout narrow>
     <PageHeader title="Приглашение в организацию" />
-    <div v-if="loading" class="invite-screen__loading">Загрузка...</div>
+    <div v-if="loading" class="invite-screen__skeleton">
+      <Skeleton variant="text" width="70%" :height="22" class="invite-screen__skeleton-title" />
+      <Skeleton variant="text" width="100%" :height="16" />
+      <Skeleton variant="text" width="90%" :height="16" />
+      <div class="invite-screen__skeleton-actions">
+        <Skeleton variant="rect" width="100px" :height="36" />
+        <Skeleton variant="rect" width="100px" :height="36" />
+      </div>
+    </div>
     <div v-else-if="error" class="invite-screen__error">
       <p>{{ error }}</p>
       <Button type="text" variant="default" size="medium" @click="$emit('cancel')">
@@ -74,6 +82,7 @@ import {
   PageHeader,
   FormSection,
   Button,
+  Skeleton,
 } from "@shared/ui";
 import { PARTICIPANT_COLOR_PALETTE } from "@shared/lib";
 import { InviteApi } from "@shared/entities";
@@ -87,6 +96,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   accepted: [orgId: string];
+  openOrg: [orgId: string];
   cancel: [];
   goLogin: [];
 }>();
@@ -116,6 +126,10 @@ async function loadInvite() {
   invite.value = null;
   try {
     invite.value = await inviteApi.getByToken(props.token);
+    if (invite.value?.already_member && isAuthenticated()) {
+      emit("openOrg", invite.value.organization_id);
+      return;
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Ошибка загрузки";
     const lower = msg.toLowerCase();
@@ -155,6 +169,27 @@ watch(() => props.token, () => loadInvite());
   padding: 48px;
   text-align: center;
   color: #999;
+}
+
+.invite-screen__skeleton {
+  padding: 24px;
+  border: 2px solid #444;
+  background: #2a2a2a;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-screen__skeleton-title {
+  margin-bottom: 4px;
+}
+
+.invite-screen__skeleton-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
 }
 
 .invite-screen__error {

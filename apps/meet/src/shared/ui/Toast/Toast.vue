@@ -55,6 +55,12 @@ defineEmits<{
   color: #bab1a8;
 }
 
+@media (max-width: 360px) {
+  .pixel-toast {
+    max-width: calc(100vw - 24px);
+  }
+}
+
 .pixel-toast__icon-wrap {
   flex-shrink: 0;
   width: 32px;

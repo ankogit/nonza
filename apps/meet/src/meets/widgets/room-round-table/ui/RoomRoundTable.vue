@@ -327,7 +327,7 @@
       @close="handleModalClose"
     >
       <div class="settings-content">
-        <div class="settings-section">
+        <div v-if="isAnonymousForSettings" class="settings-section">
           <h3 class="settings-section-title">Участник</h3>
           <div class="settings-item">
             <label class="settings-label">Ваше имя</label>
@@ -670,10 +670,13 @@ const audioSettingsRef = ref<ComponentPublicInstance | null>(null);
 const initialParticipantName = ref(props.participantName);
 const settingsParticipantName = ref(props.participantName);
 
+const isAnonymousForSettings = computed(() => !getAuthState()?.user);
+
 const hasUnsavedSettingsChanges = computed(() => {
   const nameChanged =
+    isAnonymousForSettings.value &&
     settingsParticipantName.value.trim() !==
-    initialParticipantName.value.trim();
+      initialParticipantName.value.trim();
 
   let audioChanged = false;
   if (
@@ -714,12 +717,14 @@ function handleSettings() {
 
 async function handleSaveSettings() {
   try {
-    if (settingsParticipantName.value.trim()) {
+    if (
+      isAnonymousForSettings.value &&
+      settingsParticipantName.value.trim()
+    ) {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
 
-      // Обновляем имя в родительском компоненте
       emit("update:participantName", newName);
 
       // Обновляем имя в LiveKit (через connection — сразу и у других, и в нашем state)
@@ -777,7 +782,9 @@ async function handleSaveSettings() {
 }
 
 function handleCancelSettings() {
-  settingsParticipantName.value = initialParticipantName.value;
+  if (isAnonymousForSettings.value) {
+    settingsParticipantName.value = initialParticipantName.value;
+  }
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
   if (
     audioSettingsRef.value &&
@@ -859,6 +866,16 @@ function handleModalClose() {
   }
   .round-table-content {
     flex-direction: row;
+  }
+}
+
+@media (max-width: 480px) {
+  .round-table-document {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-height: 280px;
+    padding: 12px;
   }
 }
 

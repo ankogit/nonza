@@ -514,7 +514,7 @@
       @close="handleModalClose"
     >
       <div class="settings-content">
-        <div class="settings-section">
+        <div v-if="isAnonymousForSettings" class="settings-section">
           <h3 class="settings-section-title">Участник</h3>
           <div class="settings-item">
             <label class="settings-label">Ваше имя</label>
@@ -617,6 +617,7 @@ import type { RoomParticipantListItem } from "@widgets/room-participants-list";
 import { CallMenu } from "@widgets/call-menu";
 import ParticipantsTrigger from "./ParticipantsTrigger.vue";
 import {
+  getAuthState,
   setParticipantName,
   getStoredAudioInputDevice,
   useMeetingHotkeys,
@@ -1053,10 +1054,13 @@ const audioSettingsRef = ref<ComponentPublicInstance | null>(null);
 const initialParticipantName = ref(props.participantName);
 const settingsParticipantName = ref(props.participantName);
 
+const isAnonymousForSettings = computed(() => !getAuthState()?.user);
+
 const hasUnsavedSettingsChanges = computed(() => {
   const nameChanged =
+    isAnonymousForSettings.value &&
     settingsParticipantName.value.trim() !==
-    initialParticipantName.value.trim();
+      initialParticipantName.value.trim();
 
   let audioChanged = false;
   if (
@@ -1097,12 +1101,14 @@ function handleSettings() {
 
 async function handleSaveSettings() {
   try {
-    if (settingsParticipantName.value.trim()) {
+    if (
+      isAnonymousForSettings.value &&
+      settingsParticipantName.value.trim()
+    ) {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
 
-      // Обновляем имя в родительском компоненте
       emit("update:participantName", newName);
 
       // Обновляем имя в LiveKit (через connection — сразу и у других, и в нашем state)
@@ -1164,7 +1170,9 @@ async function handleSaveSettings() {
 }
 
 function handleCancelSettings() {
-  settingsParticipantName.value = initialParticipantName.value;
+  if (isAnonymousForSettings.value) {
+    settingsParticipantName.value = initialParticipantName.value;
+  }
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
   if (
     audioSettingsRef.value &&

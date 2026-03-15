@@ -1,5 +1,11 @@
 <template>
-  <div class="org-screen">
+  <div
+    class="org-screen"
+    :class="{
+      'org-screen--mobile-list': isMobile && mobileView === 'list',
+      'org-screen--mobile-room': isMobile && mobileView === 'room',
+    }"
+  >
     <div v-if="orgLoadError" class="org-screen__error">
       <div class="org-screen__error-card">
         <h2 class="org-screen__error-title">
@@ -99,7 +105,23 @@
               + Группа
             </button>
           </header>
-          <div v-if="loading" class="rooms-list-loading">Загрузка...</div>
+          <div v-if="loading" class="rooms-list-skeleton">
+            <div
+              v-for="i in 5"
+              :key="i"
+              class="room room-skeleton"
+            >
+              <div class="room-button room-button-skeleton">
+                <span class="room-button__content">
+                  <span class="room-button__head">
+                    <Skeleton variant="rect" :width="20" :height="20" />
+                    <Skeleton variant="text" width="60%" :height="14" />
+                  </span>
+                  <Skeleton variant="text" width="40%" :height="12" />
+                </span>
+              </div>
+            </div>
+          </div>
           <div v-else class="rooms-list-scroll">
             <div
               v-if="canEditRoom && showAddGroupInput"
@@ -414,7 +436,21 @@
           <header class="rooms-list-header">
             <h5>Участники</h5>
           </header>
-          <div v-if="membersLoading" class="rooms-list-loading">Загрузка…</div>
+          <div v-if="membersLoading" class="rooms-list-skeleton">
+            <div
+              v-for="i in 6"
+              :key="i"
+              class="room-participant room-participant-skeleton"
+            >
+              <span class="room-participant__main">
+                <Skeleton variant="circle" :width="24" :height="24" />
+                <span class="room-participant-skeleton__lines">
+                  <Skeleton variant="text" width="100px" :height="14" />
+                  <Skeleton variant="text" width="60px" :height="12" />
+                </span>
+              </span>
+            </div>
+          </div>
           <div v-else class="rooms-list-scroll">
             <ul class="rooms-list-members">
               <li
@@ -472,6 +508,15 @@
           class="organization-footer"
           :class="{ 'organization-footer--colors-expanded': footerColorsExpanded }"
         >
+          <button
+            type="button"
+            class="organization-footer-menu"
+            aria-label="Меню"
+            title="Меню"
+            @click="openSidebarDrawer?.()"
+          >
+            <PixelIcon name="burger" variant="small" />
+          </button>
           <button
             type="button"
             class="organization-footer-avatar"
@@ -556,7 +601,8 @@
               variant="default"
               size="small"
               class="menu-back"
-              @click="leaveRoomOrCancelJoin()"
+              :class="{ 'org-screen__back--mobile': isMobile && joinedRoomShortCode }"
+              @click="handleBackClick"
             >
               ← Назад
             </Button>
@@ -646,7 +692,7 @@
         @close="handleCallSettingsModalClose"
       >
         <div class="settings-content">
-          <div class="settings-section">
+          <div v-if="isAnonymousForCallSettings" class="settings-section">
             <h3 class="settings-section-title">Участник</h3>
             <div class="settings-item">
               <label class="settings-label">Ваше имя</label>
@@ -661,6 +707,17 @@
             </div>
           </div>
           <AudioSettings ref="callSettingsAudioRef" />
+          <div class="settings-section">
+            <h3 class="settings-section-title">Озвучивание реплик</h3>
+            <div class="settings-item settings-item--row">
+              <Switch
+                :model-value="callSettingsReplicaTts"
+                @update:model-value="callSettingsReplicaTts = $event"
+              >
+                <span>Озвучивать реплики (TTS)</span>
+              </Switch>
+            </div>
+          </div>
         </div>
         <template #footer>
           <Button
@@ -820,6 +877,7 @@ import {
   onMounted,
   onUnmounted,
   nextTick,
+  inject,
 } from "vue";
 import {
   RoomApi,
@@ -853,6 +911,8 @@ import {
   PixelSelect,
   Input,
   AudioSettings,
+  Skeleton,
+  Switch,
 } from "@shared/ui";
 import type { PixelSelectOption } from "@shared/ui";
 import RadioButtonGroup from "@shared/ui/RadioButtonGroup/RadioButtonGroup.vue";
@@ -868,6 +928,8 @@ import {
   getParticipantInfoFromAuth,
   getParticipantName,
   setParticipantName,
+  getReplicaTtsEnabled,
+  setReplicaTtsEnabled,
   showToast,
   useAppConfig,
   DEFAULT_PARTICIPANT_COLOR,
@@ -897,6 +959,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ settings: []; "org-settings": []; back: [] }>();
+
+const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
 
 const { apiBaseURL, livekitURL } = useAppConfig();
 const apiClient = props.apiClient ?? useApiClient();
@@ -1083,10 +1147,15 @@ const inviteLink = ref<string | null>(null);
 const inviteLoading = ref(false);
 const inviteError = ref<string | null>(null);
 const joinedRoomShortCode = ref<string | null>(null);
+
+const isMobile = ref(false);
+const mobileView = ref<"list" | "room">("list");
 const nonzaWidgetRef = ref<InstanceType<typeof NonzaWidget> | null>(null);
 const showCallSettingsModal = ref(false);
 const callSettingsParticipantName = ref("");
 const initialCallSettingsParticipantName = ref("");
+const callSettingsReplicaTts = ref(false);
+const initialCallSettingsReplicaTts = ref(false);
 const callSettingsAudioRef = ref<InstanceType<typeof AudioSettings> | null>(
   null,
 );
@@ -1345,10 +1414,13 @@ const defaultParticipantName = computed(() => {
   return (user?.name || user?.email || "").trim() || undefined;
 });
 
+const isAnonymousForCallSettings = computed(() => !getAuthState()?.user);
+
 const hasUnsavedCallSettingsChanges = computed(() => {
   const nameChanged =
+    isAnonymousForCallSettings.value &&
     callSettingsParticipantName.value.trim() !==
-    initialCallSettingsParticipantName.value.trim();
+      initialCallSettingsParticipantName.value.trim();
   let audioChanged = false;
   const audioRef = callSettingsAudioRef.value as {
     hasUnsavedChanges?: () => boolean;
@@ -1356,7 +1428,9 @@ const hasUnsavedCallSettingsChanges = computed(() => {
   if (audioRef?.hasUnsavedChanges) {
     audioChanged = audioRef.hasUnsavedChanges();
   }
-  return nameChanged || audioChanged;
+  const ttsChanged =
+    callSettingsReplicaTts.value !== initialCallSettingsReplicaTts.value;
+  return nameChanged || audioChanged || ttsChanged;
 });
 
 const currentUserLetter = computed(() => {
@@ -1548,6 +1622,17 @@ async function leaveRoomOrCancelJoin() {
   widgetParticipants.value = [];
   widgetParticipantsRoomCode.value = null;
   joinedRoomShortCode.value = null;
+  if (isMobile.value) {
+    mobileView.value = "list";
+  }
+}
+
+function handleBackClick() {
+  if (isMobile.value) {
+    mobileView.value = "list";
+  } else {
+    leaveRoomOrCancelJoin();
+  }
 }
 
 function openCallSettings() {
@@ -1558,6 +1643,8 @@ function openCallSettings() {
   callSettingsParticipantName.value =
     defaultParticipantName.value ?? getParticipantName() ?? "";
   initialCallSettingsParticipantName.value = callSettingsParticipantName.value;
+  callSettingsReplicaTts.value = getReplicaTtsEnabled();
+  initialCallSettingsReplicaTts.value = callSettingsReplicaTts.value;
   nextTick(() => {
     (
       callSettingsAudioRef.value as { resetSettings?: () => void }
@@ -1567,7 +1654,7 @@ function openCallSettings() {
 }
 
 async function handleSaveCallSettings() {
-  if (callSettingsParticipantName.value.trim()) {
+  if (isAnonymousForCallSettings.value && callSettingsParticipantName.value.trim()) {
     setParticipantName(callSettingsParticipantName.value);
     initialCallSettingsParticipantName.value =
       callSettingsParticipantName.value;
@@ -1576,11 +1663,16 @@ async function handleSaveCallSettings() {
     callSettingsAudioRef.value as { saveSettings?: () => Promise<void> }
   )?.saveSettings;
   if (save) await save();
+  setReplicaTtsEnabled(callSettingsReplicaTts.value);
+  initialCallSettingsReplicaTts.value = callSettingsReplicaTts.value;
   showCallSettingsModal.value = false;
 }
 
 function handleCancelCallSettings() {
-  callSettingsParticipantName.value = initialCallSettingsParticipantName.value;
+  if (isAnonymousForCallSettings.value) {
+    callSettingsParticipantName.value = initialCallSettingsParticipantName.value;
+  }
+  callSettingsReplicaTts.value = initialCallSettingsReplicaTts.value;
   (
     callSettingsAudioRef.value as { resetSettings?: () => void }
   )?.resetSettings?.();
@@ -1796,6 +1888,9 @@ function disconnectOrgWs() {
 function joinRoom(room: Room) {
   if (room.short_code) {
     joinedRoomShortCode.value = room.short_code;
+    if (isMobile.value) {
+      mobileView.value = "room";
+    }
   }
 }
 
@@ -2009,10 +2104,13 @@ watch(
   },
 );
 
-watch(joinedRoomShortCode, () => {
+watch(joinedRoomShortCode, (code) => {
   widgetParticipants.value = [];
   widgetParticipantsRoomCode.value = null;
   refreshRoomsParticipants();
+  if (isMobile.value) {
+    mobileView.value = code ? "room" : "list";
+  }
 });
 
 watch(roomSettingsRoom, (room) => {
@@ -2025,7 +2123,20 @@ watch(roomSettingsRoom, (room) => {
   roomSettingsGroupId.value = room?.room_group_id ?? "";
 });
 
+let mobileQuery: MediaQueryList | null = null;
+let mobileQueryHandler: ((e: MediaQueryListEvent) => void) | null = null;
+
 onMounted(async () => {
+  mobileQuery = window.matchMedia("(max-width: 1000px)");
+  isMobile.value = mobileQuery.matches;
+  mobileQueryHandler = (e: MediaQueryListEvent) => {
+    isMobile.value = e.matches;
+  };
+  mobileQuery.addEventListener("change", mobileQueryHandler);
+  if (joinedRoomShortCode.value && mobileQuery.matches) {
+    mobileView.value = "room";
+  }
+
   await loadOrg();
   if (orgLoadError.value) return;
   loadRooms();
@@ -2041,6 +2152,9 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (mobileQuery && mobileQueryHandler) {
+    mobileQuery.removeEventListener("change", mobileQueryHandler);
+  }
   if (refreshParticipantsTimeout) {
     clearTimeout(refreshParticipantsTimeout);
     refreshParticipantsTimeout = null;
@@ -2101,6 +2215,34 @@ onUnmounted(() => {
 
 .vert-container.dashboard {
   border-radius: 0 5px 5px 0;
+}
+
+@media (max-width: 1000px) {
+  .org-screen--mobile-list .organization {
+    flex: 1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .org-screen--mobile-list .vert-container.dashboard {
+    display: none;
+  }
+
+  .org-screen--mobile-room .organization {
+    display: none;
+  }
+
+  .org-screen--mobile-room .vert-container.dashboard {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .org-screen__back--mobile {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 1rem;
+  }
 }
 
 .nonza-widget {
@@ -2491,5 +2633,64 @@ onUnmounted(() => {
 
 .room-button--create:active {
   cursor: grabbing;
+}
+
+.rooms-list-skeleton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.room-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.room-button-skeleton {
+  width: 100%;
+  padding: 8px 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.room-button-skeleton .room-button__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.room-button-skeleton .room-button__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.room-participant-skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.room-participant-skeleton .room-participant__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-participant-skeleton__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style>

@@ -173,3 +173,23 @@
 .pi-check {
   background-position: calc(-37 * var(--pi-size)) 0;
 }
+
+.pi-download {
+  background-position: calc(-38 * var(--pi-size)) 0;
+}
+
+.pi-upload {
+  background-position: calc(-39 * var(--pi-size)) 0;
+}
+
+.pi-open-external {
+  background-position: calc(-40 * var(--pi-size)) 0;
+}
+
+.pi-open-internal {
+  background-position: calc(-41 * var(--pi-size)) 0;
+}
+
+.pi-link {
+  background-position: 0 calc(-1 * var(--pi-size));
+}
