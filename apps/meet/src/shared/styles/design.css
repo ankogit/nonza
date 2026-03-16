@@ -959,6 +959,23 @@
   }
 }
 
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) {
+    .menu {
+      padding-bottom: max(80px, env(safe-area-inset-bottom, 0));
+    }
+
+    .call-grid {
+      padding-bottom: calc(100px + max(80px, env(safe-area-inset-bottom, 0)));
+    }
+  }
+
+  @media (max-width: 480px) {
+    .organization-footer {
+      padding-bottom: max(env(safe-area-inset-bottom, 0), 80px);
+    }
+  }
+}
 
 @media (max-width: 480px) {
   .full-page {
@@ -970,7 +987,7 @@
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .full-page {
     padding: 12px;
     padding-left: max(12px, env(safe-area-inset-left));

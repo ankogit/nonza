@@ -111,6 +111,12 @@
   gap: 6px;
 }
 
+@supports (-webkit-touch-callout: none) {
+  .room-fullscreen__show-pip {
+    bottom: calc(88px + max(80px, env(safe-area-inset-bottom, 0)));
+  }
+}
+
 .room-fullscreen__menu {
   flex-shrink: 0;
   position: static;
