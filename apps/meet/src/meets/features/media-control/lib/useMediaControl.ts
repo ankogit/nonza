@@ -7,9 +7,13 @@ import type {
 import { Track, ParticipantEvent, ConnectionState } from "livekit-client";
 import {
   getStoredAudioInputDevice,
+  getStoredVideoInputDevice,
   getDefaultAudioConstraints,
   playNotificationSound,
   showToast,
+  getVideoConstraintsForQuality,
+  getStoredDefaultVideoQuality,
+  getDisplayMediaVideoConstraints,
 } from "@shared/lib";
 
 export interface MediaControlState {
@@ -94,13 +98,22 @@ export function useMediaControl(
         | LocalTrackPublication
         | undefined;
 
+      const videoConstraints = (): MediaTrackConstraints => {
+        const base = getVideoConstraintsForQuality(getStoredDefaultVideoQuality());
+        const deviceId = getStoredVideoInputDevice();
+        if (deviceId) {
+          return { ...base, deviceId: { exact: deviceId } };
+        }
+        return base;
+      };
+
       if (cameraPub?.track) {
         if (state.value.isVideoEnabled) {
           await cameraPub.track.stop();
           await participant.value.unpublishTrack(cameraPub.track);
         } else {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: videoConstraints(),
           });
           const videoTracks = stream.getVideoTracks();
           if (videoTracks.length > 0) {
@@ -116,7 +129,7 @@ export function useMediaControl(
         });
       } else {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: videoConstraints(),
         });
         const videoTracks = stream.getVideoTracks();
         if (videoTracks.length > 0) {
@@ -221,7 +234,7 @@ export function useMediaControl(
       } else {
         try {
           const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: true,
+            video: getDisplayMediaVideoConstraints(),
             audio: true,
           });
           const videoTracks = stream.getVideoTracks();
@@ -299,11 +312,48 @@ export function useMediaControl(
     }
   };
 
+  const switchVideoInputDevice = async (): Promise<void> => {
+    if (!participant.value || !state.value.isVideoEnabled) return;
+
+    const cameraPub = Array.from(
+      participant.value.videoTrackPublications.values(),
+    ).find((pub) => pub.source === Track.Source.Camera) as
+      | LocalTrackPublication
+      | undefined;
+
+    if (!cameraPub?.track) return;
+
+    try {
+      await cameraPub.track.stop();
+      await participant.value.unpublishTrack(cameraPub.track);
+
+      const deviceId = getStoredVideoInputDevice();
+      const base = getVideoConstraintsForQuality(getStoredDefaultVideoQuality());
+      const constraints: MediaTrackConstraints = deviceId
+        ? { ...base, deviceId: { exact: deviceId } }
+        : base;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: constraints,
+      });
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        await participant.value.publishTrack(videoTracks[0], {
+          source: Track.Source.Camera,
+        });
+        nextTick(updateState);
+      }
+    } catch (err) {
+      console.error("Failed to switch video device:", err);
+    }
+  };
+
   return {
     state: computed(() => state.value),
     toggleVideo,
     toggleAudio,
     toggleScreenShare,
     switchAudioInputDevice,
+    switchVideoInputDevice,
   };
 }

@@ -36,6 +36,7 @@ type RoomResponse struct {
 	LiveKitRoomName        string     `json:"livekit_room_name"`
 	E2EEEnabled            bool       `json:"e2ee_enabled"`
 	ConferenceHallLeaderID *string    `json:"conference_hall_leader_id"`
+	CreatedByUserID        *string    `json:"created_by_user_id,omitempty"`
 	AllowAnonymousJoin     bool       `json:"allow_anonymous_join"`
 	Position               int        `json:"position"`
 	CreatedAt              time.Time  `json:"created_at"`
@@ -46,6 +47,7 @@ type RoomResponse struct {
 func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse {
 	e2ee := false
 	var conferenceHallLeaderID *string
+	var createdByUserID *string
 	allowAnonymousJoin := false
 	if room.Settings != nil {
 		if v, ok := room.Settings["e2ee_enabled"].(bool); ok {
@@ -53,6 +55,9 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 		}
 		if v, ok := room.Settings["conference_hall_leader_id"].(string); ok && v != "" {
 			conferenceHallLeaderID = &v
+		}
+		if v, ok := room.Settings["created_by_user_id"].(string); ok && v != "" {
+			createdByUserID = &v
 		}
 		if v, ok := room.Settings["allow_anonymous_join"].(bool); ok {
 			allowAnonymousJoin = v
@@ -70,6 +75,7 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 		LiveKitRoomName:        "room-" + room.ID.String(),
 		E2EEEnabled:            e2ee,
 		ConferenceHallLeaderID: conferenceHallLeaderID,
+		CreatedByUserID:        createdByUserID,
 		AllowAnonymousJoin:     allowAnonymousJoin,
 		Position:               room.Position,
 		CreatedAt:              room.CreatedAt,

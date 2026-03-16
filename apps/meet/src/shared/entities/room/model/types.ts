@@ -12,6 +12,7 @@ export interface Room {
   livekit_room_name: string;
   e2ee_enabled: boolean;
   conference_hall_leader_id?: string | null;
+  created_by_user_id?: string | null;
   allow_anonymous_join?: boolean;
   position?: number;
   created_at: string;

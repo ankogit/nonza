@@ -93,7 +93,11 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 	}
 
 	allowAnonymousJoin := (uid == "")
-	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn, req.E2EEEnabled, roomGroupID, allowAnonymousJoin)
+	var createdByUserID *string
+	if uid != "" {
+		createdByUserID = &uid
+	}
+	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn, req.E2EEEnabled, roomGroupID, allowAnonymousJoin, createdByUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

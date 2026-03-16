@@ -1,5 +1,10 @@
 import { ref, computed, onUnmounted, watch, nextTick, triggerRef } from "vue";
-import { ParticipantEvent, LocalParticipant, Track } from "livekit-client";
+import {
+  ParticipantEvent,
+  LocalParticipant,
+  Track,
+  VideoQuality,
+} from "livekit-client";
 import type { RemoteParticipant, RemoteAudioTrack } from "livekit-client";
 import { applyStoredOutputDevice } from "@shared/lib";
 
@@ -27,10 +32,14 @@ function checkIsLocal(participant: ParticipantLike): boolean {
   }
 }
 
+export type PreferredVideoSource = "camera" | "screen-share";
+
 export type UseParticipantTracksProps = {
   participant: ParticipantLike;
   participantName: string;
   previewMode?: boolean;
+  preferredVideoSource?: PreferredVideoSource;
+  onTracksUpdated?: () => void;
 };
 
 export function useParticipantTracks(props: UseParticipantTracksProps) {
@@ -93,10 +102,20 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
       const videoPubs: VideoPub[] = Array.from(
         vmap.values() as unknown as Iterable<VideoPub>,
       );
-      const videoPub =
-        videoPubs.find(
+      const preferred = props.preferredVideoSource;
+      let videoPub: VideoPub | undefined;
+      if (preferred === "screen-share") {
+        videoPub = videoPubs.find(
           (p) => p.source === Track.Source.ScreenShare && p.track,
-        ) ?? videoPubs.find((p) => p.source === Track.Source.Camera);
+        );
+      } else if (preferred === "camera") {
+        videoPub = videoPubs.find((p) => p.source === Track.Source.Camera);
+      } else {
+        videoPub =
+          videoPubs.find(
+            (p) => p.source === Track.Source.ScreenShare && p.track,
+          ) ?? videoPubs.find((p) => p.source === Track.Source.Camera);
+      }
       const videoTrackEnded =
         videoPub?.track?.mediaStreamTrack?.readyState === "ended";
       const videoPubEffective = videoTrackEnded ? undefined : videoPub;
@@ -154,6 +173,7 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
       const next = !!audioPub && isMuted === false;
       isAudioEnabled.value = next;
       triggerRef(isAudioEnabled);
+      props.onTracksUpdated?.();
     } catch {
       videoTrack.value = null;
       audioTrack.value = null;
@@ -177,8 +197,10 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     const onTrackUnsubscribed = onTrackEvent;
     const onTrackPublished = (publication: {
       trackSid?: string;
+      kind?: string;
       isSubscribed?: boolean;
       setSubscribed?(v: boolean): void;
+      setVideoQuality?(q: VideoQuality): void;
     }) => {
       if (
         !checkIsLocal(participant) &&
@@ -187,6 +209,9 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
         !publication.isSubscribed
       ) {
         publication.setSubscribed?.(true);
+        if (publication.kind === "video") {
+          publication.setVideoQuality?.(VideoQuality.HIGH);
+        }
       }
       onTrackEvent();
     };
@@ -200,6 +225,28 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
     participant.on(ParticipantEvent.TrackUnpublished, onTrackUnpublished);
     participant.on(ParticipantEvent.TrackMuted, onMuted);
     participant.on(ParticipantEvent.TrackUnmuted, onUnmuted);
+
+    if (!checkIsLocal(participant) && isRemoteParticipant(participant)) {
+      const vmap = participant.videoTrackPublications;
+      const videoPubs = Array.from(
+        vmap.values() as unknown as Iterable<{
+          trackSid?: string;
+          kind?: string;
+          source?: Track.Source;
+          isSubscribed?: boolean;
+          setSubscribed?(v: boolean): void;
+          setVideoQuality?(q: VideoQuality): void;
+        }>,
+      );
+      for (const pub of videoPubs) {
+        if (pub.trackSid && !pub.isSubscribed) {
+          pub.setSubscribed?.(true);
+          if (pub.kind === "video") {
+            pub.setVideoQuality?.(VideoQuality.HIGH);
+          }
+        }
+      }
+    }
 
     const onLocalTrackPublished = onTrackEvent;
     const onLocalTrackUnpublished = onTrackEvent;
@@ -240,7 +287,8 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
   // in subscribeToParticipant; deep: true would observe LiveKit internals and cause
   // recursive updates when updateTracks() reads participant.trackPublications.
   watch(
-    () => [props.participant, props.previewMode] as const,
+    () =>
+      [props.participant, props.previewMode, props.preferredVideoSource] as const,
     ([p, previewMode]) => {
       if (unsubscribe) {
         unsubscribe();

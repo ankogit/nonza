@@ -167,6 +167,7 @@ import ReplicaBlock from "./ReplicaBlock.vue";
 import {
   useParticipantTracks,
   type UseParticipantTracksProps,
+  type PreferredVideoSource,
 } from "../lib/useParticipantTracks";
 import { useRemoteAudioVolume } from "../lib/useRemoteAudioVolume";
 
@@ -184,6 +185,8 @@ const props = withDefaults(
     showFullSize?: boolean;
     isAudioEnabled?: boolean;
     replicaText?: string;
+    preferredVideoSource?: PreferredVideoSource;
+    onTracksUpdated?: () => void;
     pip?: boolean;
     pipStyle?: { left: string; top: string; width: string; height: string };
     onPipDrag?: (e: PointerEvent) => void;
@@ -273,6 +276,8 @@ const tracksProps = reactive<UseParticipantTracksProps>({
   participant: null,
   participantName: props.participantName,
   previewMode: true,
+  preferredVideoSource: undefined,
+  onTracksUpdated: undefined,
 });
 
 watch(
@@ -282,16 +287,22 @@ watch(
       props.participant,
       props.participantName,
       props.previewMode,
+      props.preferredVideoSource,
+      props.onTracksUpdated,
     ] as const,
-  ([mode, participant, participantName, previewMode]) => {
+  ([mode, participant, participantName, previewMode, preferredVideoSource, onTracksUpdated]) => {
     if (mode === "grid") {
       tracksProps.participant = participant ?? null;
       tracksProps.participantName = participantName;
       tracksProps.previewMode = previewMode ?? false;
+      tracksProps.preferredVideoSource = preferredVideoSource;
+      tracksProps.onTracksUpdated = onTracksUpdated;
     } else {
       tracksProps.participant = participant ?? null;
       tracksProps.participantName = participantName;
       tracksProps.previewMode = previewMode ?? false;
+      tracksProps.preferredVideoSource = preferredVideoSource;
+      tracksProps.onTracksUpdated = onTracksUpdated;
     }
   },
   { immediate: true },

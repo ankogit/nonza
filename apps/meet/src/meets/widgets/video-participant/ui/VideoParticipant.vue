@@ -11,6 +11,8 @@
     :has-speaking-permission="hasSpeakingPermission"
     :show-full-size="showFullSize"
     :replica-text="replicaText"
+    :preferred-video-source="preferredVideoSource"
+    :on-tracks-updated="onTracksUpdated"
     :pip="false"
     @full-size="emit('full-size')"
   />
@@ -31,6 +33,8 @@ defineProps<{
   hasSpeakingPermission?: boolean;
   showFullSize?: boolean;
   replicaText?: string;
+  preferredVideoSource?: "camera" | "screen-share";
+  onTracksUpdated?: () => void;
 }>();
 
 const emit = defineEmits<{ "full-size": [] }>();

@@ -37,8 +37,8 @@ function decodePayload(payload: Uint8Array): ReplicaMessage | null {
 export interface UseParticipantReplicaOptions {
   /** Играть звук нового сообщения при получении только если отправитель в этом списке (например, поднял руку). Не передавать = играть всегда. */
   raisedHands?: () => string[];
-  /** Опционально: озвучить текст реплики при получении. */
-  speakReplica?: (text: string) => void;
+  /** Опционально: озвучить текст реплики при получении/отправке. */
+  speakReplica?: (text: string, meta: { identity: string; isLocal: boolean }) => void;
 }
 
 export function useParticipantReplica(
@@ -82,7 +82,9 @@ export function useParticipantReplica(
         topic: REPLICA_TOPIC,
       })
       .catch((err) => console.error("[participant-replica] send failed:", err));
+
     playNotificationSound("message").catch(() => {});
+    options?.speakReplica?.(msg.text, { identity, isLocal: true });
   }
 
   const offDataReceived = ref<(() => void) | null>(null);
@@ -104,7 +106,10 @@ export function useParticipantReplica(
         const shouldPlay = !raised || raised.includes(participant.identity);
         if (shouldPlay) {
           playNotificationSound("message").catch(() => {});
-          options?.speakReplica?.(msg.text);
+          options?.speakReplica?.(msg.text, {
+            identity: participant.identity,
+            isLocal: false,
+          });
         }
       }
       const next = { ...replicaByIdentity.value };

@@ -9,6 +9,7 @@ export interface AudioDevice {
 
 const STORAGE_KEY_AUDIO_INPUT = "nonza_audio_input_device";
 const STORAGE_KEY_AUDIO_OUTPUT = "nonza_audio_output_device";
+const STORAGE_KEY_VIDEO_INPUT = "nonza_video_input_device";
 
 export function getStoredAudioInputDevice(): string | null {
   try {
@@ -42,16 +43,32 @@ export function setStoredAudioOutputDevice(deviceId: string): void {
   }
 }
 
+export function getStoredVideoInputDevice(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_VIDEO_INPUT);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredVideoInputDevice(deviceId: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_VIDEO_INPUT, deviceId);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function useAudioDevices() {
   const audioInputDevices = ref<AudioDevice[]>([]);
   const audioOutputDevices = ref<AudioDevice[]>([]);
+  const videoInputDevices = ref<AudioDevice[]>([]);
   const isLoading = ref(false);
   const hasPermission = ref(false);
 
   const refreshDevices = async () => {
     isLoading.value = true;
     try {
-      // Запрашиваем разрешение на доступ к микрофону для получения меток устройств
       try {
         await navigator.mediaDevices.getUserMedia({ audio: getDefaultAudioConstraints() });
         hasPermission.value = true;
@@ -60,8 +77,14 @@ export function useAudioDevices() {
         hasPermission.value = false;
       }
 
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch {
+        /* video permission optional for listing */
+      }
+
       const devices = await navigator.mediaDevices.enumerateDevices();
-      
+
       audioInputDevices.value = devices
         .filter((d) => d.kind === "audioinput")
         .map((d) => ({
@@ -75,6 +98,14 @@ export function useAudioDevices() {
         .map((d) => ({
           deviceId: d.deviceId,
           label: d.label || `Динамики ${d.deviceId.slice(0, 8)}`,
+          kind: d.kind,
+        }));
+
+      videoInputDevices.value = devices
+        .filter((d) => d.kind === "videoinput")
+        .map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Камера ${d.deviceId.slice(0, 8)}`,
           kind: d.kind,
         }));
     } catch (err) {
@@ -101,6 +132,7 @@ export function useAudioDevices() {
   return {
     audioInputDevices,
     audioOutputDevices,
+    videoInputDevices,
     isLoading,
     hasPermission,
     refreshDevices,

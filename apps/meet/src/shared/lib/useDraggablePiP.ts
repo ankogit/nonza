@@ -31,9 +31,15 @@ const docOpt = { capture: true };
 export function useDraggablePiP(
   _initialPos = { x: PADDING, y: PADDING },
   initialSize = { width: PIP_DEFAULT_WIDTH, height: PIP_DEFAULT_HEIGHT },
-  options?: { getBottomOffset?: () => number },
+  options?: {
+    getBottomOffset?: () => number;
+    defaultSide?: "left" | "right";
+    defaultVertical?: "top" | "bottom";
+  },
 ) {
   const getBottomOffset = options?.getBottomOffset ?? (() => 88);
+  const defaultSide = options?.defaultSide ?? "right";
+  const defaultVertical = options?.defaultVertical ?? "top";
 
   const size = ref({
     width: Math.min(PIP_MAX_WIDTH, Math.max(PIP_MIN_WIDTH, initialSize.width)),
@@ -42,13 +48,28 @@ export function useDraggablePiP(
       Math.max(PIP_MIN_HEIGHT, initialSize.height),
     ),
   });
+  const bottomOffset = getBottomOffset();
+  const initialX =
+    defaultSide === "left"
+      ? PADDING
+      : Math.max(PADDING, window.innerWidth - size.value.width - PADDING);
+  const initialY =
+    defaultVertical === "top"
+      ? PADDING
+      : Math.max(
+          PADDING,
+          window.innerHeight -
+            size.value.height -
+            bottomOffset -
+            PADDING,
+        );
   const position = ref(
     clampPosition(
-      window.innerWidth - size.value.width - PADDING,
-      window.innerHeight - size.value.height - getBottomOffset() - PADDING,
+      initialX,
+      initialY,
       size.value.width,
       size.value.height,
-      getBottomOffset(),
+      bottomOffset,
     ),
   );
 

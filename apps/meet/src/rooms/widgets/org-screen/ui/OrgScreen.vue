@@ -106,11 +106,7 @@
             </button>
           </header>
           <div v-if="loading" class="rooms-list-skeleton">
-            <div
-              v-for="i in 5"
-              :key="i"
-              class="room room-skeleton"
-            >
+            <div v-for="i in 5" :key="i" class="room room-skeleton">
               <div class="room-button room-button-skeleton">
                 <span class="room-button__content">
                   <span class="room-button__head">
@@ -462,9 +458,12 @@
                   <span
                     class="room-participant__avatar"
                     :class="{
-                      'room-participant__avatar--in-call': isMemberInCall(member),
-                      'room-participant__avatar--online': !isMemberInCall(member) && isMemberOnline(member),
-                      'room-participant__avatar--offline': !isMemberInCall(member) && !isMemberOnline(member),
+                      'room-participant__avatar--in-call':
+                        isMemberInCall(member),
+                      'room-participant__avatar--online':
+                        !isMemberInCall(member) && isMemberOnline(member),
+                      'room-participant__avatar--offline':
+                        !isMemberInCall(member) && !isMemberOnline(member),
                     }"
                     :style="{
                       backgroundColor:
@@ -506,7 +505,9 @@
 
         <footer
           class="organization-footer"
-          :class="{ 'organization-footer--colors-expanded': footerColorsExpanded }"
+          :class="{
+            'organization-footer--colors-expanded': footerColorsExpanded,
+          }"
         >
           <button
             type="button"
@@ -540,7 +541,9 @@
           <div
             ref="footerColorsRef"
             class="organization-footer-colors"
-            :class="{ 'organization-footer-colors--expanded': footerColorsExpanded }"
+            :class="{
+              'organization-footer-colors--expanded': footerColorsExpanded,
+            }"
           >
             <template v-if="footerColorsExpanded">
               <button
@@ -601,7 +604,9 @@
               variant="default"
               size="small"
               class="menu-back"
-              :class="{ 'org-screen__back--mobile': isMobile && joinedRoomShortCode }"
+              :class="{
+                'org-screen__back--mobile': isMobile && joinedRoomShortCode,
+              }"
               @click="handleBackClick"
             >
               ← Назад
@@ -1598,8 +1603,7 @@ function roomParticipantsForRoom(
     return {
       identity: p.identity,
       participantName: p.name || p.identity,
-      participantColor:
-        member?.color ?? DEFAULT_PARTICIPANT_COLOR,
+      participantColor: member?.color ?? DEFAULT_PARTICIPANT_COLOR,
     };
   });
 }
@@ -1654,7 +1658,10 @@ function openCallSettings() {
 }
 
 async function handleSaveCallSettings() {
-  if (isAnonymousForCallSettings.value && callSettingsParticipantName.value.trim()) {
+  if (
+    isAnonymousForCallSettings.value &&
+    callSettingsParticipantName.value.trim()
+  ) {
     setParticipantName(callSettingsParticipantName.value);
     initialCallSettingsParticipantName.value =
       callSettingsParticipantName.value;
@@ -1670,7 +1677,8 @@ async function handleSaveCallSettings() {
 
 function handleCancelCallSettings() {
   if (isAnonymousForCallSettings.value) {
-    callSettingsParticipantName.value = initialCallSettingsParticipantName.value;
+    callSettingsParticipantName.value =
+      initialCallSettingsParticipantName.value;
   }
   callSettingsReplicaTts.value = initialCallSettingsReplicaTts.value;
   (
@@ -1779,6 +1787,15 @@ function scheduleRefreshRoomsParticipants() {
   }, 100);
 }
 
+let loadRoomsTimeout: ReturnType<typeof setTimeout> | null = null;
+function scheduleLoadRooms() {
+  if (loadRoomsTimeout) clearTimeout(loadRoomsTimeout);
+  loadRoomsTimeout = setTimeout(() => {
+    loadRoomsTimeout = null;
+    loadRooms();
+  }, 150);
+}
+
 function getOrgWsUrl(): string {
   const base = apiBaseURL.replace(/^http/, "ws");
   return `${base}${base.endsWith("/") ? "" : "/"}ws/org`;
@@ -1810,7 +1827,7 @@ function connectOrgWs() {
         if (msg?.type === "participants_changed") {
           scheduleRefreshRoomsParticipants();
         } else if (msg?.type === "rooms_changed") {
-          loadRooms();
+          scheduleLoadRooms();
         } else if (msg?.type === "org_members_changed") {
           loadMembers();
         } else if (
@@ -2143,7 +2160,8 @@ onMounted(async () => {
   loadMembers();
   if (props.orgId) {
     connectOrgWs();
-    if (initialParticipantsRefreshTimeout) clearTimeout(initialParticipantsRefreshTimeout);
+    if (initialParticipantsRefreshTimeout)
+      clearTimeout(initialParticipantsRefreshTimeout);
     initialParticipantsRefreshTimeout = setTimeout(() => {
       initialParticipantsRefreshTimeout = null;
       refreshRoomsParticipants();

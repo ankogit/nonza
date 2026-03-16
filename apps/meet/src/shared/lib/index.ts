@@ -9,6 +9,7 @@ export * from "./websocket-client";
 export * from "./audio-constraints";
 export * from "./audio-devices";
 export * from "./audio-input-test";
+export * from "./video-quality";
 export * from "./notification-sounds";
 export * from "./yjs-websocket-provider";
 export * from "./screen-wake-lock";
@@ -17,4 +18,5 @@ export * from "./useMeetingHotkeys";
 export * from "./useTauriGlobalShortcuts";
 export * from "./useToasts";
 export * from "./replica-tts";
+export * from "./media-state-storage";
 

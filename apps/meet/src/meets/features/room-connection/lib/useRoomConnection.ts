@@ -8,6 +8,8 @@ import {
   LocalParticipant,
   ParticipantEvent,
   ExternalE2EEKeyProvider,
+  VideoPresets,
+  VideoQuality,
   type RoomOptions,
 } from "livekit-client";
 import e2eeWorkerUrl from "livekit-client/e2ee-worker?url";
@@ -18,6 +20,7 @@ import {
   showToast,
   getAuthState,
   DEFAULT_PARTICIPANT_COLOR,
+  getStoredDefaultVideoQuality,
 } from "@shared/lib";
 import type { RoomTokenResponse } from "@shared/entities";
 
@@ -174,7 +177,14 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
 
       // Get token
       const storedParticipantId = getStoredParticipantId(shortCode);
-      const participantIdentity = preferredIdentity ?? storedParticipantId ?? undefined;
+      const isCreatorInConferenceHall =
+        room?.room_type === "conference_hall" &&
+        room?.created_by_user_id &&
+        getAuthState()?.user?.id === room.created_by_user_id;
+      const participantIdentity =
+        isCreatorInConferenceHall && room?.conference_hall_leader_id
+          ? room.conference_hall_leader_id
+          : preferredIdentity ?? storedParticipantId ?? undefined;
       const tokenResponse: RoomTokenResponse = await roomApi.getToken(
         shortCode,
         {
@@ -196,9 +206,36 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       const connectUrl = normalizeLiveKitUrl(tokenResponse.url || livekitUrl);
 
       const useE2EE = Boolean(tokenResponse.encryption_key?.trim());
+      const quality = getStoredDefaultVideoQuality();
+      const captureResolution =
+        quality === "1080p"
+          ? VideoPresets.h1080.resolution
+          : quality === "720p"
+            ? VideoPresets.h720.resolution
+            : VideoPresets.h360.resolution;
+      const videoEncoding =
+        quality === "1080p"
+          ? { ...VideoPresets.h1080.encoding, maxBitrate: 4_500_000 }
+          : quality === "720p"
+            ? VideoPresets.h720.encoding
+            : VideoPresets.h360.encoding;
+      const simulcastLayers =
+        quality === "1080p"
+          ? [VideoPresets.h720, VideoPresets.h360]
+          : quality === "720p"
+            ? [VideoPresets.h360]
+            : [];
       const roomOptions: RoomOptions = {
-        adaptiveStream: true,
+        adaptiveStream: false,
         dynacast: true,
+        videoCaptureDefaults: { resolution: captureResolution },
+        publishDefaults: {
+          simulcast: simulcastLayers.length > 0,
+          videoEncoding,
+          videoSimulcastLayers: simulcastLayers,
+          screenShareEncoding: videoEncoding,
+          screenShareSimulcastLayers: simulcastLayers,
+        },
       };
       let keyProvider: InstanceType<typeof ExternalE2EEKeyProvider> | null =
         null;
@@ -362,11 +399,17 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       string,
       RemoteParticipant | LocalParticipant
     >();
+    const setRemoteVideoQualityHigh = (pub: { kind?: string; setVideoQuality?: (q: VideoQuality) => void }) => {
+      if (pub.kind === "video" && typeof pub.setVideoQuality === "function") {
+        pub.setVideoQuality(VideoQuality.HIGH);
+      }
+    };
     room.remoteParticipants.forEach((participant) => {
       initialParticipants.set(participant.identity, participant);
       participant.trackPublications.forEach((publication) => {
         if (publication.trackSid && !publication.isSubscribed) {
           publication.setSubscribed(true);
+          setRemoteVideoQualityHigh(publication);
         }
       });
     });
@@ -488,6 +531,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         participant.trackPublications.forEach((publication) => {
           if (publication.trackSid && !publication.isSubscribed) {
             publication.setSubscribed(true);
+            setRemoteVideoQualityHigh(publication);
           }
         });
 
@@ -548,6 +592,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         !publication.isSubscribed
       ) {
         publication.setSubscribed(true);
+        setRemoteVideoQualityHigh(publication);
       }
       bumpParticipant(participant);
     });

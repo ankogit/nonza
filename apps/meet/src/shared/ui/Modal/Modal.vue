@@ -4,29 +4,38 @@
       <div
         v-if="modelValue"
         class="modal-overlay"
+        :class="{ 'modal-overlay--fullscreen': fullscreen }"
+        :aria-label="ariaLabel"
+        role="dialog"
+        aria-modal="true"
         @click.self="handleOverlayClick"
       >
-        <div class="modal-container">
-          <div class="modal-header" v-if="title || $slots.header">
-            <h2 v-if="title" class="modal-title">{{ title }}</h2>
-            <slot name="header" />
-            <Button
-              type="icon"
-              variant="default"
-              :icon-size="'32px'"
-              native-type="button"
-              title="Закрыть"
-              aria-label="Закрыть"
-              @click="handleClose"
-            >
-              ✕
-            </Button>
-          </div>
-          <div class="modal-content">
+        <div class="modal-container" :class="{ 'modal-container--fullscreen': fullscreen }">
+          <template v-if="!fullscreen">
+            <div class="modal-header" v-if="title || $slots.header">
+              <h2 v-if="title" class="modal-title">{{ title }}</h2>
+              <slot name="header" />
+              <Button
+                type="icon"
+                variant="default"
+                :icon-size="'32px'"
+                native-type="button"
+                title="Закрыть"
+                aria-label="Закрыть"
+                @click="handleClose"
+              >
+                ✕
+              </Button>
+            </div>
+            <div class="modal-content">
+              <slot />
+            </div>
+            <div class="modal-footer" v-if="$slots.footer">
+              <slot name="footer" />
+            </div>
+          </template>
+          <div v-else class="modal-fullscreen-slot">
             <slot />
-          </div>
-          <div class="modal-footer" v-if="$slots.footer">
-            <slot name="footer" />
           </div>
         </div>
       </div>
@@ -43,9 +52,12 @@ const props = withDefaults(
     modelValue: boolean;
     title?: string;
     closeOnOverlayClick?: boolean;
+    fullscreen?: boolean;
+    ariaLabel?: string;
   }>(),
   {
     closeOnOverlayClick: true,
+    fullscreen: false,
   },
 );
 
@@ -93,13 +105,21 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(2px);
   padding: 20px;
+}
+
+.modal-overlay--fullscreen {
+  padding: 24px;
+  align-items: stretch;
+  justify-content: stretch;
+  background: var(--color-background, #1a1a1a);
+  backdrop-filter: none;
 }
 
 .modal-container {
@@ -118,11 +138,34 @@ onUnmounted(() => {
   max-width: 500px;
 }
 
+.modal-container--fullscreen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.modal-fullscreen-slot {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 @media (max-width: 360px) {
-  .modal-container {
+  .modal-container:not(.modal-container--fullscreen) {
     min-width: 0;
     width: 100%;
     max-width: calc(100vw - 24px);
+  }
+
+  .modal-overlay--fullscreen {
+    padding: 12px;
   }
 
   .modal-header,

@@ -1,6 +1,8 @@
 let cachedVoice: SpeechSynthesisVoice | null = null;
 let voicesLoaded = false;
 
+const pitchByIdentity = new Map<string, number>();
+
 function pickRuVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return null;
@@ -9,8 +11,8 @@ function pickRuVoice(): SpeechSynthesisVoice | null {
   if (!voices.length) return null;
   const exactRu = voices.find((v) => v.lang === "ru-RU");
   if (exactRu) return exactRu;
-  const startsWithRu = voices.find((v) =>
-    v.lang && v.lang.toLowerCase().startsWith("ru"),
+  const startsWithRu = voices.find(
+    (v) => v.lang && v.lang.toLowerCase().startsWith("ru"),
   );
   if (startsWithRu) return startsWithRu;
   return voices[0] ?? null;
@@ -39,7 +41,25 @@ function ensureVoiceLoaded(): void {
   );
 }
 
-export function speakReplicaText(rawText: string): void {
+interface ReplicaVoiceOptions {
+  identity: string;
+  isLocal: boolean;
+}
+
+function getPitchForIdentity(identity: string): number {
+  const existing = pitchByIdentity.get(identity);
+  if (typeof existing === "number") return existing;
+  const min = 0;
+  const max = 2;
+  const pitch = min + Math.random() * (max - min);
+  pitchByIdentity.set(identity, pitch);
+  return pitch;
+}
+
+export function speakReplicaTextWithVoice(
+  rawText: string,
+  options: ReplicaVoiceOptions,
+): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return;
   }
@@ -59,9 +79,14 @@ export function speakReplicaText(rawText: string): void {
   }
 
   utterance.rate = 1;
-  utterance.pitch = 1;
+  utterance.pitch = getPitchForIdentity(options.identity);
+  utterance.volume = options.isLocal ? 0.35 : 0.8;
 
   window.speechSynthesis.speak(utterance);
+}
+
+export function speakReplicaText(rawText: string): void {
+  speakReplicaTextWithVoice(rawText, { identity: "unknown", isLocal: false });
 }
 
 export function cancelReplicaSpeech(): void {
@@ -70,4 +95,3 @@ export function cancelReplicaSpeech(): void {
   }
   window.speechSynthesis.cancel();
 }
-

@@ -8,6 +8,7 @@ const TURTLE_COLORS = [
   "#3b82f6",
   "#f59e0b",
   "#8b5cf6",
+  "#e8b4b8",
 ];
 
 export function getColorForUser(name: string): string {
@@ -24,6 +25,7 @@ export const PARTICIPANT_COLOR_PALETTE = [
   "#3b82f6",
   "#f59e0b",
   "#8b5cf6",
+  "#e8b4b8",
 ] as const;
 
 export function parseParticipantColorFromMetadata(

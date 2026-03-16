@@ -59,6 +59,10 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 	}
 	log.Printf("[tokens] GetByShortCode %s: %v", req.ShortCode, time.Since(t0))
 
+	var uid string
+	if userID, ok := c.Get("user_id"); ok {
+		uid, _ = userID.(string)
+	}
 	allowAnonymous := false
 	if room.Settings != nil {
 		if v, ok := room.Settings["allow_anonymous_join"].(bool); ok {
@@ -66,8 +70,6 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		}
 	}
 	if !allowAnonymous {
-		userID, _ := c.Get("user_id")
-		uid, _ := userID.(string)
 		if uid == "" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "room does not allow anonymous join"})
 			return

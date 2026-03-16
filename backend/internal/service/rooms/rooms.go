@@ -26,7 +26,7 @@ type roomsService struct {
 	orgRepo repository.Organizations
 }
 
-func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool, roomGroupID *uuid.UUID, allowAnonymousJoin bool) (*models.Room, error) {
+func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.RoomType, isTemporary bool, expiresIn *time.Duration, e2eeEnabled bool, roomGroupID *uuid.UUID, allowAnonymousJoin bool, createdByUserID *string) (*models.Room, error) {
 	if _, err := s.orgRepo.GetByID(orgID); err != nil {
 		return nil, fmt.Errorf("organization not found: %w", err)
 	}
@@ -56,6 +56,12 @@ func (s *roomsService) Create(orgID uuid.UUID, name string, roomType models.Room
 	}
 	if allowAnonymousJoin {
 		settings["allow_anonymous_join"] = true
+	}
+	if createdByUserID != nil && *createdByUserID != "" {
+		settings["created_by_user_id"] = *createdByUserID
+		if roomType == models.RoomTypeConferenceHall {
+			settings["conference_hall_leader_id"] = uuid.New().String()
+		}
 	}
 
 	position, err := s.repo.GetMaxPosition(orgID, roomGroupID)

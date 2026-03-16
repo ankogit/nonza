@@ -69,7 +69,7 @@
                 </div>
                 <div class="org-settings-screen__member-role-cell">
                   <Badge
-                    v-if="!canManageRoles || member.role === ORG_ROLE_OWNER"
+                    v-if="!canManageRoles || member.role === ORG_ROLE_OWNER || isCurrentUser(member)"
                     :variant="roleBadgeVariant(member.role)"
                   >
                     {{ roleLabel(member.role) }}
@@ -86,43 +86,6 @@
               </li>
             </ul>
           </div>
-        </FormSection>
-
-        <hr class="HR" />
-        <FormSection label="Мой цвет в орге">
-          <div class="org-settings-screen__colors">
-            <button
-              v-for="c in colorPalette"
-              :key="c"
-              type="button"
-              class="org-settings-screen__color-btn"
-              :class="{ 'org-settings-screen__color-btn--active': myColorEdit === c }"
-              :style="{ backgroundColor: c }"
-              :title="c"
-              aria-label="Выбрать цвет"
-              @click="myColorEdit = myColorEdit === c ? null : c"
-            />
-            <Button
-              type="text"
-              variant="default"
-              size="small"
-              class="org-settings-screen__color-skip"
-              @click.prevent="myColorEdit = null"
-            >
-              Сбросить
-            </Button>
-          </div>
-          <Button
-            v-if="myColorDirty"
-            type="text"
-            variant="primary"
-            size="small"
-            class="org-settings-screen__color-save"
-            :disabled="savingColor"
-            @click="saveMyColor"
-          >
-            {{ savingColor ? "Сохранение…" : "Сохранить цвет" }}
-          </Button>
         </FormSection>
 
         <template v-if="!isOwner">
@@ -265,11 +228,7 @@ import {
   ORG_PERMISSION_MANAGE_MEMBERS,
 } from "@shared/entities/organization/model/org-roles";
 import type { OrgRole } from "@shared/entities/organization/model/org-roles";
-import {
-  getAuthState,
-  PARTICIPANT_COLOR_PALETTE,
-  DEFAULT_PARTICIPANT_COLOR,
-} from "@shared/lib";
+import { getAuthState, DEFAULT_PARTICIPANT_COLOR } from "@shared/lib";
 import {
   ScreenLayout,
   Button,
@@ -303,10 +262,6 @@ const showLeaveConfirm = ref(false);
 const leaving = ref(false);
 const memberToRemove = ref<OrganizationMember | null>(null);
 const removingMemberId = ref<string | null>(null);
-const myColorEdit = ref<string | null>(null);
-const savingColor = ref(false);
-
-const colorPalette = [...PARTICIPANT_COLOR_PALETTE];
 
 interface ContextMenuState {
   x: number;
@@ -342,10 +297,6 @@ const nameDirty = computed(
   () => (org.value?.name ?? "").trim() !== nameEdit.value.trim(),
 );
 
-const myColorDirty = computed(
-  () => (currentMember.value?.color ?? null) !== myColorEdit.value,
-);
-
 const memberRoleOptions = computed<PillOption[]>(() =>
   assignableRoles(currentMember.value?.role ?? "").map((r) => ({
     value: r,
@@ -356,6 +307,12 @@ const memberRoleOptions = computed<PillOption[]>(() =>
 function roleLabel(role: string): string {
   const r = role?.toLowerCase() as keyof typeof ORG_ROLE_LABELS | undefined;
   return (r && ORG_ROLE_LABELS[r]) ?? role ?? "";
+}
+
+function isCurrentUser(member: OrganizationMember): boolean {
+  const id = member.user_id?.toLowerCase();
+  const current = currentMember.value?.user_id?.toLowerCase();
+  return !!id && !!current && id === current;
 }
 
 function memberInitial(member: OrganizationMember): string {
@@ -422,14 +379,6 @@ watch(
   { immediate: true },
 );
 
-watch(
-  currentMember,
-  (m) => {
-    myColorEdit.value = m?.color ?? null;
-  },
-  { immediate: true },
-);
-
 async function saveName() {
   if (!org.value || !nameDirty.value || savingName.value) return;
   savingName.value = true;
@@ -442,21 +391,6 @@ async function saveName() {
     console.error("Failed to update org name:", e);
   } finally {
     savingName.value = false;
-  }
-}
-
-async function saveMyColor() {
-  if (!props.orgId || !myColorDirty.value || savingColor.value) return;
-  savingColor.value = true;
-  try {
-    await organizationApi.updateMyMemberColor(props.orgId, {
-      color: myColorEdit.value,
-    });
-    await loadMembers();
-  } catch {
-    // ignore
-  } finally {
-    savingColor.value = false;
   }
 }
 
@@ -716,41 +650,6 @@ async function confirmLeave() {
   align-items: center;
   justify-content: flex-end;
   min-width: 120px;
-}
-
-.org-settings-screen__colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
-.org-settings-screen__color-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 2px solid #444;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.org-settings-screen__color-btn:hover {
-  filter: brightness(1.15);
-}
-
-.org-settings-screen__color-btn--active {
-  border-color: #fff;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.4);
-}
-
-.org-settings-screen__color-skip {
-  margin-left: 4px;
-}
-
-.org-settings-screen__color-save {
-  margin-top: 12px;
 }
 
 .org-settings-screen__danger {

@@ -82,18 +82,15 @@
 
 .room-fullscreen__pip-resize {
   position: absolute;
-  right: -7px;
-  bottom: -7px;
-  width: 13px;
-  height: 13px;
+  right: 0px;
+  bottom: 0px;
+  width: 10px;
+  height: 10px;
   z-index: 10;
   cursor: nwse-resize;
-  pointer-events: auto;
-  border: 2px #eee solid;
-}
-
-.room-fullscreen__pip-resize:hover {
-  background: #555;
+  resize: both;
+  overflow: auto;
+  direction: ltr;
 }
 
 .room-fullscreen__pip-close {

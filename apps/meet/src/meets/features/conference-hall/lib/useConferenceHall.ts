@@ -118,15 +118,12 @@ export function useConferenceHall(
           // synchronously inside the LiveKit callback (avoids patch/emitsOptions errors).
           nextTick(() => {
             if (receivedState.leaderIdentity !== undefined) {
-              state.value.leaderIdentity = receivedState.leaderIdentity;
-            }
-            const local = localParticipant();
-            if (
-              local &&
-              receivedState.leaderIdentity !== undefined &&
-              receivedState.leaderIdentity === local.identity
-            ) {
-              options?.onLeaderChange?.(state.value.leaderIdentity);
+              const serverLeader = options?.initialLeaderIdentity?.();
+              if (serverLeader != null && serverLeader !== receivedState.leaderIdentity) {
+                state.value.leaderIdentity = serverLeader;
+              } else {
+                state.value.leaderIdentity = receivedState.leaderIdentity;
+              }
             }
 
             if (Array.isArray(receivedState.raisedHands)) {
@@ -398,12 +395,11 @@ export function useConferenceHall(
     if (local) presentIdentities.add(local.identity);
     remotes.forEach((p) => presentIdentities.add(p.identity));
 
-    if (
-      !state.value.leaderIdentity &&
-      options?.initialLeaderIdentity?.()
-    ) {
-      state.value.leaderIdentity = options.initialLeaderIdentity()!;
-      options?.onLeaderChange?.(state.value.leaderIdentity);
+    const roomLeader = options?.initialLeaderIdentity?.();
+    if (roomLeader && presentIdentities.has(roomLeader)) {
+      state.value.leaderIdentity = roomLeader;
+    } else if (!state.value.leaderIdentity && roomLeader) {
+      state.value.leaderIdentity = roomLeader;
     }
 
     state.value.raisedHands = state.value.raisedHands.filter((id) =>
@@ -420,10 +416,8 @@ export function useConferenceHall(
       const fromRoom = options?.initialLeaderIdentity?.();
       if (fromRoom) {
         state.value.leaderIdentity = fromRoom;
-        options?.onLeaderChange?.(state.value.leaderIdentity);
       } else {
         initializeLeader();
-        options?.onLeaderChange?.(state.value.leaderIdentity);
       }
     } else {
       const leaderExists = presentIdentities.has(state.value.leaderIdentity);

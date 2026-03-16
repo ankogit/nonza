@@ -424,6 +424,55 @@
             :replica-text="
               replicaByParticipant[fullscreenParticipant.identity]?.text
             "
+            :preferred-video-source="
+              showFullscreenCameraPiP ? 'screen-share' : undefined
+            "
+            :on-tracks-updated="() => fullscreenTracksVersion++"
+          />
+        </div>
+        <div
+          v-if="showFullscreenCameraPiP && fullscreenResolvedParticipant"
+          class="room-fullscreen__pip"
+          :style="fullscreenCameraPiPStyle"
+          @pointerdown="fullscreenCameraPiPDraggable.handlePointerDown"
+        >
+          <VideoParticipant
+            :participant="fullscreenResolvedParticipant"
+            :participant-name="
+              fullscreenParticipant &&
+              isLocal(fullscreenParticipant)
+                ? props.participantName
+                : (fullscreenParticipant &&
+                    (props.getDisplayName?.(fullscreenParticipant) ??
+                      fullscreenParticipant.name ??
+                      fullscreenParticipant.identity)) ??
+                  ''
+            "
+            :participant-color="fullscreenParticipantColor"
+            :is-speaking="
+              fullscreenParticipant
+                ? speakingIdentitySet.has(fullscreenParticipant.identity)
+                : false
+            "
+            :is-leader="
+              conferenceHall.stateSynced &&
+              conferenceHall.leader.value?.identity ===
+                fullscreenParticipant?.identity
+            "
+            :replica-text="
+              fullscreenParticipant
+                ? replicaByParticipant[fullscreenParticipant.identity]?.text
+                : undefined
+            "
+            preferred-video-source="camera"
+          />
+          <div
+            data-pip-resize-handle
+            class="room-fullscreen__pip-resize"
+            title="Изменить размер"
+            @pointerdown.stop="
+              fullscreenCameraPiPDraggable.handleResizePointerDown
+            "
           />
         </div>
         <CallMenu
@@ -560,20 +609,32 @@
           </div>
         </div>
 
+        <div class="settings-section">
+          <h3 class="settings-section-title">Видео</h3>
+          <div class="settings-item">
+            <label class="settings-label">Качество по умолчанию</label>
+            <PixelSelect
+              v-model="settingsDefaultVideoQuality"
+              :options="[
+                { value: '360p', label: '360p (экономный трафик)' },
+                { value: '720p', label: '720p' },
+                { value: '1080p', label: '1080p (максимум)' },
+              ]"
+              class="settings-quality-select"
+              aria-label="Качество видео"
+            />
+          </div>
+        </div>
         <AudioSettings ref="audioSettingsRef" />
         <div class="settings-section">
           <h3 class="settings-section-title">Звуковые уведомления</h3>
           <div class="settings-item">
-            <div class="settings-checkbox-group">
-              <label class="settings-checkbox-label">
-                <input
-                  v-model="replicaTtsEnabled"
-                  type="checkbox"
-                  class="settings-checkbox checkbox-pixel"
-                />
-                <span>Озвучивать реплики (TTS)</span>
-              </label>
-            </div>
+            <Switch
+              v-model="replicaTtsEnabled"
+              aria-label="Озвучивать реплики (TTS)"
+            >
+              <span>Озвучивать реплики (TTS)</span>
+            </Switch>
           </div>
         </div>
       </div>
@@ -601,7 +662,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE } from "@features/e2ee";
@@ -610,7 +671,15 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
-import { Button, Modal, AudioSettings, PixelIcon, Indicator } from "@shared/ui";
+import {
+  Button,
+  Modal,
+  AudioSettings,
+  PixelIcon,
+  Indicator,
+  PixelSelect,
+  Switch,
+} from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { RoomParticipantsList } from "@widgets/room-participants-list";
 import type { RoomParticipantListItem } from "@widgets/room-participants-list";
@@ -620,13 +689,20 @@ import {
   getAuthState,
   setParticipantName,
   getStoredAudioInputDevice,
+  getStoredVideoInputDevice,
+  getStoredMediaState,
+  setStoredMediaState,
   useMeetingHotkeys,
   useTauriGlobalShortcuts,
   playNotificationSound,
   getReplicaTtsEnabled,
   setReplicaTtsEnabled,
-  speakReplicaText,
+  speakReplicaTextWithVoice,
   parseParticipantColorFromMetadata,
+  getStoredDefaultVideoQuality,
+  setStoredDefaultVideoQuality,
+  type VideoQualityLevel,
+  useDraggablePiP,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity, RoomApi } from "@shared/entities";
@@ -708,11 +784,13 @@ const conferenceHall = useConferenceHall(
     initialLeaderIdentity: () => props.room?.conference_hall_leader_id ?? null,
     onLeaderChange: (leaderIdentity) => {
       const code = props.room?.short_code;
-      if (code && props.roomApi) {
-        props.roomApi
-          .updateConferenceHallLeader(code, leaderIdentity)
-          .catch(() => {});
+      const currentOnServer = props.room?.conference_hall_leader_id ?? null;
+      if (!code || !props.roomApi || leaderIdentity === currentOnServer) {
+        return;
       }
+      props.roomApi
+        .updateConferenceHallLeader(code, leaderIdentity)
+        .catch(() => {});
     },
   },
 );
@@ -724,9 +802,9 @@ const { replicaByParticipant, sendReplica } = useParticipantReplica(
   computed(() => props.livekitRoom),
   {
     raisedHands: () => conferenceHall.state.value.raisedHands,
-    speakReplica: (text) => {
+    speakReplica: (text, meta) => {
       if (replicaTtsEnabled.value) {
-        speakReplicaText(text);
+        speakReplicaTextWithVoice(text, meta);
       }
     },
   },
@@ -841,10 +919,6 @@ watch(
   () => conferenceHall.state.value.raisedHands,
   (raised) => {
     const next = new Set(Array.isArray(raised) ? raised : []);
-    console.log("[RoomConferenceHall] raisedHands watch", {
-      raised: Array.isArray(raised) ? raised : [],
-      setSize: next.size,
-    });
     raisedHandsSet.value = next;
   },
   { immediate: true },
@@ -960,6 +1034,52 @@ function closeFullscreen() {
   fullscreenIdentity.value = null;
 }
 
+function participantHasBothCameraAndScreen(
+  p: LocalParticipant | RemoteParticipant | null,
+): boolean {
+  if (!p) return false;
+  const participant = resolveParticipant(p);
+  if (!participant?.videoTrackPublications) return false;
+  type VideoPub = {
+    source: Track.Source;
+    track?: { mediaStreamTrack: MediaStreamTrack };
+    isSubscribed?: boolean;
+  };
+  const pubs = Array.from(
+    participant.videoTrackPublications.values() as unknown as Iterable<VideoPub>,
+  );
+  const isLocal = participant === localParticipant.value;
+  const has = (source: Track.Source) =>
+    pubs.some(
+      (pub) =>
+        pub.source === source &&
+        pub.track &&
+        pub.track.mediaStreamTrack?.readyState !== "ended" &&
+        (isLocal || pub.isSubscribed),
+    );
+  return has(Track.Source.Camera) && has(Track.Source.ScreenShare);
+}
+
+const fullscreenTracksVersion = ref(0);
+const fullscreenCameraPiPDraggable = useDraggablePiP(undefined, undefined, {
+  getBottomOffset: () => 88,
+  defaultSide: "left",
+});
+const fullscreenCameraPiPStyle = computed(() => ({
+  left: fullscreenCameraPiPDraggable.position.value.x + "px",
+  top: fullscreenCameraPiPDraggable.position.value.y + "px",
+  width: fullscreenCameraPiPDraggable.size.value.width + "px",
+  height: fullscreenCameraPiPDraggable.size.value.height + "px",
+}));
+const showFullscreenCameraPiP = computed(() => {
+  fullscreenTracksVersion.value;
+  const p = fullscreenParticipant.value;
+  return p !== null && participantHasBothCameraAndScreen(p);
+});
+const fullscreenResolvedParticipant = computed(() =>
+  resolveParticipant(fullscreenParticipant.value),
+);
+
 const getParticipantState = (identity: string) =>
   conferenceHall.state.value.participants.get(identity);
 
@@ -989,6 +1109,7 @@ const {
   toggleAudio,
   toggleScreenShare,
   switchAudioInputDevice,
+  switchVideoInputDevice,
 } = useMediaControl(
   localParticipant,
   computed(() => props.livekitRoom),
@@ -1030,6 +1151,42 @@ useTauriGlobalShortcuts({
   enabled: () => !!props.livekitRoom,
 });
 
+const initialMediaStateApplied = ref(false);
+watch(
+  [() => props.livekitRoom, () => props.room?.short_code],
+  ([room, shortCode]) => {
+    if (!room || !shortCode) {
+      initialMediaStateApplied.value = false;
+      return;
+    }
+    if (initialMediaStateApplied.value) return;
+    initialMediaStateApplied.value = true;
+    const stored = getStoredMediaState(shortCode);
+    nextTick(() => {
+      if (stored.micEnabled && !mediaState.value.isAudioEnabled) {
+        handleToggleAudio();
+      }
+      if (stored.videoEnabled && !mediaState.value.isVideoEnabled) {
+        toggleVideo();
+      }
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  [() => mediaState.value.isAudioEnabled, () => mediaState.value.isVideoEnabled],
+  () => {
+    const code = props.room?.short_code;
+    if (code) {
+      setStoredMediaState(code, {
+        micEnabled: mediaState.value.isAudioEnabled,
+        videoEnabled: mediaState.value.isVideoEnabled,
+      });
+    }
+  },
+);
+
 const handleRaiseHand = () => {
   hasRaisedHand.value ? conferenceHall.lowerHand() : conferenceHall.raiseHand();
 };
@@ -1053,6 +1210,12 @@ const showParticipantsPanel = ref(false);
 const audioSettingsRef = ref<ComponentPublicInstance | null>(null);
 const initialParticipantName = ref(props.participantName);
 const settingsParticipantName = ref(props.participantName);
+const initialDefaultVideoQuality = ref<VideoQualityLevel>(
+  getStoredDefaultVideoQuality(),
+);
+const settingsDefaultVideoQuality = ref<VideoQualityLevel>(
+  getStoredDefaultVideoQuality(),
+);
 
 const isAnonymousForSettings = computed(() => !getAuthState()?.user);
 
@@ -1072,8 +1235,10 @@ const hasUnsavedSettingsChanges = computed(() => {
 
   const ttsChanged =
     replicaTtsEnabled.value !== initialReplicaTtsEnabled.value;
+  const videoQualityChanged =
+    settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value;
 
-  return nameChanged || audioChanged || ttsChanged;
+  return nameChanged || audioChanged || ttsChanged || videoQualityChanged;
 });
 
 watch(
@@ -1090,6 +1255,7 @@ watch(
 function handleSettings() {
   settingsParticipantName.value = initialParticipantName.value;
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
+  settingsDefaultVideoQuality.value = initialDefaultVideoQuality.value;
   if (
     audioSettingsRef.value &&
     typeof (audioSettingsRef.value as any).resetSettings === "function"
@@ -1111,34 +1277,31 @@ async function handleSaveSettings() {
 
       emit("update:participantName", newName);
 
-      // Обновляем имя в LiveKit (через connection — сразу и у других, и в нашем state)
-      if (props.updateParticipantName) {
-        props.updateParticipantName(newName);
-      } else if (localParticipant.value) {
-        try {
-          await localParticipant.value.setName(newName);
-        } catch (error) {
-          console.error("❌ Ошибка при обновлении имени в LiveKit:", error);
-          alert(
-            "Не удалось обновить имя для других участников. " +
-              "Возможно, требуется разрешение CanUpdateOwnMetadata в токене.",
-          );
+      nextTick(() => {
+        if (props.updateParticipantName) {
+          props.updateParticipantName(newName);
+        } else if (localParticipant.value) {
+          try {
+            localParticipant.value.setName(newName);
+          } catch (err) {
+            console.error("Failed to update name in LiveKit:", err);
+          }
         }
-      }
-
-      // Обновляем состояние в conferenceHall (имя уже обновится через событие ParticipantMetadataChanged)
-      // Но обновим сразу для локального отображения
-      conferenceHall.updateParticipants();
+      });
     }
 
     let audioSettingsChanged = false;
+    let videoSettingsChanged = false;
     if (
       audioSettingsRef.value &&
       typeof (audioSettingsRef.value as any).getSettings === "function"
     ) {
       const currentSettings = (audioSettingsRef.value as any).getSettings();
       const savedInput = getStoredAudioInputDevice() || "";
+      const savedVideo = getStoredVideoInputDevice() || "";
       audioSettingsChanged = currentSettings.inputDevice !== savedInput;
+      videoSettingsChanged =
+        (currentSettings.videoDevice ?? "") !== (savedVideo ?? "");
     }
 
     if (
@@ -1153,13 +1316,25 @@ async function handleSaveSettings() {
         await switchAudioInputDevice();
       } catch (error) {
         console.error("Failed to switch audio device:", error);
-        // Можно показать уведомление пользователю, но не блокируем сохранение
+      }
+    }
+
+    if (videoSettingsChanged && mediaState.value.isVideoEnabled) {
+      try {
+        await switchVideoInputDevice();
+      } catch (error) {
+        console.error("Failed to switch video device:", error);
       }
     }
 
     if (replicaTtsEnabled.value !== initialReplicaTtsEnabled.value) {
       setReplicaTtsEnabled(replicaTtsEnabled.value);
       initialReplicaTtsEnabled.value = replicaTtsEnabled.value;
+    }
+
+    if (settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value) {
+      setStoredDefaultVideoQuality(settingsDefaultVideoQuality.value);
+      initialDefaultVideoQuality.value = settingsDefaultVideoQuality.value;
     }
 
     isSettingsOpen.value = false;
@@ -1174,6 +1349,7 @@ function handleCancelSettings() {
     settingsParticipantName.value = initialParticipantName.value;
   }
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
+  settingsDefaultVideoQuality.value = initialDefaultVideoQuality.value;
   if (
     audioSettingsRef.value &&
     typeof (audioSettingsRef.value as any).resetSettings === "function"

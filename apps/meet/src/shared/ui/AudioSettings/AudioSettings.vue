@@ -90,6 +90,21 @@
     </div>
 
     <div class="settings-section">
+      <h3 class="settings-section-title">Камера</h3>
+      <div class="settings-item">
+        <label class="settings-label">Выберите камеру</label>
+        <PixelSelect
+          v-model="selectedVideoDevice"
+          class="settings-select"
+          placeholder="По умолчанию"
+          :options="videoDeviceOptions"
+          :disabled="isLoadingDevices"
+          aria-label="Выберите камеру"
+        />
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h3 class="settings-section-title">Звуковые уведомления</h3>
       <div class="settings-item">
         <label class="settings-label">Общая громкость</label>
@@ -149,6 +164,8 @@ import {
   setStoredAudioInputDevice,
   getStoredAudioOutputDevice,
   setStoredAudioOutputDevice,
+  getStoredVideoInputDevice,
+  setStoredVideoInputDevice,
   applyOutputDevice,
   useNotificationSounds,
 } from "@shared/lib";
@@ -176,6 +193,7 @@ const emit = defineEmits<{
 const {
   audioInputDevices,
   audioOutputDevices,
+  videoInputDevices,
   isLoading: isLoadingDevices,
   hasPermission,
   refreshDevices,
@@ -188,12 +206,13 @@ const {
   stopTest: stopInputTest,
 } = useAudioInputTest();
 
-// Загружаем сохраненные значения как начальные
 const initialInputDevice = getStoredAudioInputDevice() || "";
 const initialOutputDevice = getStoredAudioOutputDevice() || "";
+const initialVideoDevice = getStoredVideoInputDevice() || "";
 
 const selectedInputDevice = ref<string>(initialInputDevice);
 const selectedOutputDevice = ref<string>(initialOutputDevice);
+const selectedVideoDevice = ref<string>(initialVideoDevice);
 
 const inputDeviceOptions = computed(() => [
   { value: "", label: "По умолчанию" },
@@ -206,6 +225,14 @@ const inputDeviceOptions = computed(() => [
 const outputDeviceOptions = computed(() => [
   { value: "", label: "По умолчанию" },
   ...audioOutputDevices.value.map((d) => ({
+    value: d.deviceId,
+    label: d.label,
+  })),
+]);
+
+const videoDeviceOptions = computed(() => [
+  { value: "", label: "По умолчанию" },
+  ...videoInputDevices.value.map((d) => ({
     value: d.deviceId,
     label: d.label,
   })),
@@ -263,6 +290,12 @@ const saveSettings = async () => {
     localStorage.removeItem("nonza_audio_output_device");
   }
 
+  if (selectedVideoDevice.value) {
+    setStoredVideoInputDevice(selectedVideoDevice.value);
+  } else {
+    localStorage.removeItem("nonza_video_input_device");
+  }
+
   const audioElements = document.querySelectorAll("audio");
   for (const audio of audioElements) {
     try {
@@ -279,20 +312,24 @@ const saveSettings = async () => {
 const hasUnsavedChanges = () => {
   const savedInput = getStoredAudioInputDevice() || "";
   const savedOutput = getStoredAudioOutputDevice() || "";
+  const savedVideo = getStoredVideoInputDevice() || "";
   return (
     selectedInputDevice.value !== savedInput ||
-    selectedOutputDevice.value !== savedOutput
+    selectedOutputDevice.value !== savedOutput ||
+    selectedVideoDevice.value !== savedVideo
   );
 };
 
 const getSettings = () => ({
   inputDevice: selectedInputDevice.value,
   outputDevice: selectedOutputDevice.value,
+  videoDevice: selectedVideoDevice.value,
 });
 
 const resetSettings = () => {
   selectedInputDevice.value = getStoredAudioInputDevice() || "";
   selectedOutputDevice.value = getStoredAudioOutputDevice() || "";
+  selectedVideoDevice.value = getStoredVideoInputDevice() || "";
 };
 
 // Экспортируем методы для использования извне

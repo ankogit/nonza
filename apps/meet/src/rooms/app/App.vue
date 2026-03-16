@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rooms-app padding-app full-page bg-dark"
+    class="rooms-app padding-app full-page bg-darker"
     :class="{
       'rooms-app--scroll-root': isScrollRootPage,
       'rooms-app--drawer-open': sidebarDrawerOpen && isMainView,
@@ -73,16 +73,6 @@
     <div v-else-if="appStore.page === 'settings'" class="rooms-app__content">
       <SettingsScreen @back="goToOrganizations" @logout="handleLogout" />
     </div>
-    <div
-      v-else-if="appStore.page === 'org-settings' && selectedOrgId"
-      class="rooms-app__content"
-    >
-      <OrganizationSettingsScreen
-        :org-id="selectedOrgId"
-        @back="handleOrgSettingsBack"
-        @deleted="handleOrgDeleted"
-      />
-    </div>
     <main v-else-if="isAuthenticated()" class="container border-radius-app">
       <div
         v-if="isMainView && sidebarDrawerOpen"
@@ -109,7 +99,11 @@
           @settings="
             () => {
               closeSidebarDrawer();
-              appStore.setPage('settings');
+              if (selectedOrgId) showSettingsModal = true;
+              else {
+                appStore.setPage('settings');
+                replaceState();
+              }
             }
           "
           @go-home="
@@ -137,6 +131,34 @@
           @select="selectOrg"
         />
       </div>
+      <Modal
+        :model-value="showSettingsModal"
+        fullscreen
+        aria-label="Настройки"
+        :close-on-overlay-click="false"
+        @update:model-value="showSettingsModal = $event"
+        @close="showSettingsModal = false"
+      >
+        <SettingsScreen
+          @back="showSettingsModal = false"
+          @logout="handleLogout"
+        />
+      </Modal>
+      <Modal
+        :model-value="!!(showOrgSettingsModal && selectedOrgId)"
+        fullscreen
+        aria-label="Настройки организации"
+        :close-on-overlay-click="false"
+        @update:model-value="showOrgSettingsModal = false"
+        @close="showOrgSettingsModal = false"
+      >
+        <OrganizationSettingsScreen
+          v-if="selectedOrgId"
+          :org-id="selectedOrgId"
+          @back="showOrgSettingsModal = false"
+          @deleted="handleOrgDeleted"
+        />
+      </Modal>
     </main>
     <div v-else class="rooms-app__content">
       <LoginScreen
@@ -162,7 +184,13 @@ import { storeToRefs } from "pinia";
 import { OrganizationApi } from "@shared/entities";
 import { ApiClient } from "@shared/api";
 import type { Organization } from "@shared/entities";
-import { ScreenLayout, PageHeader, Button, ToastContainer } from "@shared/ui";
+import {
+  ScreenLayout,
+  PageHeader,
+  Button,
+  ToastContainer,
+  Modal,
+} from "@shared/ui";
 import OrgPanel from "@rooms/widgets/org-panel/ui/OrgPanel.vue";
 import NonzaWidget from "@app/NonzaWidget.vue";
 import {
@@ -239,6 +267,8 @@ useMeetingShortcutListener();
 const { organizations, loading, selectedOrgId } = storeToRefs(orgStore);
 
 const sidebarDrawerOpen = ref(false);
+const showSettingsModal = ref(false);
+const showOrgSettingsModal = ref(false);
 
 const isMainView = computed(
   () =>
@@ -248,7 +278,7 @@ const isMainView = computed(
     !["login", "register", "invite", "create-org", "settings"].includes(
       appStore.page,
     ) &&
-    !(appStore.page === "org-settings" && selectedOrgId.value),
+    true,
 );
 
 function closeSidebarDrawer() {
@@ -263,7 +293,6 @@ const isScrollRootPage = computed(
     appStore.page === "invite" ||
     appStore.page === "create-org" ||
     appStore.page === "settings" ||
-    appStore.page === "org-settings" ||
     (!isAuthenticated() && !appStore.roomCode),
 );
 
@@ -272,11 +301,15 @@ function parseRoute() {
   const code = params.get("code");
   appStore.setRoomCode(code || null);
   if (appStore.roomCode) {
+    showSettingsModal.value = false;
+    showOrgSettingsModal.value = false;
     return;
   }
   const p = params.get("page");
   const id = params.get("id");
   const token = params.get("token");
+  showSettingsModal.value = false;
+  showOrgSettingsModal.value = false;
   if (p === "login") {
     appStore.setPage("login");
     appStore.setInviteToken(null);
@@ -298,9 +331,10 @@ function parseRoute() {
     appStore.setInviteToken(null);
     orgStore.clearSelected();
   } else if (p === "org-settings" && id) {
-    appStore.setPage("org-settings");
+    appStore.setPage("org");
     appStore.setInviteToken(null);
     orgStore.setSelectedId(id);
+    showOrgSettingsModal.value = true;
   } else if (p === "org" && id) {
     appStore.setPage("org");
     appStore.setInviteToken(null);
@@ -333,8 +367,6 @@ function replaceState() {
     query = "?page=create-org";
   } else if (appStore.page === "settings") {
     query = "?page=settings";
-  } else if (appStore.page === "org-settings" && orgStore.selectedOrgId) {
-    query = `?page=org-settings&id=${orgStore.selectedOrgId}`;
   } else if (appStore.page === "org" && orgStore.selectedOrgId) {
     query = `?page=org&id=${orgStore.selectedOrgId}`;
   } else if (orgStore.selectedOrgId) {
@@ -409,21 +441,15 @@ function handleLogout() {
 }
 
 function handleGoSettings() {
-  appStore.setPage("settings");
-  replaceState();
+  showSettingsModal.value = true;
 }
 
 function handleOrgSettings() {
-  appStore.setPage("org-settings");
-  replaceState();
-}
-
-function handleOrgSettingsBack() {
-  appStore.setPage("org");
-  replaceState();
+  showOrgSettingsModal.value = true;
 }
 
 function handleOrgDeleted() {
+  showOrgSettingsModal.value = false;
   orgStore.clearSelected();
   appStore.setPage("organizations");
   replaceState();
@@ -491,8 +517,10 @@ onMounted(() => {
 window.addEventListener("popstate", parseRoute);
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape" && sidebarDrawerOpen.value) {
-    sidebarDrawerOpen.value = false;
+  if (e.key === "Escape") {
+    if (showOrgSettingsModal.value) showOrgSettingsModal.value = false;
+    else if (showSettingsModal.value) showSettingsModal.value = false;
+    else if (sidebarDrawerOpen.value) sidebarDrawerOpen.value = false;
   }
 }
 
