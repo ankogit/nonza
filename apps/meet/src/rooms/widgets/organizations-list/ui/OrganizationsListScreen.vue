@@ -77,39 +77,39 @@
           </a>
         </div>
       </section>
-    </div>
-    <section class="organizations-list__partners">
-      <span class="organizations-list__partners-label">Партнёры</span>
-      <div class="organizations-list__partners-row">
-        <a
-          v-for="partner in partners"
-          :key="partner.url"
-          :href="partner.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="organizations-list__partner-tile"
-        >
-          <CardTile clickable>
-            <div
-              v-if="partner.logo"
-              class="organizations-list__partner-content"
-            >
-              <img
-                :src="partner.logo"
-                :alt="partner.name"
-                class="organizations-list__partner-logo"
-              />
-              <span class="organizations-list__partner-name">{{
+      <section class="organizations-list__partners">
+        <span class="organizations-list__partners-label">Партнёры</span>
+        <div class="organizations-list__partners-row">
+          <a
+            v-for="partner in partners"
+            :key="partner.url"
+            :href="partner.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="organizations-list__partner-tile"
+          >
+            <CardTile clickable>
+              <div
+                v-if="partner.logo"
+                class="organizations-list__partner-content"
+              >
+                <img
+                  :src="partner.logo"
+                  :alt="partner.name"
+                  class="organizations-list__partner-logo"
+                />
+                <span class="organizations-list__partner-name">{{
+                  partner.name
+                }}</span>
+              </div>
+              <span v-else class="organizations-list__partner-name">{{
                 partner.name
               }}</span>
-            </div>
-            <span v-else class="organizations-list__partner-name">{{
-              partner.name
-            }}</span>
-          </CardTile>
-        </a>
-      </div>
-    </section>
+            </CardTile>
+          </a>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -330,8 +330,7 @@ function orgLetter(name: string): string {
 }
 
 .organizations-list__partners {
-  flex-shrink: 0;
-  margin-top: auto;
+  margin-top: 32px;
   padding-top: 24px;
   padding-bottom: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
