@@ -32,7 +32,8 @@
     "active": true,
     "targets": [
       "app",
-      "dmg"
+      "dmg",
+      "msi"
     ],
     "createUpdaterArtifacts": true,
     "macOS": {
