@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { spawnSync } from "child_process";
 
-const root = process.cwd();
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const root = join(scriptDir, "..");
 let baseUrl = "http://127.0.0.1:8000";
 const envVars = {};
 
@@ -36,8 +38,9 @@ config.plugins.updater.endpoints = [baseUrl + path];
 writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 
 if (!envVars.TAURI_SIGNING_PRIVATE_KEY && envVars.TAURI_SIGNING_PRIVATE_KEY_PATH) {
-  const rawPath = envVars.TAURI_SIGNING_PRIVATE_KEY_PATH.replace(/^~/, process.env.HOME || "");
-  const keyPath = rawPath.startsWith("/") ? rawPath : join(root, rawPath);
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const rawPath = envVars.TAURI_SIGNING_PRIVATE_KEY_PATH.replace(/^~/, home);
+  const keyPath = rawPath.startsWith("/") || /^[A-Za-z]:[/\\]/.test(rawPath) ? rawPath : join(root, rawPath);
   try {
     envVars.TAURI_SIGNING_PRIVATE_KEY = readFileSync(keyPath, "utf8");
   } catch {}
