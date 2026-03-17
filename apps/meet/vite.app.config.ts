@@ -47,5 +47,20 @@ export default defineConfig({
         : "safari13"
       : undefined,
     base: isTauri ? "./" : undefined,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@tauri-apps")) return "tauri";
+            if (id.includes("livekit-client")) return "livekit";
+            if (id.includes("@tiptap") || id.includes("y-prosemirror") || id.includes("yjs") || id.includes("y-protocols")) return "editor";
+            if (id.includes("vue") || id.includes("pinia")) return "vendor";
+            return "lib";
+          }
+        },
+        chunkFileNames: "assets/[name]-[hash].js",
+        experimentalMinChunkSize: 20_000,
+      },
+    },
   },
 });
