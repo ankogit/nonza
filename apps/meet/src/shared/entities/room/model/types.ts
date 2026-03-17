@@ -14,6 +14,7 @@ export interface Room {
   conference_hall_leader_id?: string | null;
   created_by_user_id?: string | null;
   allow_anonymous_join?: boolean;
+  password_protected?: boolean;
   position?: number;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ export interface CreateRoomRequest {
 export interface RoomTokenRequest {
   participant_name: string;
   participant_identity?: string;
+  password?: string;
 }
 
 export interface RTCIceServer {

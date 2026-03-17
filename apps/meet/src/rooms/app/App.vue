@@ -4,8 +4,12 @@
     :class="{
       'rooms-app--scroll-root': isScrollRootPage,
       'rooms-app--drawer-open': sidebarDrawerOpen && isMainView,
+      'rooms-app--with-titlebar': isTauriDesktop(),
     }"
   >
+    <header v-if="isTauriDesktop()" class="app-titlebar" data-tauri-drag-region>
+      <span class="app-titlebar__title">Nonza</span>
+    </header>
     <div v-if="appStore.showReconnectScreen" class="rooms-app__content">
       <ScreenLayout narrow>
         <div class="reconnect-screen__card">
@@ -39,6 +43,19 @@
         connect-on-mount
         @disconnect="handleRoomDisconnect"
       />
+      <!-- Временно скрыто: открытие звонка в отдельном окне
+      <Button
+        v-if="isTauriDesktop()"
+        type="icon"
+        size="small"
+        class="rooms-app__open-in-new-window"
+        title="Открыть звонок в отдельном окне"
+        aria-label="Открыть звонок в отдельном окне"
+        @click="openCallInNewWindow(appStore.roomCode!)"
+      >
+        <PixelIcon name="link" variant="large" />
+      </Button>
+      -->
     </div>
     <div v-else-if="appStore.page === 'login'" class="rooms-app__content">
       <LoginScreen
@@ -167,6 +184,18 @@
       />
     </div>
     <ToastContainer />
+    <Button
+      v-if="isTauriDesktop()"
+      type="icon"
+      size="small"
+      variant="default"
+      class="rooms-app__refresh"
+      title="Обновить страницу"
+      aria-label="Обновить страницу"
+      @click="handleRefresh"
+    >
+      <PixelIcon name="reload" variant="small" />
+    </Button>
   </div>
 </template>
 
@@ -188,6 +217,7 @@ import {
   ScreenLayout,
   PageHeader,
   Button,
+  PixelIcon,
   ToastContainer,
   Modal,
 } from "@shared/ui";
@@ -198,11 +228,15 @@ import {
   clearAuth,
   isAuthenticated,
   refreshAccessToken,
+  startProactiveRefreshScheduler,
   useMeetingShortcutListener,
   getApiBaseURL,
   getLivekitURL,
   API_BASE_URL_INJECT_KEY,
   LIVEKIT_URL_INJECT_KEY,
+  // openCallInNewWindow, // временно скрыта кнопка "открыть в отдельном окне"
+  isTauriDesktop,
+  getStoredShortcuts,
 } from "@shared/lib";
 import { useAppStore, useOrganizationsStore } from "@rooms/app/stores";
 
@@ -269,6 +303,8 @@ const { organizations, loading, selectedOrgId } = storeToRefs(orgStore);
 const sidebarDrawerOpen = ref(false);
 const showSettingsModal = ref(false);
 const showOrgSettingsModal = ref(false);
+
+const unlistenAppMenuLogout = ref<(() => void) | null>(null);
 
 const isMainView = computed(
   () =>
@@ -433,11 +469,17 @@ function handleAuthSuccess() {
   appStore.setPage("organizations");
   replaceState();
   loadOrganizations();
+  syncAppMenu();
 }
 
 function handleLogout() {
+  clearAuth();
+  appStore.setRoomCode(null);
   appStore.setPage("login");
+  appStore.clearInviteAndPending();
+  orgStore.clearSelected();
   replaceState();
+  syncAppMenu();
 }
 
 function handleGoSettings() {
@@ -473,6 +515,34 @@ function handleReconnect() {
   }
 }
 
+function handleRefresh() {
+  window.location.reload();
+}
+
+function syncAppMenu() {
+  if (!isTauriDesktop()) return;
+  const shortcuts = getStoredShortcuts();
+  import("@tauri-apps/api/core")
+    .then(({ invoke }) =>
+      Promise.all([
+        invoke("set_shortcut_bindings", {
+          audio: shortcuts.audio,
+          video: shortcuts.video,
+          leave: shortcuts.leave,
+          sound: shortcuts.sound,
+        }),
+        invoke("update_app_menu", {
+          logoutVisible: isAuthenticated(),
+          audioShortcut: shortcuts.audio,
+          videoShortcut: shortcuts.video,
+          leaveShortcut: shortcuts.leave,
+          soundShortcut: shortcuts.sound,
+        }),
+      ]),
+    )
+    .catch((err) => console.error("[syncAppMenu] set_shortcut_bindings / update_app_menu failed:", err));
+}
+
 watch(
   [
     () => appStore.page,
@@ -488,8 +558,13 @@ function loadOrganizations() {
 }
 
 onMounted(() => {
+  startProactiveRefreshScheduler(apiBaseURL);
   window.addEventListener("keydown", onKeydown);
   parseRoute();
+  if (isTauriDesktop()) {
+    document.documentElement.classList.add("nonza-desktop");
+    syncAppMenu();
+  }
   const publicPages = ["login", "register", "invite"];
   if (!isAuthenticated() && !publicPages.includes(appStore.page)) {
     appStore.setRoomCode(null);
@@ -512,6 +587,15 @@ onMounted(() => {
   ) {
     loadOrganizations();
   }
+  if (isTauriDesktop()) {
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("app-menu-logout", () => {
+        handleLogout();
+      }).then((fn) => {
+        unlistenAppMenuLogout.value = fn;
+      });
+    });
+  }
 });
 
 window.addEventListener("popstate", parseRoute);
@@ -526,6 +610,7 @@ function onKeydown(e: KeyboardEvent) {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
+  unlistenAppMenuLogout.value?.();
 });
 </script>
 
@@ -582,6 +667,53 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.rooms-app__open-in-new-window {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  opacity: 0.7;
+}
+
+.rooms-app__open-in-new-window:hover {
+  opacity: 1;
+}
+
+.rooms-app__refresh {
+  position: fixed;
+  top: 35px;
+  right: 0px;
+  z-index: 100;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  background: transparent !important;
+  border: none;
+  box-shadow: none;
+  filter: none;
+  opacity: 0.4;
+  color: var(--color-text-secondary, #888);
+}
+
+.rooms-app__refresh:hover {
+  opacity: 1;
+  color: var(--color-text, #fff);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.rooms-app__refresh:hover:not(.button--disabled) {
+  scale: 1;
+}
+
+.rooms-app__refresh :deep(.pi) {
+  --pi-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .container {

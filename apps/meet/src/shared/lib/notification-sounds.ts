@@ -1,5 +1,6 @@
 import { ref, computed, type Ref, type ComputedRef } from "vue";
 import { getStoredAudioOutputDevice } from "./audio-devices";
+import { getOutputMuted } from "./output-mute";
 
 export const NOTIFICATION_SOUND_EVENTS = [
   "participant_joined",
@@ -253,6 +254,7 @@ export function useNotificationSounds(): {
   }
 
   async function play(event: NotificationSoundEventId): Promise<void> {
+    if (getOutputMuted()) return;
     const config = getEventConfig(event);
     if (!config.enabled) return;
     try {

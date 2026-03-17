@@ -74,6 +74,8 @@ func (h *Handler) InitRoutes(cfg *config.Config) *gin.Engine {
 	router.Use(cors.New(corsConfig))
 
 	router.POST("/api/v1/webhooks/livekit", h.HandleLiveKitWebhook)
+	router.GET("/api/v1/desktop-update/:target/:arch/:current_version", v1.DesktopUpdate(cfg))
+	router.GET("/api/v1/desktop-download/:platform", v1.DesktopDownload(cfg))
 
 	api := router.Group("/api/v1")
 	api.Use(AuthMiddleware(h.services))

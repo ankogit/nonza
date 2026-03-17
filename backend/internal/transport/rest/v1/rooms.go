@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const userIDContextKey = "user_id"
@@ -285,6 +286,7 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 		RoomType           *string `json:"room_type"`
 		Name               *string `json:"name"`
 		RoomGroupID        *string `json:"room_group_id"`
+		Password           *string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -299,6 +301,26 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 	}
 	if req.AllowAnonymousJoin != nil {
 		newSettings["allow_anonymous_join"] = *req.AllowAnonymousJoin
+	}
+	if req.Password != nil {
+		allowAnonymous := false
+		if v, ok := newSettings["allow_anonymous_join"].(bool); ok {
+			allowAnonymous = v
+		}
+		if !allowAnonymous {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "password can only be set for rooms with allow_anonymous_join"})
+			return
+		}
+		if *req.Password != "" {
+			hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to set password"})
+				return
+			}
+			newSettings["room_password_hash"] = string(hash)
+		} else {
+			delete(newSettings, "room_password_hash")
+		}
 	}
 	room.Settings = newSettings
 

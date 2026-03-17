@@ -52,7 +52,7 @@ export function useMeetingShortcutListener(): void {
 }
 
 export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
-  const { toggleAudio, toggleVideo, toggleScreenShare, leaveRoom } = options;
+  const { toggleAudio, toggleVideo, toggleScreenShare, leaveRoom, toggleOutputMute } = options;
   const bus = inject(MEETING_SHORTCUT_BUS_KEY);
   if (!bus) return;
 
@@ -73,6 +73,9 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
             break;
           case "leave":
             leaveRoom?.();
+            break;
+          case "sound":
+            toggleOutputMute?.();
             break;
         }
         bus.shortcut.value = null;

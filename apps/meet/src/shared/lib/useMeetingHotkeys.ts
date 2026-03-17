@@ -12,6 +12,7 @@ export interface MeetingHotkeysOptions {
   toggleVideo?: () => void;
   toggleScreenShare?: () => void;
   leaveRoom?: () => void;
+  toggleOutputMute?: () => void;
   enabled: () => boolean;
 }
 

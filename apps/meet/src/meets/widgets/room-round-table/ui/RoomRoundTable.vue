@@ -504,6 +504,7 @@ import {
   getStoredDefaultVideoQuality,
   setStoredDefaultVideoQuality,
   type VideoQualityLevel,
+  toggleOutputMuted,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@shared/entities";
@@ -771,6 +772,7 @@ useTauriGlobalShortcuts({
   toggleVideo,
   toggleScreenShare: props.previewMode ? undefined : toggleScreenShare,
   leaveRoom: handleDisconnect,
+  toggleOutputMute: toggleOutputMuted,
   enabled: () => !!props.livekitRoom,
 });
 

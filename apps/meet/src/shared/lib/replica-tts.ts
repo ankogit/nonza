@@ -1,3 +1,5 @@
+import { getOutputMuted } from "./output-mute";
+
 let cachedVoice: SpeechSynthesisVoice | null = null;
 let voicesLoaded = false;
 
@@ -63,6 +65,7 @@ export function speakReplicaTextWithVoice(
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return;
   }
+  if (getOutputMuted()) return;
   const trimmed = rawText.trim();
   if (!trimmed) return;
 

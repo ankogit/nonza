@@ -1,4 +1,8 @@
 const AUTH_STORAGE_KEY = "nonza_auth";
+const REFRESH_BEFORE_MS = 5 * 60 * 1000;
+
+let refreshTimerId: ReturnType<typeof setTimeout> | null = null;
+let apiBaseURLForRefresh = "";
 
 export interface AuthUser {
   id: string;
@@ -67,6 +71,36 @@ export function setAuth(
     user,
   };
   saveToStorage(state);
+  scheduleProactiveRefresh();
+}
+
+function scheduleProactiveRefresh(): void {
+  if (!apiBaseURLForRefresh) return;
+  if (refreshTimerId) clearTimeout(refreshTimerId);
+  refreshTimerId = null;
+  const s = getAuthState();
+  if (!s?.accessToken || !s.expiresAt) return;
+  const expiresMs = new Date(s.expiresAt).getTime();
+  if (Number.isNaN(expiresMs)) return;
+  const now = Date.now();
+  const refreshAt = expiresMs - REFRESH_BEFORE_MS;
+  if (refreshAt <= now) {
+    refreshAccessToken(apiBaseURLForRefresh).then((ok) => {
+      if (ok) scheduleProactiveRefresh();
+    });
+    return;
+  }
+  refreshTimerId = setTimeout(() => {
+    refreshTimerId = null;
+    refreshAccessToken(apiBaseURLForRefresh).then((ok) => {
+      if (ok) scheduleProactiveRefresh();
+    });
+  }, refreshAt - now);
+}
+
+export function startProactiveRefreshScheduler(baseURL: string): void {
+  apiBaseURLForRefresh = baseURL;
+  scheduleProactiveRefresh();
 }
 
 export function updateAuthUser(partial: Partial<AuthUser>) {
@@ -78,6 +112,8 @@ export function updateAuthUser(partial: Partial<AuthUser>) {
 }
 
 export function clearAuth() {
+  if (refreshTimerId) clearTimeout(refreshTimerId);
+  refreshTimerId = null;
   state = null;
   saveToStorage(null);
 }

@@ -89,7 +89,10 @@ export interface UseRoomConnectionReturn {
     shortCode: string,
     participantName: string,
     livekitUrl: string,
-    options?: { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] },
+    options?: {
+      iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"];
+      password?: string;
+    },
     preferredIdentity?: string
   ) => Promise<void>;
   reconnect: () => Promise<void>;
@@ -115,7 +118,11 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const lastParticipantName = ref<string>("");
   const lastLivekitUrl = ref<string>("");
   const lastConnectOptions = ref<
-    { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] } | undefined
+    | {
+        iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"];
+        password?: string;
+      }
+    | undefined
   >(undefined);
   const connectAbortedRef = ref(false);
 
@@ -159,7 +166,10 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
     shortCode: string,
     participantName: string,
     livekitUrl: string,
-    options?: { iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"] },
+    options?: {
+      iceTransportPolicy?: RTCConfiguration["iceTransportPolicy"];
+      password?: string;
+    },
     preferredIdentity?: string
   ): Promise<void> => {
     if (state.value.isConnecting || state.value.isConnected) {
@@ -190,6 +200,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         {
           participant_name: participantName,
           participant_identity: participantIdentity,
+          password: options?.password,
         }
       );
 

@@ -56,6 +56,27 @@
           + Создать организацию
         </Button>
       </div>
+      <section class="organizations-list__download">
+        <span class="organizations-list__download-label">Приложение для ПК</span>
+        <div class="organizations-list__download-row">
+          <a
+            :href="downloadUrl('windows')"
+            class="organizations-list__download-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Windows
+          </a>
+          <a
+            :href="downloadUrl('macos')"
+            class="organizations-list__download-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            macOS
+          </a>
+        </div>
+      </section>
     </div>
     <section class="organizations-list__partners">
       <span class="organizations-list__partners-label">Партнёры</span>
@@ -96,8 +117,14 @@
 import { inject } from "vue";
 import { PageHeader, CardTile, ListEmpty, Button, Skeleton, PixelIcon } from "@shared/ui";
 import type { Organization } from "@shared/entities";
+import { getApiBaseURL } from "@shared/lib";
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
+
+function downloadUrl(platform: "windows" | "macos"): string {
+  const base = getApiBaseURL().replace(/\/$/, "");
+  return `${base}/api/v1/desktop-download/${platform}`;
+}
 
 defineProps<{
   organizations: Organization[];
@@ -267,6 +294,39 @@ function orgLetter(name: string): string {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.organizations-list__download {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.organizations-list__download-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 8px;
+}
+
+.organizations-list__download-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.organizations-list__download-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.organizations-list__download-link:hover {
+  text-decoration: underline;
 }
 
 .organizations-list__partners {

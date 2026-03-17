@@ -40,11 +40,15 @@ export class RoomApi {
     shortCode: string,
     data: RoomTokenRequest,
   ): Promise<RoomTokenResponse> {
-    return this.client.post<RoomTokenResponse>("/api/v1/tokens", {
+    const body: Record<string, string | undefined> = {
       short_code: shortCode,
       participant_name: data.participant_name,
       participant_id: data.participant_identity,
-    });
+    };
+    if (data.password !== undefined) {
+      body.password = data.password;
+    }
+    return this.client.post<RoomTokenResponse>("/api/v1/tokens", body);
   }
 
   async updateConferenceHallLeader(
@@ -64,6 +68,7 @@ export class RoomApi {
       room_type?: import("@shared/lib").RoomType;
       name?: string;
       room_group_id?: string | null;
+      password?: string | null;
     },
   ): Promise<Room> {
     return this.client.patch<Room>(

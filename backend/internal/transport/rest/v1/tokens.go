@@ -3,6 +3,7 @@ package v1
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"nonza/backend/internal/config"
@@ -11,10 +12,10 @@ import (
 	"nonza/backend/internal/transport/websocket"
 	"nonza/backend/internal/webrtc/livekit"
 	"nonza/backend/internal/webrtc/turn"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func normalizeTURNSecret(s string) string {
@@ -58,6 +59,19 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 		return
 	}
 	log.Printf("[tokens] GetByShortCode %s: %v", req.ShortCode, time.Since(t0))
+
+	if room.Settings != nil {
+		if hash, ok := room.Settings["room_password_hash"].(string); ok && hash != "" {
+			if req.Password == "" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "password_required"})
+				return
+			}
+			if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+				c.JSON(http.StatusForbidden, gin.H{"error": "wrong_password"})
+				return
+			}
+		}
+	}
 
 	var uid string
 	if userID, ok := c.Get("user_id"); ok {

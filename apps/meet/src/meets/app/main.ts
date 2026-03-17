@@ -6,4 +6,6 @@ import "@shared/styles/main.css";
 setLogLevel(LogLevel.warn);
 
 const app = createApp(App);
+const el = document.getElementById("app");
+if (el) el.classList.add("app-meets");
 app.mount("#app");

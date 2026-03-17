@@ -24,104 +24,129 @@
       </div>
     </div>
     <div v-else-if="!isConnected" class="nonza-widget__connect">
-      <div
-        v-if="isRoomNotFound"
-        class="nonza-widget__reconnecting-card nonza-widget__connect-form"
-      >
-        <h2 class="nonza-widget__title">Комната не найдена</h2>
-        <p class="nonza-widget__reconnecting-hint">
-          Проверьте код комнаты или перейдите к списку организаций.
-        </p>
-        <Button
-          v-if="defaultShortCode"
-          type="text"
-          variant="accent"
-          size="medium"
-          class="nonza-widget__form-button"
-          @click="handleRoomNotFoundBack"
-        >
-          К списку организаций
-        </Button>
-        <Button
-          v-else
-          type="text"
-          variant="accent"
-          size="medium"
-          class="nonza-widget__form-button"
-          @click="handleTryAnotherCode"
-        >
-          Ввести другой код
-        </Button>
-      </div>
-      <div
-        v-else-if="(willAutoConnect || isConnecting) && !error"
-        class="nonza-widget__reconnecting-card nonza-widget__connect-form"
-      >
-        <p class="nonza-widget__reconnecting-text">
-          {{ isConnecting ? "Подключение..." : "Подготовка..." }}
-        </p>
-      </div>
-      <div v-else class="nonza-widget__connect-form">
-        <h2 class="nonza-widget__title">Присоединиться к комнате</h2>
+      <template v-if="entryMode === 'by_selection'">
         <div
-          v-if="entryMode === 'by_code'"
-          class="nonza-widget__input-group nonza-widget__input-group--full"
+          v-if="!passwordRequired"
+          class="nonza-widget__reconnecting-card nonza-widget__connect-form"
         >
-          <label for="shortCode">Код комнаты</label>
-          <input
-            id="shortCode"
-            v-model="shortCode"
-            type="text"
-            placeholder="abc-defg-hij"
-            class="nonza-widget__input"
-          />
+          <p class="nonza-widget__reconnecting-text">
+            {{ isConnecting ? "Подключение..." : "Подготовка..." }}
+          </p>
         </div>
-        <div v-if="!isAuthParticipant" class="nonza-widget__input-group">
-          <label for="participantName">Ваше имя</label>
-          <div class="nonza-widget__input-with-button">
+      </template>
+      <template v-else>
+        <div
+          v-if="isRoomNotFound"
+          class="nonza-widget__reconnecting-card nonza-widget__connect-form"
+        >
+          <h2 class="nonza-widget__title">Комната не найдена</h2>
+          <p class="nonza-widget__reconnecting-hint">
+            Проверьте код комнаты или перейдите к списку организаций.
+          </p>
+          <Button
+            v-if="defaultShortCode"
+            type="text"
+            variant="accent"
+            size="medium"
+            class="nonza-widget__form-button"
+            @click="handleRoomNotFoundBack"
+          >
+            К списку организаций
+          </Button>
+          <Button
+            v-else
+            type="text"
+            variant="accent"
+            size="medium"
+            class="nonza-widget__form-button"
+            @click="handleTryAnotherCode"
+          >
+            Ввести другой код
+          </Button>
+        </div>
+        <div
+          v-else-if="isConnecting && !error"
+          class="nonza-widget__reconnecting-card nonza-widget__connect-form"
+        >
+          <p class="nonza-widget__reconnecting-text">Подключение...</p>
+        </div>
+        <form
+          v-else
+          class="nonza-widget__connect-form"
+          autocomplete="on"
+          @submit.prevent="handleConnect"
+        >
+          <h2 class="nonza-widget__title">Присоединиться к комнате</h2>
+          <div class="nonza-widget__input-group nonza-widget__input-group--full">
+            <label for="shortCode">Код комнаты</label>
             <input
-              id="participantName"
-              v-model="participantName"
+              id="shortCode"
+              v-model="shortCode"
               type="text"
-              placeholder="Введите ваше имя"
+              placeholder="abc-defg-hij"
               class="nonza-widget__input"
             />
-            <Button
-              type="icon"
-              size="small"
-              class="nonza-widget__randomize-button"
-              :title="'Сгенерировать случайное имя'"
-              aria-label="Сгенерировать случайное имя"
-              @click="handleRandomizeName"
-            >
-              <PixelIcon name="reload" variant="large" />
-            </Button>
           </div>
-        </div>
-        <div v-else class="nonza-widget__input-group">
-          <label for="participantName">Участник</label>
-          <input
-            id="participantName"
-            :value="displayParticipantName"
+          <div v-if="!isAuthParticipant" class="nonza-widget__input-group">
+            <label for="participantName">Ваше имя</label>
+            <div class="nonza-widget__input-with-button">
+              <input
+                id="participantName"
+                v-model="participantName"
+                type="text"
+                placeholder="Введите ваше имя"
+                class="nonza-widget__input"
+              />
+              <Button
+                type="icon"
+                size="small"
+                class="nonza-widget__randomize-button"
+                :title="'Сгенерировать случайное имя'"
+                aria-label="Сгенерировать случайное имя"
+                @click="handleRandomizeName"
+              >
+                <PixelIcon name="reload" variant="large" />
+              </Button>
+            </div>
+          </div>
+          <div v-else class="nonza-widget__input-group">
+            <label for="participantName">Участник</label>
+            <input
+              id="participantName"
+              :value="displayParticipantName"
+              type="text"
+              readonly
+              class="nonza-widget__input nonza-widget__input--readonly"
+            />
+          </div>
+          <div
+            v-if="showPasswordField"
+            class="nonza-widget__input-group nonza-widget__input-group--full"
+          >
+            <label for="roomPassword">Пароль комнаты</label>
+            <input
+              id="roomPassword"
+              v-model="roomPassword"
+              type="password"
+              placeholder="Введите пароль"
+              class="nonza-widget__input"
+              autocomplete="current-password"
+            />
+          </div>
+          <Button
             type="text"
-            readonly
-            class="nonza-widget__input nonza-widget__input--readonly"
-          />
-        </div>
-        <Button
-          type="text"
-          variant="accent"
-          size="medium"
-          :disabled="!canConnect || isConnecting"
-          class="nonza-widget__form-button"
-          @click="handleConnect"
-        >
-          {{ isConnecting ? "Подключение..." : "Присоединиться" }}
-        </Button>
-        <template v-if="entryMode === 'by_code'">
+            native-type="submit"
+            variant="accent"
+            size="medium"
+            :disabled="!canConnect || isConnecting"
+            class="nonza-widget__form-button"
+          >
+            {{ isConnecting ? "Подключение..." : "Присоединиться" }}
+          </Button>
           <hr class="HR" />
           <Button
             type="text"
+            native-type="button"
             variant="default"
             size="medium"
             class="nonza-widget__form-button"
@@ -129,9 +154,9 @@
           >
             Создать комнату
           </Button>
-        </template>
-        <div v-if="error" class="nonza-widget__error">{{ error }}</div>
-      </div>
+          <div v-if="error" class="nonza-widget__error">{{ error }}</div>
+        </form>
+      </template>
     </div>
 
     <div
@@ -158,6 +183,52 @@
         @update:participants="(list) => (participantsFromView = list)"
       />
     </div>
+
+    <Modal
+      :model-value="entryMode === 'by_selection' && passwordRequired"
+      title="Пароль комнаты"
+      :close-on-overlay-click="false"
+      @update:model-value="onRoomPasswordModalClose"
+    >
+      <form
+        id="nonza-widget-password-form"
+        class="nonza-widget__password-form"
+        autocomplete="on"
+        @submit.prevent="handleConnect"
+      >
+        <label for="roomPasswordModal" class="nonza-widget__password-label">Пароль</label>
+        <input
+          id="roomPasswordModal"
+          v-model="roomPassword"
+          type="password"
+          placeholder="Введите пароль"
+          class="nonza-widget__input"
+          autocomplete="current-password"
+        />
+        <div v-if="error" class="nonza-widget__error">{{ error }}</div>
+      </form>
+      <template #footer>
+        <Button
+          type="text"
+          native-type="button"
+          variant="default"
+          size="small"
+          @click="onRoomPasswordModalClose"
+        >
+          Отмена
+        </Button>
+        <Button
+          type="text"
+          native-type="submit"
+          variant="accent"
+          size="small"
+          form="nonza-widget-password-form"
+          :disabled="!roomPassword.trim() || isConnecting"
+        >
+          {{ isConnecting ? "Подключение..." : "Подключиться" }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -168,7 +239,7 @@ import { useRoomConnection } from "@features/room-connection";
 import { useScreenWakeLock, resolveDisplayRoomType } from "@shared/lib";
 import { ConnectedRoomView } from "@widgets/connected-room-view";
 import { RoomApi } from "@shared/entities";
-import { Button, PixelIcon } from "@shared/ui";
+import { Button, PixelIcon, Modal } from "@shared/ui";
 import {
   getParticipantName,
   setParticipantName,
@@ -176,6 +247,9 @@ import {
   getRoomShortCode,
   setRoomShortCode,
   clearRoomShortCode,
+  getStoredRoomPassword,
+  setStoredRoomPassword,
+  clearStoredRoomPassword,
   parseParticipantColorFromMetadata,
   DEFAULT_PARTICIPANT_COLOR,
 } from "@shared/lib";
@@ -196,6 +270,7 @@ const props = withDefaults(
     entryMode?: "by_code" | "by_selection";
     connectOnMount?: boolean;
     syncUrlWithRoomCode?: boolean;
+    room?: RoomEntity | null;
   }>(),
   { syncUrlWithRoomCode: false }
 );
@@ -262,6 +337,12 @@ watch(
 );
 const error = ref<string | null>(null);
 const room = ref<RoomEntity | null>(null);
+const passwordRequired = ref(false);
+const roomPassword = ref("");
+
+const showPasswordField = computed(
+  () => passwordRequired.value || (props.room?.password_protected ?? false)
+);
 
 const currentRoom = computed(() => connectionState.value.room);
 
@@ -406,14 +487,6 @@ const canConnect = computed(() => {
   return participantName.value.trim().length > 0;
 });
 
-const willAutoConnect = computed(() => {
-  if (!props.connectOnMount || userHasLeftRoom.value) return false;
-  const code = (props.defaultShortCode ?? urlCode ?? shortCode.value).toString().trim();
-  if (!code) return false;
-  const name = effectiveParticipantInfo.value?.displayName ?? participantName.value.trim();
-  return name.length > 0;
-});
-
 const SHORT_CODE_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
 function looksLikeFullShortCode(code: string): boolean {
   return SHORT_CODE_REGEX.test(code.trim());
@@ -432,7 +505,8 @@ function replaceUrlRoomCode(code: string | null) {
   window.history.replaceState(null, "", url);
 }
 
-const handleConnect = async () => {
+const handleConnect = async (ev?: unknown) => {
+  const passwordOverride = typeof ev === "string" ? ev : undefined;
   if (!canConnect.value) return;
 
   userHasLeftRoom.value = false;
@@ -442,17 +516,52 @@ const handleConnect = async () => {
   const info = effectiveParticipantInfo.value;
   const name = info?.displayName ?? participantName.value.trim();
   const identity = info?.identity;
+  const password =
+    (typeof passwordOverride === "string" ? passwordOverride : null) ??
+    (roomPassword.value.trim() || undefined);
 
   try {
     await connect(code, name, props.livekitURL, {
       ...(forceRelay && { iceTransportPolicy: "relay" }),
+      password,
     }, identity);
     room.value = connectionState.value.room;
+    passwordRequired.value = false;
+    roomPassword.value = "";
+    if (password) setStoredRoomPassword(code, password);
     setRoomShortCode(code);
     replaceUrlRoomCode(connectionState.value.room?.short_code ?? code);
   } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : "Не удалось подключиться";
+    const msg = err instanceof Error ? err.message : "Не удалось подключиться";
+    if (msg === "password_required") {
+      const stored = getStoredRoomPassword(code);
+      if (stored) {
+        try {
+          await connect(code, name, props.livekitURL, {
+            ...(forceRelay && { iceTransportPolicy: "relay" }),
+            password: stored,
+          }, identity);
+          room.value = connectionState.value.room;
+          passwordRequired.value = false;
+          roomPassword.value = "";
+          setRoomShortCode(code);
+          replaceUrlRoomCode(connectionState.value.room?.short_code ?? code);
+          return;
+        } catch (retryErr) {
+          const retryMsg = retryErr instanceof Error ? retryErr.message : "";
+          if (retryMsg === "wrong_password") {
+            clearStoredRoomPassword(code);
+          }
+        }
+      }
+      passwordRequired.value = true;
+      userHasLeftRoom.value = true;
+    } else if (msg === "wrong_password") {
+      clearStoredRoomPassword(code);
+      error.value = "Неверный пароль";
+    } else {
+      error.value = msg;
+    }
   }
 };
 
@@ -477,6 +586,8 @@ const handleDisconnect = async () => {
   await disconnect();
   room.value = null;
   error.value = null;
+  passwordRequired.value = false;
+  roomPassword.value = "";
   clearRoomShortCode();
   replaceUrlRoomCode(null);
   userHasLeftRoom.value = true;
@@ -485,15 +596,26 @@ const handleDisconnect = async () => {
 
 function handleRoomNotFoundBack() {
   error.value = null;
+  passwordRequired.value = false;
+  roomPassword.value = "";
   shortCode.value = "";
   clearRoomShortCode();
   replaceUrlRoomCode(null);
   emit("disconnect");
 }
 
+function onRoomPasswordModalClose() {
+  passwordRequired.value = false;
+  roomPassword.value = "";
+  error.value = null;
+  emit("disconnect");
+}
+
 function handleTryAnotherCode() {
   roomNotFoundDismissed.value = true;
   error.value = null;
+  passwordRequired.value = false;
+  roomPassword.value = "";
   shortCode.value = "";
 }
 
@@ -564,6 +686,7 @@ onMounted(() => {
   justify-content: center;
   padding: 24px;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .nonza-widget__reconnecting-card {
@@ -642,6 +765,18 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 500;
   color: #ccc;
+}
+
+.nonza-widget__password-form .nonza-widget__password-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.nonza-widget__password-form .nonza-widget__input {
+  margin-bottom: 16px;
 }
 
 .nonza-widget__input-with-button {

@@ -518,62 +518,64 @@
           >
             <PixelIcon name="burger" variant="small" />
           </button>
-          <button
-            type="button"
-            class="organization-footer-avatar"
-            :style="{
-              backgroundColor: footerColor,
-              color: '#fff',
-            }"
-            title="Мой цвет в орге"
-            aria-label="Развернуть палитру"
-            :aria-expanded="footerColorsExpanded"
-            :disabled="footerColorSaving"
-            @click="footerColorsExpanded = !footerColorsExpanded"
-          >
-            {{ currentUserLetter }}
-          </button>
+          <div class="organization-footer-avatar-wrap">
+            <button
+              type="button"
+              class="organization-footer-avatar"
+              :style="{
+                backgroundColor: footerColor,
+                color: '#fff',
+              }"
+              title="Мой цвет в орге"
+              aria-label="Развернуть палитру"
+              :aria-expanded="footerColorsExpanded"
+              :disabled="footerColorSaving"
+              @click="footerColorsExpanded = !footerColorsExpanded"
+            >
+              {{ currentUserLetter }}
+            </button>
+            <div
+              ref="footerColorsRef"
+              class="organization-footer-colors"
+              :class="{
+                'organization-footer-colors--expanded': footerColorsExpanded,
+              }"
+            >
+              <template v-if="footerColorsExpanded">
+                <button
+                  v-for="c in footerColorPalette"
+                  :key="c"
+                  type="button"
+                  class="organization-footer-color"
+                  :class="{
+                    'organization-footer-color--active': footerColor === c,
+                  }"
+                  :style="{ backgroundColor: c }"
+                  :title="c"
+                  aria-label="Выбрать цвет"
+                  :disabled="footerColorSaving"
+                  @click="setFooterColor(c)"
+                />
+                <button
+                  type="button"
+                  class="organization-footer-color organization-footer-color--reset"
+                  :class="{
+                    'organization-footer-color--active': !currentMember?.color,
+                  }"
+                  title="Сбросить цвет"
+                  aria-label="Сбросить цвет"
+                  :disabled="footerColorSaving"
+                  @click="setFooterColor(null)"
+                >
+                  −
+                </button>
+              </template>
+            </div>
+          </div>
           <div class="organization-footer-details">
             <span class="organization-footer-username">{{
               currentUserName
             }}</span>
-          </div>
-          <div
-            ref="footerColorsRef"
-            class="organization-footer-colors"
-            :class="{
-              'organization-footer-colors--expanded': footerColorsExpanded,
-            }"
-          >
-            <template v-if="footerColorsExpanded">
-              <button
-                v-for="c in footerColorPalette"
-                :key="c"
-                type="button"
-                class="organization-footer-color"
-                :class="{
-                  'organization-footer-color--active': footerColor === c,
-                }"
-                :style="{ backgroundColor: c }"
-                :title="c"
-                aria-label="Выбрать цвет"
-                :disabled="footerColorSaving"
-                @click="setFooterColor(c)"
-              />
-              <button
-                type="button"
-                class="organization-footer-color organization-footer-color--reset"
-                :class="{
-                  'organization-footer-color--active': !currentMember?.color,
-                }"
-                title="Сбросить цвет"
-                aria-label="Сбросить цвет"
-                :disabled="footerColorSaving"
-                @click="setFooterColor(null)"
-              >
-                −
-              </button>
-            </template>
           </div>
           <Button
             type="icon"
@@ -598,6 +600,20 @@
             </h2>
           </div>
           <div class="room-indicators">
+            <!-- Временно скрыто: открытие звонка в отдельном окне
+            <Button
+              v-if="joinedRoomShortCode && isTauriDesktop()"
+              type="icon"
+              variant="default"
+              size="small"
+              class="room-indicators__open-in-new-window"
+              title="Открыть звонок в отдельном окне"
+              aria-label="Открыть звонок в отдельном окне"
+              @click="openCallInNewWindow(joinedRoomShortCode!)"
+            >
+              <PixelIcon name="link" variant="large" />
+            </Button>
+            -->
             <Button
               v-if="joinedRoomShortCode"
               type="text"
@@ -626,6 +642,7 @@
             :api-base-u-r-l="apiBaseURL"
             :livekit-u-r-l="livekitURL"
             :default-short-code="joinedRoomShortCode"
+            :room="joinedRoom"
             :room-type-hint="joinedRoom?.room_type"
             :default-participant-name="defaultParticipantName"
             :get-participant-info="getParticipantInfoFromAuth"
@@ -723,6 +740,69 @@
               </Switch>
             </div>
           </div>
+          <div v-if="isTauriDesktop()" class="settings-section">
+            <h3 class="settings-section-title">Горячие клавиши</h3>
+            <div class="settings-item settings-item--row settings-hotkeys">
+              <span class="settings-hotkeys__label">Микрофон</span>
+              <button
+                type="button"
+                class="settings-hotkeys__key settings-hotkeys__key--editable"
+                @click="recordingShortcut = 'audio'"
+              >
+                <template v-if="recordingShortcut === 'audio'">
+                  Нажмите комбинацию…
+                </template>
+                <template v-else>
+                  {{ shortcutToDisplay(callSettingsAudioShortcut) }}
+                </template>
+              </button>
+            </div>
+            <div class="settings-item settings-item--row settings-hotkeys">
+              <span class="settings-hotkeys__label">Видео</span>
+              <button
+                type="button"
+                class="settings-hotkeys__key settings-hotkeys__key--editable"
+                @click="recordingShortcut = 'video'"
+              >
+                <template v-if="recordingShortcut === 'video'">
+                  Нажмите комбинацию…
+                </template>
+                <template v-else>
+                  {{ shortcutToDisplay(callSettingsVideoShortcut) }}
+                </template>
+              </button>
+            </div>
+            <div class="settings-item settings-item--row settings-hotkeys">
+              <span class="settings-hotkeys__label">Отключить звук</span>
+              <button
+                type="button"
+                class="settings-hotkeys__key settings-hotkeys__key--editable"
+                @click="recordingShortcut = 'sound'"
+              >
+                <template v-if="recordingShortcut === 'sound'">
+                  Нажмите комбинацию…
+                </template>
+                <template v-else>
+                  {{ shortcutToDisplay(callSettingsSoundShortcut) }}
+                </template>
+              </button>
+            </div>
+            <div class="settings-item settings-item--row settings-hotkeys">
+              <span class="settings-hotkeys__label">Завершить звонок</span>
+              <button
+                type="button"
+                class="settings-hotkeys__key settings-hotkeys__key--editable"
+                @click="recordingShortcut = 'leave'"
+              >
+                <template v-if="recordingShortcut === 'leave'">
+                  Нажмите комбинацию…
+                </template>
+                <template v-else>
+                  {{ shortcutToDisplay(callSettingsLeaveShortcut) }}
+                </template>
+              </button>
+            </div>
+          </div>
         </div>
         <template #footer>
           <Button
@@ -789,6 +869,22 @@
               @update:model-value="roomSettingsAllowAnonymousSelect = $event"
             />
           </FormSection>
+          <template v-if="roomSettingsAllowAnonymous">
+            <hr class="HR" />
+            <FormSection
+              label="Пароль комнаты"
+              hint="Необязательно. Если задан, при входе по коду потребуется ввести пароль. Оставьте пустым, чтобы убрать пароль."
+            >
+              <Input
+                v-model="roomSettingsPassword"
+                type="password"
+                placeholder="Новый пароль или пусто"
+                aria-label="Пароль комнаты"
+                :disabled="!canEditRoom"
+                autocomplete="new-password"
+              />
+            </FormSection>
+          </template>
           <template v-if="canEditRoom">
             <hr class="HR" />
             <FormSection label="Группа">
@@ -939,6 +1035,14 @@ import {
   useAppConfig,
   DEFAULT_PARTICIPANT_COLOR,
   PARTICIPANT_COLOR_PALETTE,
+  // openCallInNewWindow, // временно скрыта кнопка "открыть в отдельном окне"
+  isTauriDesktop,
+  getStoredShortcuts,
+  storeShortcuts,
+  shortcutToDisplay,
+  keyEventToShortcut,
+  isModifierOnlyKey,
+  type ShortcutBindings,
 } from "@shared/lib";
 
 const USER_ID_KEY = "nonza_user_id";
@@ -1144,6 +1248,7 @@ const roomSettingsRoom = ref<Room | null>(null);
 const roomSettingsName = ref("");
 const roomSettingsAllowAnonymous = ref(false);
 const roomSettingsRoomType = ref<RoomType>("conference_hall");
+const roomSettingsPassword = ref("");
 const roomSettingsGroupId = ref<string>("");
 const roomSettingsSaving = ref(false);
 const showRoomDeleteConfirm = ref(false);
@@ -1161,6 +1266,35 @@ const callSettingsParticipantName = ref("");
 const initialCallSettingsParticipantName = ref("");
 const callSettingsReplicaTts = ref(false);
 const initialCallSettingsReplicaTts = ref(false);
+const callSettingsAudioShortcut = ref("");
+const callSettingsVideoShortcut = ref("");
+const callSettingsSoundShortcut = ref("");
+const callSettingsLeaveShortcut = ref("");
+const initialCallSettingsShortcuts = ref<ShortcutBindings | null>(null);
+const recordingShortcut = ref<"audio" | "video" | "sound" | "leave" | null>(null);
+
+watch(recordingShortcut, (key) => {
+  if (!key) return;
+  const handler = (e: KeyboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isModifierOnlyKey(e.key)) return;
+    const s = keyEventToShortcut(e);
+    if (!s) return;
+    if (key === "audio") callSettingsAudioShortcut.value = s;
+    else if (key === "video") callSettingsVideoShortcut.value = s;
+    else if (key === "sound") callSettingsSoundShortcut.value = s;
+    else callSettingsLeaveShortcut.value = s;
+    recordingShortcut.value = null;
+    cleanup();
+  };
+  function cleanup() {
+    window.removeEventListener("keydown", handler, true);
+  }
+  window.addEventListener("keydown", handler, true);
+  return cleanup;
+});
+
 const callSettingsAudioRef = ref<InstanceType<typeof AudioSettings> | null>(
   null,
 );
@@ -1435,7 +1569,15 @@ const hasUnsavedCallSettingsChanges = computed(() => {
   }
   const ttsChanged =
     callSettingsReplicaTts.value !== initialCallSettingsReplicaTts.value;
-  return nameChanged || audioChanged || ttsChanged;
+  const prev = initialCallSettingsShortcuts.value;
+  const shortcutsChanged =
+    isTauriDesktop() &&
+    prev &&
+    (callSettingsAudioShortcut.value !== prev.audio ||
+      callSettingsVideoShortcut.value !== prev.video ||
+      callSettingsSoundShortcut.value !== prev.sound ||
+      callSettingsLeaveShortcut.value !== prev.leave);
+  return nameChanged || audioChanged || ttsChanged || shortcutsChanged;
 });
 
 const currentUserLetter = computed(() => {
@@ -1640,7 +1782,11 @@ function handleBackClick() {
 }
 
 function openCallSettings() {
-  if (joinedRoomShortCode.value && nonzaWidgetRef.value?.openCallSettings) {
+  if (
+    joinedRoomShortCode.value &&
+    nonzaWidgetRef.value?.openCallSettings &&
+    !isTauriDesktop()
+  ) {
     nonzaWidgetRef.value.openCallSettings();
     return;
   }
@@ -1649,6 +1795,13 @@ function openCallSettings() {
   initialCallSettingsParticipantName.value = callSettingsParticipantName.value;
   callSettingsReplicaTts.value = getReplicaTtsEnabled();
   initialCallSettingsReplicaTts.value = callSettingsReplicaTts.value;
+  const stored = getStoredShortcuts();
+  callSettingsAudioShortcut.value = stored.audio;
+  callSettingsVideoShortcut.value = stored.video;
+  callSettingsSoundShortcut.value = stored.sound;
+  callSettingsLeaveShortcut.value = stored.leave;
+  initialCallSettingsShortcuts.value = { ...stored };
+  recordingShortcut.value = null;
   nextTick(() => {
     (
       callSettingsAudioRef.value as { resetSettings?: () => void }
@@ -1672,7 +1825,41 @@ async function handleSaveCallSettings() {
   if (save) await save();
   setReplicaTtsEnabled(callSettingsReplicaTts.value);
   initialCallSettingsReplicaTts.value = callSettingsReplicaTts.value;
+  const newShortcuts: ShortcutBindings = {
+    audio: callSettingsAudioShortcut.value,
+    video: callSettingsVideoShortcut.value,
+    sound: callSettingsSoundShortcut.value,
+    leave: callSettingsLeaveShortcut.value,
+  };
+  if (hasShortcutsChanged(newShortcuts)) {
+    storeShortcuts(newShortcuts);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("set_shortcut_bindings", newShortcuts);
+      await invoke("update_app_menu", {
+        logoutVisible: !!getAuthState(),
+        audioShortcut: newShortcuts.audio,
+        videoShortcut: newShortcuts.video,
+        leaveShortcut: newShortcuts.leave,
+        soundShortcut: newShortcuts.sound,
+      });
+    } catch (err) {
+      console.error("[shortcuts] set_shortcut_bindings / update_app_menu failed:", err);
+    }
+    initialCallSettingsShortcuts.value = { ...newShortcuts };
+  }
   showCallSettingsModal.value = false;
+}
+
+function hasShortcutsChanged(next: ShortcutBindings): boolean {
+  const prev = initialCallSettingsShortcuts.value;
+  if (!prev) return false;
+  return (
+    next.audio !== prev.audio ||
+    next.video !== prev.video ||
+    next.sound !== prev.sound ||
+    next.leave !== prev.leave
+  );
 }
 
 function handleCancelCallSettings() {
@@ -1681,6 +1868,17 @@ function handleCancelCallSettings() {
       initialCallSettingsParticipantName.value;
   }
   callSettingsReplicaTts.value = initialCallSettingsReplicaTts.value;
+  if (initialCallSettingsShortcuts.value) {
+    callSettingsAudioShortcut.value =
+      initialCallSettingsShortcuts.value.audio;
+    callSettingsVideoShortcut.value =
+      initialCallSettingsShortcuts.value.video;
+    callSettingsSoundShortcut.value =
+      initialCallSettingsShortcuts.value.sound;
+    callSettingsLeaveShortcut.value =
+      initialCallSettingsShortcuts.value.leave;
+  }
+  recordingShortcut.value = null;
   (
     callSettingsAudioRef.value as { resetSettings?: () => void }
   )?.resetSettings?.();
@@ -1919,6 +2117,7 @@ function openRoomSettings(room: Room) {
     room.room_type === "conference_hall" || room.room_type === "round_table"
       ? room.room_type
       : "conference_hall";
+  roomSettingsPassword.value = "";
 }
 
 async function saveRoomSettings() {
@@ -1931,6 +2130,7 @@ async function saveRoomSettings() {
       room_type: RoomType;
       name?: string;
       room_group_id?: string | null;
+      password?: string | null;
     } = {
       allow_anonymous_join: roomSettingsAllowAnonymous.value,
       room_type: roomSettingsRoomType.value,
@@ -1939,6 +2139,9 @@ async function saveRoomSettings() {
     if (nameTrimmed && nameTrimmed !== room.name) payload.name = nameTrimmed;
     if (roomSettingsGroupId.value !== (room.room_group_id ?? "")) {
       payload.room_group_id = roomSettingsGroupId.value || null;
+    }
+    if (roomSettingsAllowAnonymous.value) {
+      payload.password = roomSettingsPassword.value.trim();
     }
     const updated = await roomApi.updateSettings(room.short_code, payload);
     const idx = rooms.value.findIndex((r) => r.id === updated.id);
@@ -2138,6 +2341,7 @@ watch(roomSettingsRoom, (room) => {
       ? room.room_type
       : "conference_hall";
   roomSettingsGroupId.value = room?.room_group_id ?? "";
+  roomSettingsPassword.value = "";
 });
 
 let mobileQuery: MediaQueryList | null = null;

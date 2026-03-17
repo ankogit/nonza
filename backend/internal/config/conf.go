@@ -1,9 +1,25 @@
 package config
 
 import (
+	"encoding/json"
+	"log"
+	"strings"
+
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 )
+
+type DesktopUpdatePlatform struct {
+	URL       string `json:"url"`
+	Signature string `json:"signature"`
+}
+
+type DesktopUpdateManifest struct {
+	Version   string                         `json:"version"`
+	Notes    string                         `json:"notes"`
+	PubDate  string                         `json:"pub_date"`
+	Platforms map[string]DesktopUpdatePlatform `json:"platforms"`
+}
 
 type Config struct {
 	HTTPPort        string `envconfig:"HTTP_PORT" default:"8000"`
@@ -79,6 +95,17 @@ type Config struct {
 
 	// CORS: через запятую, например https://meet.nonza.ru,https://www.nonza.ru
 	CORSAllowedOrigins string `envconfig:"CORS_ALLOWED_ORIGINS"`
+
+	// Десктоп-приложение: актуальная версия и артефакты для обновления.
+	// Если пусто — эндпоинт обновления отдаёт 204 (обновления нет).
+	// Формат JSON: {"version":"0.1.1","notes":"","pub_date":"2025-03-17T12:00:00Z","platforms":{"darwin-aarch64":{"url":"https://...","signature":"..."},"darwin-x86_64":{...},"windows-x86_64":{...},"linux-x86_64":{...}}}
+	DesktopAppUpdateJSON string `envconfig:"DESKTOP_APP_UPDATE_JSON"`
+	DesktopUpdate        *DesktopUpdateManifest
+
+	// Каталог с артефактами для скачивания десктоп-приложения.
+	// Ожидаются файлы: windows.msi (или произвольное имя .msi), macos.dmg (или произвольное имя .dmg).
+	// Если пусто — эндпоинт скачивания отдаёт 404.
+	DesktopDownloadDir string `envconfig:"DESKTOP_DOWNLOAD_DIR"`
 }
 
 func Init() (*Config, error) {
@@ -88,6 +115,16 @@ func Init() (*Config, error) {
 	err := envconfig.Process("", &cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	if cfg.DesktopAppUpdateJSON != "" {
+		raw := strings.TrimSpace(cfg.DesktopAppUpdateJSON)
+		var manifest DesktopUpdateManifest
+		if err := json.Unmarshal([]byte(raw), &manifest); err != nil {
+			log.Printf("[config] invalid DESKTOP_APP_UPDATE_JSON, desktop updates disabled: %v", err)
+		} else {
+			cfg.DesktopUpdate = &manifest
+		}
 	}
 
 	return &cfg, nil

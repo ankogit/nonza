@@ -68,9 +68,13 @@ export function useAudioDevices() {
 
   const refreshDevices = async () => {
     isLoading.value = true;
+    const streamsToStop: MediaStream[] = [];
     try {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: getDefaultAudioConstraints() });
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: getDefaultAudioConstraints(),
+        });
+        streamsToStop.push(audioStream);
         hasPermission.value = true;
       } catch (err) {
         console.warn("Permission denied for audio devices:", err);
@@ -78,12 +82,17 @@ export function useAudioDevices() {
       }
 
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamsToStop.push(videoStream);
       } catch {
         /* video permission optional for listing */
       }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
+
+      for (const stream of streamsToStop) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
 
       audioInputDevices.value = devices
         .filter((d) => d.kind === "audioinput")

@@ -4,6 +4,7 @@ import {
   getVolumeForParticipant,
   setVolumeForParticipant,
   applyStoredOutputDevice,
+  useOutputMuted,
 } from "@shared/lib";
 
 const VOLUME_MIN = 0;
@@ -37,10 +38,12 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
   const volumeAudioContextRef = ref<AudioContext | null>(null);
   const volumeGainNodeRef = ref<GainNode | null>(null);
   const volumeSourceNodeRef = ref<MediaStreamAudioSourceNode | null>(null);
+  const outputMuted = useOutputMuted();
 
   function setupVolumeGraphWithContext(track: RemoteAudioTrack, ctx: AudioContext): boolean {
     try {
-      const gainValue = Math.min(5, Math.max(0, volume.value / 100));
+      const baseGain = Math.min(5, Math.max(0, volume.value / 100));
+      const gainValue = outputMuted.value ? 0 : baseGain;
       const stream = new MediaStream([track.mediaStreamTrack]);
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
@@ -78,6 +81,7 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
     const t = remoteLiveKitAudioTrack.value;
     if (!t || previewModeVal()) return;
     const vol = volume.value;
+    const effectiveVol = outputMuted.value ? 0 : vol / 100;
     const wantGraph = vol > 100;
 
     if (wantGraph) {
@@ -94,7 +98,7 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
     if (el) {
       try {
         (t as { attach(el: HTMLMediaElement): HTMLMediaElement }).attach(el);
-        t.setVolume(vol / 100);
+        t.setVolume(effectiveVol);
         applyStoredOutputDevice(el);
       } catch (err) {
         console.warn("[VP:vol] attach failed:", err);
@@ -119,7 +123,8 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
     if (!remoteLiveKitAudioTrack.value) return;
     if (v > 100) {
       if (volumeGainNodeRef.value) {
-        const gainValue = Math.min(5, Math.max(0, v / 100));
+        const baseGain = Math.min(5, Math.max(0, v / 100));
+        const gainValue = outputMuted.value ? 0 : baseGain;
         const ctx = volumeGainNodeRef.value.context;
         volumeGainNodeRef.value.gain.setValueAtTime(gainValue, ctx.currentTime);
       } else {
@@ -131,9 +136,21 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
       applyRemoteAudioOutput();
     } else {
       const track = remoteLiveKitAudioTrack.value;
-      if (track) track.setVolume(v / 100);
+      if (track) track.setVolume(outputMuted.value ? 0 : v / 100);
     }
   }
+
+  watch(outputMuted, () => {
+    if (remoteLiveKitAudioTrack.value && !previewModeVal()) {
+      nextTick(() => applyRemoteAudioOutput());
+    }
+    if (volumeGainNodeRef.value) {
+      const baseGain = Math.min(5, Math.max(0, volume.value / 100));
+      const gainValue = outputMuted.value ? 0 : baseGain;
+      const ctx = volumeGainNodeRef.value.context;
+      volumeGainNodeRef.value.gain.setValueAtTime(gainValue, ctx.currentTime);
+    }
+  });
 
   watch(remoteLiveKitAudioTrack, (newTrack, oldTrack) => {
     if (oldTrack) {

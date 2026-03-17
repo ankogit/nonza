@@ -4,6 +4,7 @@ type GenerateTokenRequest struct {
 	ShortCode       string `json:"short_code" binding:"required"`
 	ParticipantID   string `json:"participant_id"`
 	ParticipantName string `json:"participant_name"`
+	Password        string `json:"password"`
 }
 
 type ICEServer struct {

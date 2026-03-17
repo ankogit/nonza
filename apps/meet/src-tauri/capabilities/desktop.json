@@ -9,7 +9,10 @@
     "main"
   ],
   "permissions": [
+    "core:window:default",
     "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:webview:allow-create-webview-window",
     "global-shortcut:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",

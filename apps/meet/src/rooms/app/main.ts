@@ -8,4 +8,6 @@ setLogLevel(LogLevel.warn);
 
 const app = createApp(App);
 app.use(createPinia());
+const el = document.getElementById("app");
+if (el) el.classList.add("app-rooms");
 app.mount("#app");

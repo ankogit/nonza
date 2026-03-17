@@ -46,3 +46,16 @@ body {
   flex-direction: column;
   min-height: 0;
 }
+
+html.nonza-desktop,
+html.nonza-desktop * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html.nonza-desktop input,
+html.nonza-desktop textarea,
+html.nonza-desktop [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}

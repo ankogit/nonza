@@ -30,6 +30,42 @@
             disabled
           />
         </FormSection>
+        <template v-if="isTauriApp">
+          <hr class="HR" />
+          <div class="settings-screen__update">
+            <h3 class="settings-screen__update-title">Обновление</h3>
+            <p v-if="currentVersion" class="settings-screen__update-version">
+              Версия {{ currentVersion }}
+            </p>
+            <div class="settings-screen__update-actions">
+              <Button
+                type="text"
+                variant="secondary"
+                size="small"
+                :disabled="checking || downloading"
+                @click="check"
+              >
+                {{ checking ? "Проверка…" : "Проверить обновления" }}
+              </Button>
+              <Button
+                v-if="update"
+                type="text"
+                variant="primary"
+                size="small"
+                :disabled="downloading"
+                @click="install"
+              >
+                {{ downloading ? "Идёт загрузка…" : "Обновить" }}
+              </Button>
+            </div>
+            <p v-if="update && (update.body || update.version)" class="settings-screen__update-notes">
+              {{ update.body || `Доступна версия ${update.version}` }}
+            </p>
+            <p v-if="error" class="settings-screen__update-error">
+              {{ error }}
+            </p>
+          </div>
+        </template>
         <hr class="HR" />
         <div class="settings-screen__danger">
           <h3 class="settings-screen__danger-title">Выйти из аккаунта</h3>
@@ -65,12 +101,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { ScreenLayout, Button, Input, FormSection } from "@shared/ui";
 import {
   getAuthState,
   clearAuth,
   updateAuthUser,
+  useAppUpdate,
 } from "@shared/lib";
 import { AuthApi } from "@shared/entities";
 import { useApiClient } from "@shared/api";
@@ -83,9 +120,25 @@ const emit = defineEmits<{
   logout: [];
 }>();
 
+const {
+  isTauriApp,
+  currentVersion,
+  checking,
+  update,
+  downloading,
+  error,
+  loadVersion,
+  check,
+  install,
+} = useAppUpdate();
+
 const user = computed(() => getAuthState()?.user ?? null);
 const nameEdit = ref(user.value?.name ?? "");
 const saving = ref(false);
+
+onMounted(() => {
+  loadVersion();
+});
 
 watch(user, (u) => {
   nameEdit.value = u?.name ?? "";
@@ -154,11 +207,38 @@ function handleLogout() {
   gap: 20px;
 }
 
+.settings-screen__update-title,
 .settings-screen__danger-title {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
   color: #999;
+}
+
+.settings-screen__update-version {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #999;
+}
+
+.settings-screen__update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.settings-screen__update-notes {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #999;
+}
+
+.settings-screen__update-error {
+  margin: 0;
+  font-size: 14px;
+  color: #c44;
 }
 
 .settings-screen__danger-hint {

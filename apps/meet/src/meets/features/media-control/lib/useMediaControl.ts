@@ -102,7 +102,7 @@ export function useMediaControl(
         const base = getVideoConstraintsForQuality(getStoredDefaultVideoQuality());
         const deviceId = getStoredVideoInputDevice();
         if (deviceId) {
-          return { ...base, deviceId: { exact: deviceId } };
+          return { ...base, deviceId: { ideal: deviceId } };
         }
         return base;
       };
@@ -145,7 +145,20 @@ export function useMediaControl(
       }
     } catch (err) {
       if (r?.state !== ConnectionState.Connected) return;
-      console.error("toggleVideo failed:", err);
+
+      const isOverconstrained =
+        err instanceof DOMException && err.name === "OverconstrainedError";
+      const isNotReadable =
+        err instanceof DOMException && err.name === "NotReadableError";
+
+      if (isOverconstrained || isNotReadable) {
+        showToast(
+          "Не удалось включить камеру. Возможно, она уже используется в другой вкладке или приложении.",
+        );
+      } else {
+        console.error("toggleVideo failed:", err);
+        showToast("Не удалось включить камеру");
+      }
     }
   };
 
@@ -330,7 +343,7 @@ export function useMediaControl(
       const deviceId = getStoredVideoInputDevice();
       const base = getVideoConstraintsForQuality(getStoredDefaultVideoQuality());
       const constraints: MediaTrackConstraints = deviceId
-        ? { ...base, deviceId: { exact: deviceId } }
+        ? { ...base, deviceId: { ideal: deviceId } }
         : base;
 
       const stream = await navigator.mediaDevices.getUserMedia({

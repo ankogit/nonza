@@ -2,6 +2,7 @@ const STORAGE_KEY_NAME = "nonza_participant_name";
 const STORAGE_KEY_VOLUMES = "nonza_volumes";
 const STORAGE_KEY_ROOM_SHORT_CODE = "nonza_room_short_code";
 const STORAGE_KEY_REPLICA_TTS = "nonza_replica_tts_enabled";
+const STORAGE_KEY_ROOM_PASSWORD_PREFIX = "nonza_room_password:";
 
 export function getRoomShortCode(): string | null {
   try {
@@ -26,6 +27,33 @@ export function setRoomShortCode(shortCode: string): void {
 export function clearRoomShortCode(): void {
   try {
     sessionStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getStoredRoomPassword(shortCode: string): string | null {
+  try {
+    return sessionStorage.getItem(STORAGE_KEY_ROOM_PASSWORD_PREFIX + shortCode.trim());
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredRoomPassword(shortCode: string, password: string): void {
+  try {
+    const code = shortCode.trim();
+    if (code && password) {
+      sessionStorage.setItem(STORAGE_KEY_ROOM_PASSWORD_PREFIX + code, password);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearStoredRoomPassword(shortCode: string): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY_ROOM_PASSWORD_PREFIX + shortCode.trim());
   } catch {
     /* ignore */
   }

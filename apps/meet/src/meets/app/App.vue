@@ -64,9 +64,9 @@ const needsScroll = computed(
 );
 const apiBaseURL = getApiBaseURL();
 const livekitURL = getLivekitURL();
-const apiClient = useApiClient();
 provide(API_BASE_URL_INJECT_KEY, apiBaseURL);
 provide(LIVEKIT_URL_INJECT_KEY, livekitURL);
+const apiClient = useApiClient();
 
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search);

@@ -13,13 +13,15 @@
     "windows": [
       {
         "label": "main",
-        "title": "Nonza Meet",
+        "title": "",
         "width": 1200,
         "height": 800,
-        "minWidth": 1000,
-        "minHeight": 800,
+        "minWidth": 400,
+        "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay"
       }
     ],
     "security": {
@@ -28,10 +30,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "createUpdaterArtifacts": true,
     "macOS": {
-      "entitlements": "entitlements.plist"
+      "entitlements": "entitlements.plist",
+      "signingIdentity": "-"
     },
-    "icon": ["icons/32x32.ico", "icons/icon.ico", "icons/icon.png"]
+    "icon": [
+      "icons/nonza-icon-m.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4RjYzREZENUMyN0M2RjMKUlVUenhpZGMvVDMyYUlXcUhmc2tDRERSVDVXTXVDbi9wKzd5YTUxYkhYYUhHWUowamVWSHpKMkMK",
+      "endpoints": [
+        "https://api.nonza.ru/api/v1/desktop-update/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
   }
 }
