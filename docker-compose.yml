@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: nonza-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: nonza
       POSTGRES_PASSWORD: nonza_password
@@ -15,12 +16,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    mem_limit: 1500m
+    mem_reservation: 900m
+    cpus: "0.60"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nonza-network
 
   redis:
     image: redis:7-alpine
     container_name: nonza-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -30,12 +41,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "0.25"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nonza-network
 
   livekit:
     image: livekit/livekit-server:latest
     container_name: nonza-livekit
+    restart: unless-stopped
     ports:
       - "7880:7880"
       - "7881:7881"
@@ -48,6 +69,15 @@ services:
       redis:
         condition: service_healthy
     command: --config /etc/livekit.yaml
+    mem_limit: 1000m
+    mem_reservation: 512m
+    cpus: "0.70"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nonza-network
 
@@ -89,6 +119,15 @@ services:
     networks:
       - nonza-network
     restart: unless-stopped
+    mem_limit: 1200m
+    mem_reservation: 700m
+    cpus: "0.85"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend-rooms:
     build:
@@ -106,6 +145,15 @@ services:
     networks:
       - nonza-network
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.20"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend-meets:
     build:
@@ -123,6 +171,15 @@ services:
     networks:
       - nonza-network
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.20"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
