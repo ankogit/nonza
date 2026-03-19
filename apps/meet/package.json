@@ -33,9 +33,9 @@
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-global-shortcut": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2",
-    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
     "@tiptap/core": "^3.18.0",
     "@tiptap/extension-collaboration": "^3.18.0",
     "@tiptap/extension-collaboration-caret": "^3.18.0",
@@ -52,9 +52,9 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
-    "dotenv-cli": "^8.0.0",
     "@vitejs/plugin-vue": "^6.0.3",
     "@vue/eslint-config-typescript": "^14.6.0",
+    "dotenv-cli": "^8.0.0",
     "eslint": "^9.17.0",
     "eslint-plugin-vue": "^9.32.0",
     "typescript": "^5.7.2",
