@@ -352,6 +352,8 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
           // ignore if token does not allow metadata update
         }
       }
+
+      playNotificationSound("participant_joined").catch(() => {});
     } catch (error) {
       state.value = {
         ...state.value,
@@ -368,6 +370,9 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
   const disconnect = async (): Promise<void> => {
     if (state.value.isConnecting) {
       connectAbortedRef.value = true;
+    }
+    if (state.value.isConnected && state.value.livekitRoom) {
+      playNotificationSound("participant_left").catch(() => {});
     }
     if (state.value.livekitRoom) {
       await state.value.livekitRoom.disconnect();

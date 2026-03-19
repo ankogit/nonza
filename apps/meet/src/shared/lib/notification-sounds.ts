@@ -15,8 +15,8 @@ export type NotificationSoundEventId =
   (typeof NOTIFICATION_SOUND_EVENTS)[number];
 
 const DEFAULT_URLS: Record<NotificationSoundEventId, string> = {
-  participant_joined: "/sounds/join.wav",
-  participant_left: "/sounds/left.wav",
+  participant_joined: "/sounds/sound_join_room.ogg",
+  participant_left: "/sounds/sound_left_room.ogg",
   message: "/sounds/message.wav",
   mic_on: "/sounds/mic%20on.wav",
   mic_off: "/sounds/mic%20off.wav",
