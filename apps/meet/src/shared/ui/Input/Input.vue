@@ -10,7 +10,10 @@
     :aria-invalid="error ? 'true' : undefined"
     :autocomplete="autocomplete"
     class="pixel-input"
-    :class="{ 'pixel-input--error': error }"
+    :class="[
+      `pixel-input--${size}`,
+      { 'pixel-input--error': error },
+    ]"
     @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     @blur="emit('blur', $event)"
     @focus="emit('focus', $event)"
@@ -22,6 +25,7 @@ withDefaults(
   defineProps<{
     modelValue: string;
     type?: "text" | "email" | "password" | "number" | "search";
+    size?: "small" | "medium";
     placeholder?: string;
     disabled?: boolean;
     readonly?: boolean;
@@ -32,6 +36,7 @@ withDefaults(
   }>(),
   {
     type: "text",
+    size: "medium",
     disabled: false,
     readonly: false,
     error: false,
@@ -62,6 +67,20 @@ const emit = defineEmits<{
   outline: none;
   filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.25));
   transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pixel-input--small {
+  height: 36px;
+  min-height: 36px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.pixel-input--medium {
+  height: 48px;
+  min-height: 48px;
+  padding: 12px;
+  font-size: 16px;
 }
 
 .pixel-input::placeholder {

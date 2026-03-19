@@ -13,6 +13,7 @@ export const BRAND_COLORS = {
 export const ROOM_TYPES = {
   CONFERENCE_HALL: "conference_hall",
   ROUND_TABLE: "round_table",
+  TABLE_CIRCLE: "table_circle",
   MUSIC_LESSON: "music_lesson",
   STREAMING: "streaming",
 } as const;

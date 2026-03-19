@@ -81,9 +81,11 @@ func Run(cfg *config.Config) error {
 	logger.Printf("Document TTL set to: %v", documentTTL)
 
 	repositories := repository.NewRepositories(db)
+	txRunner := repository.NewTransactionRunner(db)
 	services := service.NewServices(service.Deps{
-		Repositories: repositories,
-		Config:       cfg,
+		Repositories:      repositories,
+		TransactionRunner: txRunner,
+		Config:            cfg,
 	})
 
 	restHandler := rest.NewHandler(services, redisCli, repositories.Rooms, cfg.DocumentTTL)

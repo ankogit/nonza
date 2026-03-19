@@ -48,7 +48,7 @@
               <PixelIcon
                 v-if="formData.room_type === type.value"
                 name="check"
-                :size="14"
+                :size="20"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ const formData = ref<
   Omit<CreateRoomRequest, "name"> & { name: string; expires_in?: string }
 >({
   name: "",
-  room_type: "conference_hall" as RoomType,
+  room_type: "round_table" as RoomType,
   is_temporary: false,
   expires_in: "",
   e2ee_enabled: true,
@@ -172,6 +172,13 @@ defineExpose({
 
 const roomTypes = [
   {
+    value: "round_table",
+    title: "Круглый стол",
+    iconName: "round-table" as const,
+    description:
+      "Равноправные участники в круге. Подходит для командных встреч, обсуждений и совместной работы.",
+  },
+  {
     value: "conference_hall",
     title: "Конференц-зал",
     iconName: "conference" as const,
@@ -179,11 +186,11 @@ const roomTypes = [
       "Один основной спикер, остальные в сетке. Идеально для вебинаров, лекций и презентаций.",
   },
   {
-    value: "round_table",
-    title: "Круглый стол",
-    iconName: "round-table" as const,
+    value: "table_circle",
+    title: "Игровой круг",
+    iconName: "people" as const,
     description:
-      "Равноправные участники в круге. Подходит для командных встреч, обсуждений и совместной работы.",
+      "Круговой стол с общими инструментами для настолок: центр-стрим, кубики и быстрые действия по соседям.",
   },
 ];
 
@@ -331,6 +338,14 @@ const handleSubmit = async () => {
   color: #999;
   line-height: 1.4;
 }
+
+.create-room-form__room-types :deep(.check-box) {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
 
 .create-room-form__error {
   margin-bottom: 16px;

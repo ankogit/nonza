@@ -149,7 +149,7 @@
     <Teleport to="body">
       <div
         v-if="fullscreenParticipant"
-        class="room-fullscreen grain-overlay"
+        class="room-fullscreen"
         role="dialog"
         aria-label="Во весь экран"
         @click.self="closeFullscreen"

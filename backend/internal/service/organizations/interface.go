@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"context"
 	orgDto "nonza/backend/internal/dto/organizations"
 	"nonza/backend/internal/models"
 
@@ -12,7 +13,7 @@ type Organizations interface {
 	GetByID(id uuid.UUID) (*models.Organization, error)
 	List(userID *string) ([]*models.Organization, error)
 	Update(id uuid.UUID, name, description string, callerUserID string) (*models.Organization, error)
-	Delete(id uuid.UUID, callerUserID string) error
+	Delete(ctx context.Context, id uuid.UUID, callerUserID string) error
 	UserCanAccess(orgID uuid.UUID, userID string) (bool, error)
 	GetMemberRole(orgID uuid.UUID, userID string) (string, error)
 	GetMemberColor(orgID uuid.UUID, userID string) (*string, error)

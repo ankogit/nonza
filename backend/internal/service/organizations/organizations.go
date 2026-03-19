@@ -1,6 +1,7 @@
 package organizations
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	orgDto "nonza/backend/internal/dto/organizations"
@@ -28,9 +29,10 @@ var (
 )
 
 type organizationsService struct {
-	repo    repository.Organizations
-	members repository.OrganizationMembers
-	users   repository.Users
+	repo       repository.Organizations
+	members    repository.OrganizationMembers
+	users      repository.Users
+	txRunner   repository.TransactionRunner
 }
 
 func (s *organizationsService) Create(name, description string, ownerID *string) (*models.Organization, error) {
@@ -83,12 +85,17 @@ func (s *organizationsService) Update(id uuid.UUID, name, description string, ca
 	return org, nil
 }
 
-func (s *organizationsService) Delete(id uuid.UUID, callerUserID string) error {
+func (s *organizationsService) Delete(ctx context.Context, id uuid.UUID, callerUserID string) error {
 	ok, err := s.UserHasPermission(id, callerUserID, orgroles.PermissionManageOrg)
 	if err != nil || !ok {
 		return ErrForbidden
 	}
-	return s.repo.Delete(id)
+	return s.txRunner.RunInTransaction(ctx, func(repos *repository.Repositories) error {
+		if err := repos.OrganizationMembers.DeleteByOrganizationID(id); err != nil {
+			return err
+		}
+		return repos.Organizations.Delete(id)
+	})
 }
 
 func (s *organizationsService) GetMemberRole(orgID uuid.UUID, userID string) (string, error) {

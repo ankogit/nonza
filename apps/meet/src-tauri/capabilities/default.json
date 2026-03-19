@@ -14,6 +14,7 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "updater:default",
+    "opener:default",
     "process:allow-restart"
   ]
 }

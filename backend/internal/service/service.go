@@ -21,14 +21,15 @@ type Services struct {
 }
 
 type Deps struct {
-	Repositories *repository.Repositories
-	Config       *config.Config
+	Repositories      *repository.Repositories
+	TransactionRunner repository.TransactionRunner
+	Config            *config.Config
 }
 
 func NewServices(deps Deps) *Services {
 	return &Services{
 		Auth:             auth.NewAuthService(deps.Repositories.Users, deps.Config),
-		Organizations:    organizations.NewOrganizationsService(deps.Repositories.Organizations, deps.Repositories.OrganizationMembers, deps.Repositories.Users),
+		Organizations:    organizations.NewOrganizationsService(deps.Repositories.Organizations, deps.Repositories.OrganizationMembers, deps.Repositories.Users, deps.TransactionRunner),
 		Rooms:            rooms.NewRoomsService(deps.Repositories.Rooms, deps.Repositories.Organizations),
 		RoomGroups:       room_groups.NewRoomGroupsService(deps.Repositories.RoomGroups, deps.Repositories.Rooms, deps.Repositories.Organizations),
 		MeetingDocuments: meeting_documents.NewMeetingDocumentsService(deps.Repositories.MeetingDocuments),

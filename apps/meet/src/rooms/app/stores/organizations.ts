@@ -39,6 +39,14 @@ export const useOrganizationsStore = defineStore("organizations", () => {
     }
   }
 
+  function updateOrganization(org: Organization) {
+    const idx = list.value.findIndex((o) => o.id === org.id);
+    if (idx !== -1) {
+      list.value = list.value.slice();
+      list.value[idx] = org;
+    }
+  }
+
   function clearSelected() {
     selectedId.value = null;
   }
@@ -51,6 +59,7 @@ export const useOrganizationsStore = defineStore("organizations", () => {
     loadOrganizations,
     setSelectedId,
     addOrganization,
+    updateOrganization,
     clearSelected,
   };
 });

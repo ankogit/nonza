@@ -11,6 +11,10 @@
           <input type="radio" v-model="roomType" value="round_table" />
           Round Table
         </label>
+        <label>
+          <input type="radio" v-model="roomType" value="table_circle" />
+          Table Circle
+        </label>
         <Button type="text" variant="secondary" size="small" @click="toggleConnected">
           {{ isConnected ? "Disconnect" : "Connect" }}
         </Button>
@@ -38,6 +42,15 @@
         :preview-mode="true"
         @disconnect="handleDisconnect"
       />
+      <RoomTableCircle
+        v-else-if="roomType === 'table_circle' && isConnected"
+        :room="mockRoom"
+        :livekit-room="null"
+        :participant-name="participantName"
+        :api-base-u-r-l="''"
+        :preview-mode="true"
+        @disconnect="handleDisconnect"
+      />
       <div v-else class="preview-mode__placeholder">
         <div class="preview-mode__placeholder-content">
           <h2>Preview Mode</h2>
@@ -57,9 +70,10 @@ import { ref, computed } from "vue";
 import { Button } from "@shared/ui";
 import { RoomConferenceHall } from "@widgets/room-conference-hall";
 import { RoomRoundTable } from "@widgets/room-round-table";
+import { RoomTableCircle } from "@widgets/room-table-circle";
 import type { Room } from "@shared/entities";
 
-const roomType = ref<"conference_hall" | "round_table">("conference_hall");
+const roomType = ref<"conference_hall" | "round_table" | "table_circle">("conference_hall");
 const isConnected = ref(false);
 const participantName = ref("Preview User");
 

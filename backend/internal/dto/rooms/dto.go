@@ -17,11 +17,14 @@ func roomGroupIDPtr(id *uuid.UUID) *string {
 
 type CreateRoomRequest struct {
 	Name        string  `json:"name" binding:"required"`
-	RoomType    string  `json:"room_type" binding:"required,oneof=conference_hall round_table"`
+	RoomType    string  `json:"room_type" binding:"required,oneof=conference_hall round_table table_circle"`
 	IsTemporary bool    `json:"is_temporary"`
 	ExpiresIn   string  `json:"expires_in"`
 	E2EEEnabled bool    `json:"e2ee_enabled"`
 	RoomGroupID *string `json:"room_group_id"`
+	// AllowAnonymousJoin enables joining by room code without organization access.
+	AllowAnonymousJoin *bool   `json:"allow_anonymous_join"`
+	Password           *string `json:"password"`
 }
 
 type RoomResponse struct {

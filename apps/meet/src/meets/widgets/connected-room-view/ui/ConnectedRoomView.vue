@@ -36,6 +36,23 @@
     @disconnect="emit('disconnect')"
     @update:participantName="(name: string) => emit('update:participantName', name)"
   />
+  <RoomTableCircle
+    v-else-if="displayRoomType === 'table_circle'"
+    ref="roomRef"
+    :room="room"
+    :room-api="roomApi"
+    :livekit-room="livekitRoom as any"
+    :local-participant="localParticipant as any"
+    :remote-participants="remoteParticipants"
+    :get-display-name="getDisplayName"
+    :participant-name="participantName"
+    :api-base-u-r-l="apiBaseURL"
+    :settings-in-call-menu="false"
+    :settings-in-upper-menu="settingsInUpperMenu"
+    :update-participant-name="updateParticipantName"
+    @disconnect="emit('disconnect')"
+    @update:participantName="(name: string) => emit('update:participantName', name)"
+  />
   <div v-else class="connected-room-view__unsupported">
     Тип комнаты "{{ room?.room_type }}" пока не поддерживается
   </div>
@@ -45,6 +62,7 @@
 import { ref, computed, watch } from "vue";
 import { RoomConferenceHall } from "@widgets/room-conference-hall";
 import { RoomRoundTable } from "@widgets/room-round-table";
+import { RoomTableCircle } from "@widgets/room-table-circle";
 import type { Room as RoomEntity } from "@shared/entities";
 import type { RoomApi } from "@shared/entities";
 import type { Room as LiveKitRoom, RemoteParticipant, LocalParticipant } from "livekit-client";
@@ -68,7 +86,12 @@ const props = defineProps<{
 
 const settingsInUpperMenu = computed(() => !props.hideSidebar);
 
-const roomRef = ref<InstanceType<typeof RoomConferenceHall> | InstanceType<typeof RoomRoundTable> | null>(null);
+const roomRef = ref<
+  | InstanceType<typeof RoomConferenceHall>
+  | InstanceType<typeof RoomRoundTable>
+  | InstanceType<typeof RoomTableCircle>
+  | null
+>(null);
 
 defineExpose({
   openCallSettings: () => (roomRef.value as { openCallSettings?: () => void })?.openCallSettings?.(),

@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "nonza-meet",
+  "productName": "Nonza",
   "version": "0.1.0",
   "identifier": "com.nonza.meet",
   "build": {
@@ -38,10 +38,27 @@
     "createUpdaterArtifacts": true,
     "macOS": {
       "entitlements": "entitlements.plist",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "infoPlist": "Info.plist",
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
+      }
     },
     "icon": [
-      "icons/nonza-icon-m.ico"
+      "icons/32x32.ico",
+      "icons/icon.ico",
+      "icons/icon.png"
     ]
   },
   "plugins": {

@@ -75,3 +75,7 @@ func (r *OrganizationMembersRepository) Remove(orgID uuid.UUID, userID string) e
 	return r.db.Where("organization_id = ? AND LOWER(user_id) = LOWER(?)", orgID, userID).
 		Delete(&models.OrganizationMember{}).Error
 }
+
+func (r *OrganizationMembersRepository) DeleteByOrganizationID(orgID uuid.UUID) error {
+	return r.db.Where("organization_id = ?", orgID).Delete(&models.OrganizationMember{}).Error
+}

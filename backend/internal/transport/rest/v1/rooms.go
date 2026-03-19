@@ -94,11 +94,18 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 	}
 
 	allowAnonymousJoin := (uid == "")
+	if req.AllowAnonymousJoin != nil {
+		allowAnonymousJoin = *req.AllowAnonymousJoin
+	}
 	var createdByUserID *string
 	if uid != "" {
 		createdByUserID = &uid
 	}
-	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn, req.E2EEEnabled, roomGroupID, allowAnonymousJoin, createdByUserID)
+	if req.Password != nil && strings.TrimSpace(*req.Password) != "" && !allowAnonymousJoin {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password can only be set for rooms with allow_anonymous_join"})
+		return
+	}
+	room, err := h.Services.Rooms.Create(orgID, req.Name, models.RoomType(req.RoomType), req.IsTemporary, expiresIn, req.E2EEEnabled, roomGroupID, allowAnonymousJoin, req.Password, createdByUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -335,10 +342,10 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 
 	if req.RoomType != nil {
 		switch *req.RoomType {
-		case string(models.RoomTypeConferenceHall), string(models.RoomTypeRoundTable):
+		case string(models.RoomTypeConferenceHall), string(models.RoomTypeRoundTable), string(models.RoomTypeTableCircle):
 			room.RoomType = models.RoomType(*req.RoomType)
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "room_type must be conference_hall or round_table"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "room_type must be conference_hall, round_table or table_circle"})
 			return
 		}
 	}

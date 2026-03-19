@@ -3,8 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>NSCameraUsageDescription</key>
-  <string>Доступ к камере для видеозвонков</string>
+  <string>Nonza Meet needs camera access for video calls.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Доступ к микрофону для голосовой связи</string>
+  <string>Nonza Meet needs microphone access for audio calls.</string>
+  <key>NSScreenCaptureDescription</key>
+  <string>Nonza Meet needs screen recording access when you share your screen.</string>
 </dict>
 </plist>

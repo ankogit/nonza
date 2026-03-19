@@ -49,7 +49,7 @@
               <PixelIcon
                 v-if="formData.room_type === type.value"
                 name="check"
-                :size="14"
+                :size="20"
               />
             </div>
           </div>
@@ -59,7 +59,36 @@
         <Checkbox v-model="formData.e2ee_enabled">E2EE</Checkbox>
       </div>
       <div class="create-room-form__input-group">
+        <Checkbox v-model="formData.allow_anonymous_join">Публичная комната</Checkbox>
+      </div>
+      <div
+        v-if="formData.allow_anonymous_join"
+        class="create-room-form__input-group"
+      >
+        <label for="roomPassword" class="create-room-form__label">Пароль комнаты</label>
+        <Input
+          id="roomPassword"
+          v-model.trim="formData.password"
+          type="password"
+          placeholder="Новый пароль или пусто"
+          autocomplete="new-password"
+        />
+        <p class="create-room-form__hint">
+          Пароль необязателен: можно создать публичную комнату без пароля.
+        </p>
+      </div>
+      <div class="create-room-form__input-group">
         <Checkbox v-model="formData.is_temporary">Временная комната</Checkbox>
+      </div>
+      <div v-if="formData.is_temporary" class="create-room-form__input-group">
+        <label for="expiresIn" class="create-room-form__label">Истекает через (необязательно)</label>
+        <PixelSelect
+          id="expiresIn"
+          :model-value="formData.expires_in"
+          placeholder="Никогда"
+          :options="expiresInOptions"
+          @update:model-value="(v) => (formData.expires_in = v)"
+        />
       </div>
       <div v-if="error" class="create-room-form__error">{{ error }}</div>
       <div class="create-room-form__actions">
@@ -100,22 +129,39 @@ const emit = defineEmits<{ created: [room: Room]; cancel: [] }>();
 const apiClient = useApiClient();
 const roomApi = new RoomApi(apiClient);
 
-const roomTypes: { value: RoomType; title: string; iconName: "conference" | "round-table" }[] = [
-  { value: "conference_hall", title: "Конференц-зал", iconName: "conference" },
+const roomTypes: { value: RoomType; title: string; iconName: "conference" | "round-table" | "people" }[] = [
   { value: "round_table", title: "Круглый стол", iconName: "round-table" },
+  { value: "conference_hall", title: "Конференц-зал", iconName: "conference" },
+  { value: "table_circle", title: "Игровой круг", iconName: "people" },
+];
+
+const expiresInOptions = [
+  { value: "", label: "Никогда" },
+  { value: "15m", label: "15 минут" },
+  { value: "30m", label: "30 минут" },
+  { value: "1h", label: "1 час" },
+  { value: "2h", label: "2 часа" },
+  { value: "6h", label: "6 часов" },
+  { value: "24h", label: "24 часа" },
 ];
 
 const formData = ref<{
   name: string;
   room_type: RoomType;
   e2ee_enabled: boolean;
+  allow_anonymous_join: boolean;
+  password: string;
   is_temporary: boolean;
+  expires_in: string;
   room_group_id: string;
 }>({
   name: "",
-  room_type: "conference_hall",
+  room_type: "round_table",
   e2ee_enabled: true,
+  allow_anonymous_join: false,
+  password: "",
   is_temporary: false,
+  expires_in: "",
   room_group_id: "",
 });
 
@@ -156,6 +202,13 @@ async function submit() {
       room_type: formData.value.room_type,
       is_temporary: formData.value.is_temporary,
       e2ee_enabled: formData.value.e2ee_enabled,
+      allow_anonymous_join: formData.value.allow_anonymous_join,
+      password: formData.value.allow_anonymous_join
+        ? formData.value.password.trim() || undefined
+        : undefined,
+      expires_in: formData.value.is_temporary
+        ? formData.value.expires_in || undefined
+        : undefined,
       room_group_id: formData.value.room_group_id || null,
     });
     emit("created", room);
@@ -209,6 +262,21 @@ async function submit() {
   color: rgba(255, 255, 255, 0.5);
 }
 
+.create-room-form__hint {
+  margin: 8px 0 0 34px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #999;
+  overflow-wrap: break-word;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.create-room-form__select {
+  width: 100%;
+}
+
 .required {
   color: #e2534b;
 }
@@ -254,6 +322,14 @@ async function submit() {
   font-weight: 600;
   color: #fff;
 }
+
+.create-room-form__room-types :deep(.check-box) {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
 
 .create-room-form__error {
   margin-bottom: 16px;

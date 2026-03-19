@@ -30,6 +30,15 @@ func (h *OrganizationsHandler) broadcastOrgMembersChanged(orgID uuid.UUID) {
 	_ = h.WsHub.BroadcastToRoom(channel, msg)
 }
 
+func (h *OrganizationsHandler) broadcastOrganizationChanged(orgID uuid.UUID) {
+	if h.WsHub == nil {
+		return
+	}
+	channel := "org:" + orgID.String()
+	msg := map[string]interface{}{"type": "organization_changed"}
+	_ = h.WsHub.BroadcastToRoom(channel, msg)
+}
+
 func (h *OrganizationsHandler) Create(c *gin.Context) {
 	var req orgDto.CreateOrganizationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,7 +145,7 @@ func (h *OrganizationsHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	h.broadcastOrganizationChanged(id)
 	c.JSON(http.StatusOK, orgDto.ToOrganizationResponse(org))
 }
 
@@ -153,7 +162,7 @@ func (h *OrganizationsHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.Services.Organizations.Delete(id, userID); err != nil {
+	if err := h.Services.Organizations.Delete(c.Request.Context(), id, userID); err != nil {
 		if errors.Is(err, organizations.ErrForbidden) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return

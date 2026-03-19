@@ -558,6 +558,23 @@
                 />
                 <button
                   type="button"
+                  class="organization-footer-color organization-footer-color--custom organization-footer-color--trigger"
+                  title="Выбрать любой цвет"
+                  aria-label="Выбрать любой цвет"
+                  :disabled="footerColorSaving"
+                  @click="openFooterColorPicker()"
+                />
+                <input
+                  ref="footerColorPickerRef"
+                  class="organization-footer-color-picker"
+                  type="color"
+                  :value="footerColor"
+                  aria-label="Выбрать любой цвет"
+                  :disabled="footerColorSaving"
+                  @change="onFooterColorPickerInput($event)"
+                />
+                <button
+                  type="button"
                   class="organization-footer-color organization-footer-color--reset"
                   :class="{
                     'organization-footer-color--active': !currentMember?.color,
@@ -1018,6 +1035,7 @@ import {
 import type { PixelSelectOption } from "@shared/ui";
 import RadioButtonGroup from "@shared/ui/RadioButtonGroup/RadioButtonGroup.vue";
 import type { RadioButtonOption } from "@shared/ui/RadioButtonGroup/RadioButtonGroup.vue";
+import { useOrganizationsStore } from "@rooms/app/stores";
 import CreateRoomForm from "@rooms/features/create-room/ui/CreateRoomForm.vue";
 import NonzaWidget from "@app/NonzaWidget.vue";
 import {
@@ -1070,6 +1088,7 @@ const props = defineProps<{
 const emit = defineEmits<{ settings: []; "org-settings": []; back: [] }>();
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
+const orgStore = useOrganizationsStore();
 
 const { apiBaseURL, livekitURL } = useAppConfig();
 const apiClient = props.apiClient ?? useApiClient();
@@ -1624,6 +1643,7 @@ const footerColor = computed(
 const footerColorSaving = ref(false);
 const footerColorsExpanded = ref(false);
 const footerColorsRef = ref<HTMLElement | null>(null);
+const footerColorPickerRef = ref<HTMLInputElement | null>(null);
 
 async function setFooterColor(color: string | null) {
   if (!props.orgId) return;
@@ -1640,6 +1660,15 @@ async function setFooterColor(color: string | null) {
   } finally {
     footerColorSaving.value = false;
   }
+}
+
+function openFooterColorPicker() {
+  footerColorPickerRef.value?.click();
+}
+
+function onFooterColorPickerInput(e: Event) {
+  const value = (e.target as HTMLInputElement).value;
+  setFooterColor(value);
 }
 
 let footerColorsClose: ((e: MouseEvent) => void) | null = null;
@@ -2028,6 +2057,10 @@ function connectOrgWs() {
           scheduleLoadRooms();
         } else if (msg?.type === "org_members_changed") {
           loadMembers();
+        } else if (msg?.type === "organization_changed") {
+          loadOrg().then(() => {
+            if (org.value) orgStore.updateOrganization(org.value);
+          });
         } else if (
           msg?.type === "connected" &&
           msg?.payload?.channel === "org_participants"

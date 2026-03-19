@@ -193,3 +193,11 @@
 .pi-link {
   background-position: 0 calc(-1 * var(--pi-size));
 }
+
+.pi-dice {
+  background-position: calc(-1 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-settings-alt {
+  background-position: calc(-2 * var(--pi-size)) calc(-1 * var(--pi-size));
+}

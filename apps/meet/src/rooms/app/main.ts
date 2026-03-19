@@ -3,8 +3,10 @@ import { createPinia } from "pinia";
 import { setLogLevel, LogLevel } from "livekit-client";
 import App from "./App.vue";
 import "@shared/styles/main.css";
+import { setupExternalLinks } from "@shared/lib";
 
 setLogLevel(LogLevel.warn);
+setupExternalLinks();
 
 const app = createApp(App);
 app.use(createPinia());

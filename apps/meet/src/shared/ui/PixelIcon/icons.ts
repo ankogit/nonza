@@ -39,6 +39,8 @@ export const PIXEL_ICON_NAMES = [
   "check",
   "download",
   "link",
+  "dice",
+  "settings-alt",
 ] as const;
 
 export type PixelIconName = (typeof PIXEL_ICON_NAMES)[number];

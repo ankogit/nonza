@@ -37,6 +37,8 @@ export interface CreateRoomRequest {
   expires_in?: string;
   e2ee_enabled?: boolean;
   room_group_id?: string | null;
+  allow_anonymous_join?: boolean;
+  password?: string;
 }
 
 export interface RoomTokenRequest {

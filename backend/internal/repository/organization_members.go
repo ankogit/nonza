@@ -14,4 +14,5 @@ type OrganizationMembers interface {
 	UpdateRole(orgID uuid.UUID, userID string, role string) error
 	UpdateColor(orgID uuid.UUID, userID string, color *string) error
 	Remove(orgID uuid.UUID, userID string) error
+	DeleteByOrganizationID(orgID uuid.UUID) error
 }

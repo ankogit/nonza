@@ -11,8 +11,9 @@ type RoomType string
 const (
 	RoomTypeConferenceHall RoomType = "conference_hall"
 	RoomTypeRoundTable     RoomType = "round_table"
-	RoomTypeMusicLesson    RoomType = "music_lesson"
-	RoomTypeStreaming      RoomType = "streaming"
+	RoomTypeTableCircle   RoomType = "table_circle"
+	RoomTypeMusicLesson   RoomType = "music_lesson"
+	RoomTypeStreaming     RoomType = "streaming"
 )
 
 type Room struct {

@@ -20,7 +20,9 @@ export * from "./useToasts";
 export * from "./replica-tts";
 export * from "./media-state-storage";
 export * from "./openCallInNewWindow";
+export * from "./external-links";
 export * from "./desktopShortcuts";
 export * from "./useAppUpdate";
 export * from "./output-mute";
+export * from "./dice";
 

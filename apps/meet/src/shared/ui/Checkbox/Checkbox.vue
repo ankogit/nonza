@@ -18,7 +18,7 @@
       aria-hidden="true"
     >
       <span class="pixel-checkbox__box-inner" :class="{ 'pixel-checkbox__box-inner--visible': modelValue }">
-        <PixelIcon name="check" :size="14" />
+        <PixelIcon name="check" :size="18" />
       </span>
     </span>
     <span v-if="$slots.default" class="pixel-checkbox__label">
@@ -76,8 +76,8 @@ function onChange(e: Event) {
 
 .pixel-checkbox__box-inner {
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   visibility: hidden;
   line-height: 0;
 }

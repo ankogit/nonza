@@ -162,7 +162,7 @@
 }
 
 .checkbox-pixel:checked {
-  background: #2980b9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center/14px 14px no-repeat;
+  background: #2980b9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center/18px 18px no-repeat;
   border-color: #3a9ae0;
 }
 
@@ -709,6 +709,70 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.organization-footer-color-picker {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+}
+
+.organization-footer-color--custom {
+  background: rgba(255, 255, 255, 0.06);
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.organization-footer-color--custom::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 90deg,
+    #ff4d4d,
+    #ffcc3d,
+    #4dff9a,
+    #4dc3ff,
+    #7d4dff,
+    #ff4dc4,
+    #ff4d4d
+  );
+  animation: organization-footer-rgb-spin 1.8s linear infinite;
+  z-index: 0;
+}
+
+.organization-footer-color--custom::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0) 55%
+  );
+  z-index: 1;
+}
+
+@keyframes organization-footer-rgb-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .organization-footer-color--custom::before {
+    animation: none;
+  }
+}
+
 .organization-footer-color:hover:not(:disabled) {
   filter: brightness(1.15);
   border-color: rgba(255, 255, 255, 0.25);
@@ -769,7 +833,7 @@
 }
 
 .room-participants-list {
-  padding: 4px 0 2px 20px;
+  padding: 4px 1px 2px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;

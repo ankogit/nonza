@@ -3,7 +3,7 @@
 .room-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 10002;
   background: #000;
   display: flex;
   flex-direction: column;
@@ -54,7 +54,7 @@
 
 .room-fullscreen__pip {
   position: fixed;
-  z-index: 10000;
+  z-index: 10003;
   display: flex;
   flex-direction: column;
   overflow: visible;
@@ -105,7 +105,7 @@
   position: fixed;
   left: 16px;
   bottom: 88px;
-  z-index: 10000;
+  z-index: 10003;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -126,7 +126,7 @@
   position: absolute;
   top: 20px;
   right: 20px;
-  z-index: 10001;
+  z-index: 10004;
 }
 
 /* Общие стили модалки настроек комнаты */

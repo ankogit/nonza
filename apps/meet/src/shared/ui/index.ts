@@ -27,3 +27,4 @@ export * from "./FormSection";
 export * from "./SubmitCancelActions";
 export * from "./Skeleton";
 export * from "./Toast";
+export * from "./DiceRoller";
