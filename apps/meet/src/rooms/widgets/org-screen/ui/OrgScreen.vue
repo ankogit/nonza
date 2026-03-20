@@ -1058,8 +1058,11 @@ import {
   getStoredShortcuts,
   storeShortcuts,
   shortcutToDisplay,
+  getKeyboardShortcutsOrDefaults,
   keyEventToShortcut,
   isModifierOnlyKey,
+  mouseEventToShortcut,
+  pointerEventToShortcut,
   type ShortcutBindings,
 } from "@shared/lib";
 
@@ -1294,7 +1297,7 @@ const recordingShortcut = ref<"audio" | "video" | "sound" | "leave" | null>(null
 
 watch(recordingShortcut, (key) => {
   if (!key) return;
-  const handler = (e: KeyboardEvent) => {
+  const keyboardHandler = (e: KeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isModifierOnlyKey(e.key)) return;
@@ -1307,10 +1310,39 @@ watch(recordingShortcut, (key) => {
     recordingShortcut.value = null;
     cleanup();
   };
+
+  const pointerHandler = (e: PointerEvent) => {
+    const s = pointerEventToShortcut(e);
+    if (!s) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (key === "audio") callSettingsAudioShortcut.value = s;
+    else if (key === "video") callSettingsVideoShortcut.value = s;
+    else if (key === "sound") callSettingsSoundShortcut.value = s;
+    else callSettingsLeaveShortcut.value = s;
+    recordingShortcut.value = null;
+    cleanup();
+  };
+  const mouseHandler = (e: MouseEvent) => {
+    const s = mouseEventToShortcut(e);
+    if (!s) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (key === "audio") callSettingsAudioShortcut.value = s;
+    else if (key === "video") callSettingsVideoShortcut.value = s;
+    else if (key === "sound") callSettingsSoundShortcut.value = s;
+    else callSettingsLeaveShortcut.value = s;
+    recordingShortcut.value = null;
+    cleanup();
+  };
   function cleanup() {
-    window.removeEventListener("keydown", handler, true);
+    window.removeEventListener("keydown", keyboardHandler, true);
+    window.removeEventListener("pointerdown", pointerHandler, true);
+    window.removeEventListener("mousedown", mouseHandler, true);
   }
-  window.addEventListener("keydown", handler, true);
+  window.addEventListener("keydown", keyboardHandler, true);
+  window.addEventListener("pointerdown", pointerHandler, true);
+  window.addEventListener("mousedown", mouseHandler, true);
   return cleanup;
 });
 
@@ -1862,15 +1894,17 @@ async function handleSaveCallSettings() {
   };
   if (hasShortcutsChanged(newShortcuts)) {
     storeShortcuts(newShortcuts);
+    const keyboardShortcuts = getKeyboardShortcutsOrDefaults(newShortcuts);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
+      // Для Rust важно хранить и mouse-биндинги тоже, чтобы event-tap мог их матчить.
       await invoke("set_shortcut_bindings", newShortcuts);
       await invoke("update_app_menu", {
         logoutVisible: !!getAuthState(),
-        audioShortcut: newShortcuts.audio,
-        videoShortcut: newShortcuts.video,
-        leaveShortcut: newShortcuts.leave,
-        soundShortcut: newShortcuts.sound,
+        audioShortcut: keyboardShortcuts.audio,
+        videoShortcut: keyboardShortcuts.video,
+        leaveShortcut: keyboardShortcuts.leave,
+        soundShortcut: keyboardShortcuts.sound,
       });
     } catch (err) {
       console.error("[shortcuts] set_shortcut_bindings / update_app_menu failed:", err);

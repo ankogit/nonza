@@ -12,5 +12,7 @@
   <true/>
   <key>com.apple.security.screen-recording</key>
   <true/>
+  <key>com.apple.security.device.input-monitoring</key>
+  <true/>
 </dict>
 </plist>

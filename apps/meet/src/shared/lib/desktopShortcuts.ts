@@ -41,10 +41,14 @@ export function storeShortcuts(bindings: ShortcutBindings): void {
 }
 
 export function shortcutToDisplay(shortcut: string): string {
+  const trimmed = shortcut.trim();
+  const mouseMatch = trimmed.match(/^Mouse(\d+)$/i);
+  if (mouseMatch) return `Mouse ${mouseMatch[1]}`;
+
   const isMac =
     (import.meta.env as { TAURI_ENV_PLATFORM?: string }).TAURI_ENV_PLATFORM ===
     "darwin";
-  return shortcut
+  return trimmed
     .replace(/CommandOrControl/gi, isMac ? "⌘" : "Ctrl")
     .replace(/\+/g, "+")
     .replace(/Shift/gi, "⇧")
@@ -64,6 +68,11 @@ export function isModifierOnlyKey(key: string): boolean {
 }
 
 export function keyEventToShortcut(e: KeyboardEvent): string {
+  // Side buttons on many systems/browsers are reported as "BrowserBack"/"BrowserForward".
+  if (e.code === "BrowserBack" || e.key === "BrowserBack") return "Mouse4";
+  if (e.code === "BrowserForward" || e.key === "BrowserForward")
+    return "Mouse5";
+
   if (isModifierOnlyKey(e.key)) {
     return "";
   }
@@ -76,4 +85,52 @@ export function keyEventToShortcut(e: KeyboardEvent): string {
   else if (key === " ") key = "Space";
   parts.push(key);
   return parts.join("+");
+}
+
+export function isMouseShortcut(s: string): boolean {
+  return /^Mouse\d+$/i.test(s.trim());
+}
+
+export function isKeyboardShortcut(s: string): boolean {
+  const t = s.trim();
+  return t.includes("+") && !isMouseShortcut(t);
+}
+
+// Доп. кнопки мыши:
+// - DOM MouseEvent.button=3 => "Mouse4" (назад)
+// - DOM MouseEvent.button=4 => "Mouse5" (вперёд)
+export function pointerEventToShortcut(e: PointerEvent): string {
+  if (e.pointerType !== "mouse") return "";
+  if (e.button === 3 || e.button === 8) return "Mouse4";
+  if (e.button === 4 || e.button === 9) return "Mouse5";
+  return "";
+}
+
+export function mouseEventToShortcut(e: MouseEvent): string {
+  // Standard mapping:
+  // - 3 => Back
+  // - 4 => Forward
+  // Some platforms may differ, but this covers the common case.
+  if (e.button === 3 || e.button === 8) return "Mouse4";
+  if (e.button === 4 || e.button === 9) return "Mouse5";
+  return "";
+}
+
+export function getKeyboardShortcutsOrDefaults(
+  shortcuts: ShortcutBindings,
+): ShortcutBindings {
+  return {
+    audio: isKeyboardShortcut(shortcuts.audio)
+      ? shortcuts.audio
+      : DEFAULT_SHORTCUTS.audio,
+    video: isKeyboardShortcut(shortcuts.video)
+      ? shortcuts.video
+      : DEFAULT_SHORTCUTS.video,
+    leave: isKeyboardShortcut(shortcuts.leave)
+      ? shortcuts.leave
+      : DEFAULT_SHORTCUTS.leave,
+    sound: isKeyboardShortcut(shortcuts.sound)
+      ? shortcuts.sound
+      : DEFAULT_SHORTCUTS.sound,
+  };
 }

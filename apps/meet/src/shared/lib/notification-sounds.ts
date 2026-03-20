@@ -3,6 +3,7 @@ import { getStoredAudioOutputDevice } from "./audio-devices";
 import { getOutputMuted } from "./output-mute";
 
 export const NOTIFICATION_SOUND_EVENTS = [
+  "local_joined",
   "participant_joined",
   "participant_left",
   "message",
@@ -15,8 +16,9 @@ export type NotificationSoundEventId =
   (typeof NOTIFICATION_SOUND_EVENTS)[number];
 
 const DEFAULT_URLS: Record<NotificationSoundEventId, string> = {
-  participant_joined: "/sounds/sound_join_room.ogg",
-  participant_left: "/sounds/sound_left_room.ogg",
+  local_joined: "/sounds/7_11_hello_welcome.ogg",
+  participant_joined: "/sounds/7eleven_door.ogg",
+  participant_left: "/sounds/bye-sound-effect.ogg",
   message: "/sounds/message.wav",
   mic_on: "/sounds/mic%20on.wav",
   mic_off: "/sounds/mic%20off.wav",
@@ -26,6 +28,7 @@ const DEFAULT_URLS: Record<NotificationSoundEventId, string> = {
 const PAN_BY_EVENT: Partial<Record<NotificationSoundEventId, number>> = {
   participant_joined: -1,
   participant_left: 1,
+  local_joined: 0,
 };
 const PAN_OFFSET_RIGHT = 0.2;
 

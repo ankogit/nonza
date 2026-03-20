@@ -353,7 +353,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
         }
       }
 
-      playNotificationSound("participant_joined").catch(() => {});
+      playNotificationSound("local_joined").catch(() => {});
     } catch (error) {
       state.value = {
         ...state.value,

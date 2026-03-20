@@ -178,6 +178,7 @@ function getEventConfig(id: NotificationSoundEventId) {
   return notificationSounds.eventsConfig.value[id];
 }
 const eventLabels: Record<NotificationSoundEventId, string> = {
+  local_joined: "Я вошёл в комнату",
   participant_joined: "Участник вошёл в комнату",
   participant_left: "Участник вышел из комнаты",
   message: "Новое сообщение",
