@@ -25,4 +25,5 @@ export * from "./desktopShortcuts";
 export * from "./useAppUpdate";
 export * from "./output-mute";
 export * from "./dice";
+export * from "./text-links";
 

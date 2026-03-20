@@ -29,7 +29,23 @@
       <div class="table-circle__board">
         <div class="table-circle__center bg-dark-20" :style="centerStyle">
           <div class="table-circle__center-body">
-            <div v-if="centerMode === 'public_table'" class="table-circle__public-table">
+            <div
+              v-show="centerContent === 'chat'"
+              class="table-circle__public-table"
+            >
+              <TableCirclePublicChat
+                :local-participant="localParticipant"
+                :remote-participants="remoteParticipants"
+                :participant-name="props.participantName"
+                :get-display-name="props.getDisplayName"
+                :livekit-room="props.livekitRoom"
+              />
+            </div>
+
+            <div
+              v-show="centerContent === 'dice'"
+              class="table-circle__public-table"
+            >
               <TableCirclePublicTable
                 :local-participant="localParticipant"
                 :remote-participants="remoteParticipants"
@@ -39,7 +55,10 @@
               />
             </div>
 
-            <div v-else class="table-circle__leader-stream">
+            <div
+              v-show="centerContent === 'stream'"
+              class="table-circle__leader-stream"
+            >
               <div v-if="leaderParticipant" class="table-circle__center-video">
                 <VideoParticipant
                   :participant="leaderParticipant"
@@ -61,18 +80,27 @@
             <Button
               variant="default"
               size="small"
-              :class="{ active: centerMode === 'public_table' }"
-              title="Публичный стол (кубики всем)"
-              @click="centerMode = 'public_table'"
+              :class="{ active: centerContent === 'chat' }"
+              title="Чат стола"
+              @click="centerContent = 'chat'"
+            >
+              <PixelIcon name="message" variant="small" />
+            </Button>
+            <Button
+              variant="default"
+              size="small"
+              :class="{ active: centerContent === 'dice' }"
+              title="Кости"
+              @click="centerContent = 'dice'"
             >
               <PixelIcon name="dice" variant="small" />
             </Button>
             <Button
               variant="default"
               size="small"
-              :class="{ active: centerMode === 'leader_stream' }"
-              title="Стрим лидера в центре"
-              @click="centerMode = 'leader_stream'"
+              :class="{ active: centerContent === 'stream' }"
+              title="Стрим ведущего"
+              @click="centerContent = 'stream'"
             >
               <PixelIcon name="screen-on" variant="small" />
             </Button>
@@ -251,6 +279,7 @@ import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";
 import TableCirclePublicTable from "./TableCirclePublicTable.vue";
+import TableCirclePublicChat from "./TableCirclePublicChat.vue";
 import {
   DEFAULT_PARTICIPANT_COLOR,
   parseParticipantColorFromMetadata,
@@ -545,7 +574,7 @@ const targetOppositeIdentity = computed(() => {
 
 const settingsOpen = ref(false);
 const audioSettingsRef = ref<InstanceType<typeof AudioSettings> | null>(null);
-const centerMode = ref<"public_table" | "leader_stream">("public_table");
+const centerContent = ref<"dice" | "stream" | "chat">("chat");
 
 const leaderParticipant = computed(() => {
   const id = leaderIdentity.value;
@@ -616,7 +645,15 @@ void DEFAULT_PARTICIPANT_COLOR;
 .table-circle__center-body {
   width: 100%;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-circle__center-body > * {
+  flex: 1;
+  min-height: 0;
 }
 
 .table-circle__center-video {
@@ -650,7 +687,19 @@ void DEFAULT_PARTICIPANT_COLOR;
   z-index: 0;
 }
 
-.table-circle__public-table,
+.table-circle__public-table {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-circle__public-table > * {
+  flex: 1;
+  min-height: 0;
+}
+
 .table-circle__leader-stream {
   width: 100%;
   height: 100%;
@@ -748,6 +797,8 @@ void DEFAULT_PARTICIPANT_COLOR;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   align-items: center;
   padding: 4px;
@@ -755,6 +806,7 @@ void DEFAULT_PARTICIPANT_COLOR;
   background: #141414;
   box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
   z-index: 4;
+  max-width: calc(100vw - 24px);
 }
 
 .table-circle__settings {

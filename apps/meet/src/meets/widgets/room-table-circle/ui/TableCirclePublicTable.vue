@@ -1,23 +1,24 @@
 <template>
   <div class="public-table">
     <div class="public-table__controls">
-      <div class="public-table__row">
-        <Input
-          size="small"
-          v-model.trim="expression"
+      <div class="public-table__roll-row">
+        <input
+          v-model="expression"
+          type="text"
+          class="public-table__roll-field"
           placeholder="d20, 2d6+3, 1d100"
           maxlength="64"
-          @keydown.enter.prevent="doRoll"
+          :disabled="!canRoll"
+          @keydown.enter.exact.prevent="doRoll"
         />
         <Button
-          class="public-table__btn public-table__btn--primary"
-          type="text"
-          variant="primary"
-          size="small"
-          :disabled="!canRoll"
+          variant="default"
+          class="public-table__roll-btn"
+          title="Бросить"
+          :disabled="!canRoll || !expression.trim()"
           @click="doRoll"
         >
-          Бросить
+          <PixelIcon name="dice" variant="large" />
         </Button>
       </div>
 
@@ -123,7 +124,8 @@ import type {
   Room as LiveKitRoom,
 } from "livekit-client";
 import type { DiceRollMode } from "@shared/lib";
-import { Button, Input } from "@shared/ui";
+import { Button } from "@shared/ui";
+import PixelIcon from "@shared/ui/PixelIcon/PixelIcon.vue";
 import { useTableCircleDice } from "@features/table-circle";
 
 const props = defineProps<{
@@ -189,11 +191,62 @@ function formatTs(ts: number) {
   gap: 10px;
 }
 
-.public-table__row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+.public-table__roll-row {
+  display: flex;
   align-items: center;
+}
+
+.public-table__roll-field {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 6px 10px;
+  border: 3px solid #444;
+  border-right: none;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #1a1a1a;
+  color: #bab1a8;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: "Bebas Neue", sans-serif;
+  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.25));
+}
+
+.public-table__roll-field::placeholder {
+  color: #666;
+  font-family: "Bebas Neue", sans-serif;
+}
+
+.public-table__roll-field:focus {
+  border-color: #2980b9;
+}
+
+.public-table__roll-field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.public-table__roll-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .public-table__roll-field {
+    height: 40px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .public-table__roll-field {
+    height: 36px;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
 }
 
 .public-table__presets {
@@ -215,10 +268,6 @@ function formatTs(ts: number) {
   padding: 0 10px;
   font-size: 14px;
   line-height: 1;
-}
-
-.public-table__btn--primary {
-  min-width: 76px;
 }
 
 .public-table__latest {
