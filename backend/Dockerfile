@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/app ./cmd/app
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata ffmpeg
 
 WORKDIR /app
 
