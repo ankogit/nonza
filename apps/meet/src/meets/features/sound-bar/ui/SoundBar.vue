@@ -1,9 +1,9 @@
 <template>
   <div v-if="!previewMode" ref="rootRef" class="sound-bar">
-    <div class="sound-bar__anchor">
+    <div v-if="sounds.length > 0" class="sound-bar__anchor">
       <Button
         type="icon"
-        size="small"
+        size="large"
         :class="{ active: popoverOpen }"
         title="Звуки организации"
         @click.stop="togglePopover"
@@ -18,10 +18,7 @@
         aria-label="Звуки"
         @click.stop
       >
-        <div v-if="sounds.length === 0" class="sound-bar__empty">
-          Звуки не настроены
-        </div>
-        <div v-else class="sound-bar__scroll">
+        <div class="sound-bar__scroll">
           <div class="sound-bar__emoji-grid">
             <Button
               v-for="s in sounds"
@@ -78,6 +75,10 @@ const { startAndBroadcast, stopAndBroadcast, sessionByEmoji } =
 const { sounds } = useOrganizationSounds(() => props.orgId);
 
 const previewMode = computed(() => props.previewMode ?? false);
+
+watch(sounds, (list) => {
+  if (list.length === 0) popoverOpen.value = false;
+});
 
 const pressedEmoji = ref<string | null>(null);
 
@@ -263,12 +264,6 @@ function handleRowClick(sound: OrganizationSound) {
 .sound-bar__scroll::-webkit-scrollbar-thumb {
   background: #444;
   border: 1px solid #2a2a2a;
-}
-
-.sound-bar__empty {
-  color: #888;
-  font-size: 13px;
-  padding: 8px 4px;
 }
 
 .sound-bar__emoji-grid {

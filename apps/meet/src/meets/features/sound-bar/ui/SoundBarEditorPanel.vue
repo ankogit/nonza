@@ -577,7 +577,7 @@ function handleFile(e: Event) {
 
   destroyWaveSurfer();
   selectedFile.value = file;
-  selectEntireWaveOnReady.value = false;
+  selectEntireWaveOnReady.value = true;
 
   void loadWaveFromFile(file);
 }
