@@ -41,6 +41,18 @@ export const PIXEL_ICON_NAMES = [
   "link",
   "dice",
   "settings-alt",
+  "play",
+  "play-hold",
+  "notes",
+  "one-on-one",
+  "settings-extra",
+  "film",
+  "add",
+  "edit",
+  "delete",
+  "cancel",
+  "pause",
+  "stop",
 ] as const;
 
 export type PixelIconName = (typeof PIXEL_ICON_NAMES)[number];

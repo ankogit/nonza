@@ -18,6 +18,10 @@
   --pi-size: 20px;
 }
 
+.pi--medium {
+  --pi-size: 26px;
+}
+
 .pi--large {
   --pi-size: 32px;
 }
@@ -200,4 +204,52 @@
 
 .pi-settings-alt {
   background-position: calc(-2 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-play {
+  background-position: calc(-3 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-play-hold {
+  background-position: calc(-4 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-notes {
+  background-position: calc(-5 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-one-on-one {
+  background-position: calc(-6 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-settings-extra {
+  background-position: calc(-7 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-film {
+  background-position: calc(-8 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-add {
+  background-position: calc(-9 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-edit {
+  background-position: calc(-10 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-delete {
+  background-position: calc(-11 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-cancel {
+  background-position: calc(-12 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-pause {
+  background-position: calc(-13 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-stop {
+  background-position: calc(-14 * var(--pi-size)) calc(-1 * var(--pi-size));
 }

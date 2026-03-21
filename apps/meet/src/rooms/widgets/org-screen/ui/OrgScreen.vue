@@ -67,7 +67,7 @@
           <div class="organization-header-actions">
             <Button
               v-if="canManageOrg"
-              type="text"
+              type="icon"
               variant="default"
               size="small"
               class="organization-header-settings"
@@ -75,7 +75,7 @@
               title="Настройки организации"
               @click="emit('org-settings')"
             >
-              <PixelIcon name="settings" variant="small" />
+              <PixelIcon name="settings" variant="medium" />
             </Button>
             <Button
               v-if="canInvite"
@@ -223,7 +223,7 @@
                         title="Завершить звонок"
                         @click.stop="leaveRoomOrCancelJoin()"
                       >
-                        <PixelIcon name="hangup" variant="small" />
+                        <PixelIcon name="hangup" variant="medium" />
                       </Button>
                       <Button
                         v-if="canEditRoom || canDeleteRoom"
@@ -233,7 +233,7 @@
                         title="Настройки комнаты"
                         @click.stop="handleRoomSettingsClick($event, room)"
                       >
-                        <PixelIcon name="settings" variant="small" />
+                        <PixelIcon name="settings" variant="medium" />
                       </Button>
                     </span>
                   </div>
@@ -604,7 +604,7 @@
             title="Настройки"
             @click="openCallSettings()"
           >
-            <PixelIcon name="settings" variant="small" />
+            <PixelIcon name="settings-extra" variant="medium" />
           </Button>
         </footer>
       </aside>
@@ -1293,7 +1293,9 @@ const callSettingsVideoShortcut = ref("");
 const callSettingsSoundShortcut = ref("");
 const callSettingsLeaveShortcut = ref("");
 const initialCallSettingsShortcuts = ref<ShortcutBindings | null>(null);
-const recordingShortcut = ref<"audio" | "video" | "sound" | "leave" | null>(null);
+const recordingShortcut = ref<"audio" | "video" | "sound" | "leave" | null>(
+  null,
+);
 
 watch(recordingShortcut, (key) => {
   if (!key) return;
@@ -1907,7 +1909,10 @@ async function handleSaveCallSettings() {
         soundShortcut: keyboardShortcuts.sound,
       });
     } catch (err) {
-      console.error("[shortcuts] set_shortcut_bindings / update_app_menu failed:", err);
+      console.error(
+        "[shortcuts] set_shortcut_bindings / update_app_menu failed:",
+        err,
+      );
     }
     initialCallSettingsShortcuts.value = { ...newShortcuts };
   }
@@ -1932,14 +1937,10 @@ function handleCancelCallSettings() {
   }
   callSettingsReplicaTts.value = initialCallSettingsReplicaTts.value;
   if (initialCallSettingsShortcuts.value) {
-    callSettingsAudioShortcut.value =
-      initialCallSettingsShortcuts.value.audio;
-    callSettingsVideoShortcut.value =
-      initialCallSettingsShortcuts.value.video;
-    callSettingsSoundShortcut.value =
-      initialCallSettingsShortcuts.value.sound;
-    callSettingsLeaveShortcut.value =
-      initialCallSettingsShortcuts.value.leave;
+    callSettingsAudioShortcut.value = initialCallSettingsShortcuts.value.audio;
+    callSettingsVideoShortcut.value = initialCallSettingsShortcuts.value.video;
+    callSettingsSoundShortcut.value = initialCallSettingsShortcuts.value.sound;
+    callSettingsLeaveShortcut.value = initialCallSettingsShortcuts.value.leave;
   }
   recordingShortcut.value = null;
   (

@@ -9,7 +9,7 @@ import { pixelIconClass, type PixelIconName } from "./icons";
 const props = withDefaults(
   defineProps<{
     name: PixelIconName;
-    variant?: "small" | "large";
+    variant?: "small" | "medium" | "large";
     size?: number | string;
   }>(),
   { variant: undefined, size: undefined }
@@ -19,6 +19,7 @@ const iconClass = computed(() => {
   const base = pixelIconClass(props.name);
   if (props.size != null) return base;
   if (props.variant === "small") return `${base} pi--small`;
+  if (props.variant === "medium") return `${base} pi--medium`;
   if (props.variant === "large") return `${base} pi--large`;
   return base;
 });

@@ -79,6 +79,16 @@ type Config struct {
 		RedisURL string `envconfig:"LIVEKIT_REDIS_URL"`
 	}
 
+	S3 struct {
+		Endpoint      string `envconfig:"S3_ENDPOINT"`
+		AccessKey     string `envconfig:"S3_ACCESS_KEY"`
+		SecretKey     string `envconfig:"S3_SECRET_KEY"`
+		Bucket        string `envconfig:"S3_BUCKET"`
+		UseSSL        bool   `envconfig:"S3_USE_SSL" default:"false"`
+		Region        string `envconfig:"S3_REGION" default:"us-east-1"`
+		PublicBaseURL string `envconfig:"S3_PUBLIC_BASE_URL"`
+	}
+
 	CacheTTL string `envconfig:"CACHE_TTL" default:"60s"`
 
 	// Document TTL - how long to keep document state in Redis after room becomes empty

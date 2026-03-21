@@ -166,7 +166,7 @@
         fullscreen
         aria-label="Настройки организации"
         :close-on-overlay-click="false"
-        @update:model-value="showOrgSettingsModal = false"
+        @update:model-value="onOrgSettingsModalUpdate"
         @close="showOrgSettingsModal = false"
       >
         <OrganizationSettingsScreen
@@ -174,6 +174,22 @@
           :org-id="selectedOrgId"
           @back="showOrgSettingsModal = false"
           @deleted="handleOrgDeleted"
+          @open-soundbar="handleOpenOrgSoundbar"
+        />
+      </Modal>
+      <Modal
+        :model-value="!!(showOrgSoundbarModal && selectedOrgId)"
+        fullscreen
+        aria-label="Soundbar"
+        :close-on-overlay-click="false"
+        @update:model-value="showOrgSoundbarModal = $event"
+        @close="showOrgSoundbarModal = false"
+      >
+        <OrganizationSoundbarScreen
+          v-if="selectedOrgId"
+          :org-id="selectedOrgId"
+          :can-edit="orgSoundbarCanEdit"
+          @back="showOrgSoundbarModal = false"
         />
       </Modal>
     </main>
@@ -260,6 +276,10 @@ const OrganizationSettingsScreen = defineAsyncComponent(
   () =>
     import("@rooms/widgets/org-settings-screen/ui/OrganizationSettingsScreen.vue"),
 );
+const OrganizationSoundbarScreen = defineAsyncComponent(
+  () =>
+    import("@rooms/widgets/org-soundbar-screen/ui/OrganizationSoundbarScreen.vue"),
+);
 const OrgScreen = defineAsyncComponent(
   () => import("@rooms/widgets/org-screen/ui/OrgScreen.vue"),
 );
@@ -303,6 +323,8 @@ const { organizations, loading, selectedOrgId } = storeToRefs(orgStore);
 const sidebarDrawerOpen = ref(false);
 const showSettingsModal = ref(false);
 const showOrgSettingsModal = ref(false);
+const showOrgSoundbarModal = ref(false);
+const orgSoundbarCanEdit = ref(true);
 
 const unlistenAppMenuLogout = ref<(() => void) | null>(null);
 
@@ -339,6 +361,7 @@ function parseRoute() {
   if (appStore.roomCode) {
     showSettingsModal.value = false;
     showOrgSettingsModal.value = false;
+    showOrgSoundbarModal.value = false;
     return;
   }
   const p = params.get("page");
@@ -346,6 +369,7 @@ function parseRoute() {
   const token = params.get("token");
   showSettingsModal.value = false;
   showOrgSettingsModal.value = false;
+  showOrgSoundbarModal.value = false;
   if (p === "login") {
     appStore.setPage("login");
     appStore.setInviteToken(null);
@@ -490,8 +514,21 @@ function handleOrgSettings() {
   showOrgSettingsModal.value = true;
 }
 
+function onOrgSettingsModalUpdate(v: boolean) {
+  showOrgSettingsModal.value = v;
+  if (!v) {
+    showOrgSoundbarModal.value = false;
+  }
+}
+
+function handleOpenOrgSoundbar(payload: { canEdit: boolean }) {
+  orgSoundbarCanEdit.value = payload.canEdit;
+  showOrgSoundbarModal.value = true;
+}
+
 function handleOrgDeleted() {
   showOrgSettingsModal.value = false;
+  showOrgSoundbarModal.value = false;
   orgStore.clearSelected();
   appStore.setPage("organizations");
   replaceState();
@@ -602,7 +639,8 @@ window.addEventListener("popstate", parseRoute);
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
-    if (showOrgSettingsModal.value) showOrgSettingsModal.value = false;
+    if (showOrgSoundbarModal.value) showOrgSoundbarModal.value = false;
+    else if (showOrgSettingsModal.value) showOrgSettingsModal.value = false;
     else if (showSettingsModal.value) showSettingsModal.value = false;
     else if (sidebarDrawerOpen.value) sidebarDrawerOpen.value = false;
   }

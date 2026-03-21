@@ -245,6 +245,11 @@
             <PixelIcon name="right" variant="small" />
           </Button>
         </div>
+        <SoundBar
+          :org-id="props.room?.organization_id ?? null"
+          :livekit-room="props.livekitRoom"
+          :preview-mode="previewMode"
+        />
         <Button
           v-if="settingsInCallMenu"
           variant="default"
@@ -275,6 +280,7 @@ import { useMediaControl } from "@features/media-control";
 import { useParticipantReplica, ReplicaInput } from "@features/participant-replica";
 import { useConferenceHall } from "@features/conference-hall";
 import { useTableCircle } from "@features/table-circle";
+import { SoundBar } from "@features/sound-bar";
 import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";

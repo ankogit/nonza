@@ -28,3 +28,4 @@ export * from "./SubmitCancelActions";
 export * from "./Skeleton";
 export * from "./Toast";
 export * from "./DiceRoller";
+export * from "./Knob";

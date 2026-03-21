@@ -85,6 +85,7 @@ func (h *Handler) InitRoutes(cfg *config.Config) *gin.Engine {
 		h.initOrgRoomGroupsRoutes(api)
 		h.initOrgInvitesRoutes(api)
 		h.initOrganizationsRoutes(api)
+		h.initOrgSoundsRoutes(api)
 		h.initRoomsRoutes(api, cfg)
 		h.initInvitesRoutes(api)
 		h.initTokensRoutes(api, cfg)
@@ -136,6 +137,17 @@ func (h *Handler) initOrgInvitesRoutes(api *gin.RouterGroup) {
 	orgInvites := api.Group("/org/:id/invites")
 	{
 		orgInvites.POST("", invitesHandler.Create)
+	}
+}
+
+func (h *Handler) initOrgSoundsRoutes(api *gin.RouterGroup) {
+	soundsHandler := v1.NewOrganizationSoundsHandler(h.services)
+
+	orgSounds := api.Group("/org/:id/sounds")
+	{
+		orgSounds.GET("", soundsHandler.GetByOrganizationID)
+		orgSounds.POST("", soundsHandler.Upsert)
+		orgSounds.DELETE("/:soundId", soundsHandler.Delete)
 	}
 }
 

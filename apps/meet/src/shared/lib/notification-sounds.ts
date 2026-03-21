@@ -68,17 +68,21 @@ function getDecodeContext(): AudioContext {
 }
 
 async function preloadEvent(id: NotificationSoundEventId): Promise<void> {
-  const url = DEFAULT_URLS[id];
-  const response = await fetch(url);
-  if (!response.ok) return;
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = await getDecodeContext().decodeAudioData(arrayBuffer);
-  bufferCache.set(id, buffer);
+  try {
+    const url = DEFAULT_URLS[id];
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = await getDecodeContext().decodeAudioData(arrayBuffer);
+    bufferCache.set(id, buffer);
+  } catch {
+    // Ignore invalid or unsupported files so one broken sound does not disable all notifications.
+  }
 }
 
 function preloadAll(): Promise<void> {
   if (preloadPromise) return preloadPromise;
-  preloadPromise = Promise.all(
+  preloadPromise = Promise.allSettled(
     NOTIFICATION_SOUND_EVENTS.map((id) => preloadEvent(id))
   ).then(() => {});
   return preloadPromise;

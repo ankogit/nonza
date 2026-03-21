@@ -88,6 +88,23 @@
           </div>
         </FormSection>
 
+        <hr class="HR" />
+
+        <FormSection label="Soundbar">
+          <p class="org-settings-screen__soundbar-hint">
+            Звуки для панели в комнате: обрезка, громкость, эмодзи-слоты.
+          </p>
+          <Button
+            type="text"
+            variant="secondary"
+            size="small"
+            @click="emit('open-soundbar', { canEdit: canManageOrg })"
+          >
+            <PixelIcon name="notes" variant="small" />
+            Открыть Soundbar…
+          </Button>
+        </FormSection>
+
         <template v-if="!isOwner">
           <hr class="HR" />
           <div class="org-settings-screen__danger">
@@ -239,12 +256,17 @@ import {
   Badge,
   ContextMenu,
   Skeleton,
+  PixelIcon,
 } from "@shared/ui";
 import type { PillOption } from "@shared/ui";
 import type { ContextMenuItem } from "@shared/ui";
 
 const props = defineProps<{ orgId: string }>();
-const emit = defineEmits<{ back: []; deleted: [] }>();
+const emit = defineEmits<{
+  back: [];
+  deleted: [];
+  "open-soundbar": [payload: { canEdit: boolean }];
+}>();
 
 const apiClient = useApiClient();
 const organizationApi = new OrganizationApi(apiClient);
@@ -539,6 +561,13 @@ async function confirmLeave() {
 .org-settings-screen__readonly {
   font-size: 16px;
   color: #bab1a8;
+}
+
+.org-settings-screen__soundbar-hint {
+  margin: 0 0 8px;
+  color: #888;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .org-settings-screen__loading {

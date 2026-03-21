@@ -54,6 +54,37 @@ services:
     networks:
       - nonza-network
 
+  minio:
+    image: minio/minio:latest
+    container_name: nonza-minio-dev
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: nonza_minio
+      MINIO_ROOT_PASSWORD: nonza_minio_password
+    ports:
+      - "${MINIO_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - minio_data_dev:/data
+    networks:
+      - nonza-network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: nonza-minio-init-dev
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 nonza_minio nonza_minio_password &&
+      mc mb --ignore-existing local/nonza-files &&
+      mc anonymous set public local/nonza-files
+      "
+    networks:
+      - nonza-network
+
   livekit:
     image: livekit/livekit-server:latest
     container_name: nonza-livekit-dev
@@ -84,6 +115,7 @@ services:
 volumes:
   postgres_data_dev:
   redis_data_dev:
+  minio_data_dev:
 
 networks:
   nonza-network:

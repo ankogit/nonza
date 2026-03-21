@@ -24,7 +24,7 @@ const props = withDefaults(
       | "primary"
       | "secondary"
       | "accent";
-    size?: "small" | "medium" | "large";
+    size?: "tiny" | "small" | "medium" | "large";
     iconSize?: string; // для кастомного размера иконки, например "48px"
     disabled?: boolean;
     nativeType?: "button" | "submit" | "reset";
@@ -42,6 +42,7 @@ const classes = computed(() => {
 
   if (props.type === "text")
     cls.push("button--text", `button--text-${props.size}`);
+  if (props.size === "tiny") cls.push("button--tiny");
   if (props.size === "small") cls.push("button--small");
   if (props.variant) cls.push(props.variant);
   if (props.disabled) cls.push("button--disabled");
@@ -144,6 +145,14 @@ const emit = defineEmits<{
   background-color: #1f6fa0;
 }
 
+.button--tiny {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 0.75rem;
+}
+
 .button--small {
   width: 36px;
   height: 36px;
@@ -171,6 +180,11 @@ const emit = defineEmits<{
   font-weight: 600;
   gap: 8px;
   /* hover scale работает как у иконок */
+}
+
+.button--text-tiny {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .button--text-small {

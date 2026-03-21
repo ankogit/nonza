@@ -373,6 +373,11 @@
           :raised-count="raisedHandsSet.size"
           @toggle="showParticipantsPanel = !showParticipantsPanel"
         />
+        <SoundBar
+          :org-id="props.room?.organization_id ?? null"
+          :livekit-room="props.livekitRoom"
+          :preview-mode="previewMode"
+        />
         <Button
           v-if="settingsInCallMenu"
           variant="default"
@@ -667,6 +672,7 @@ import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
+import { SoundBar } from "@features/sound-bar";
 import {
   useParticipantReplica,
   ReplicaInput,

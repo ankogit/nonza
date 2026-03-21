@@ -11,6 +11,7 @@ import (
 	"nonza/backend/internal/repository/postgresDB"
 	"nonza/backend/internal/repository/redis"
 	"nonza/backend/internal/service"
+	"nonza/backend/internal/storage"
 	"nonza/backend/internal/transport/rest"
 	"os"
 	"os/signal"
@@ -82,10 +83,25 @@ func Run(cfg *config.Config) error {
 
 	repositories := repository.NewRepositories(db)
 	txRunner := repository.NewTransactionRunner(db)
+
+	objectStorage, err := storage.NewS3Storage(storage.S3Config{
+		Endpoint:      cfg.S3.Endpoint,
+		AccessKey:     cfg.S3.AccessKey,
+		SecretKey:     cfg.S3.SecretKey,
+		UseSSL:        cfg.S3.UseSSL,
+		BucketName:    cfg.S3.Bucket,
+		PublicBaseURL: cfg.S3.PublicBaseURL,
+		Region:        cfg.S3.Region,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to init object storage: %w", err)
+	}
+
 	services := service.NewServices(service.Deps{
 		Repositories:      repositories,
 		TransactionRunner: txRunner,
 		Config:            cfg,
+		ObjectStorage:     objectStorage,
 	})
 
 	restHandler := rest.NewHandler(services, redisCli, repositories.Rooms, cfg.DocumentTTL)

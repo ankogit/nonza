@@ -10,6 +10,8 @@ type Repositories struct {
 	Users               Users
 	Organizations       Organizations
 	OrganizationMembers OrganizationMembers
+	OrganizationSounds  OrganizationSounds
+	Files               Files
 	Invites             Invites
 	Rooms               Rooms
 	RoomGroups          RoomGroups
@@ -21,6 +23,8 @@ func NewRepositories(db *gorm.DB) *Repositories {
 	usersRepo := postgresDB.NewUsersRepository(db)
 	orgRepo := postgresDB.NewOrganizationsRepository(db)
 	orgMembersRepo := postgresDB.NewOrganizationMembersRepository(db)
+	orgSoundsRepo := postgresDB.NewOrganizationSoundsRepository(db)
+	filesRepo := postgresDB.NewFilesRepository(db)
 	invitesRepo := postgresDB.NewInvitesRepository(db)
 	roomRepo := postgresDB.NewRoomsRepository(db)
 	roomGroupsRepo := postgresDB.NewRoomGroupsRepository(db)
@@ -31,6 +35,8 @@ func NewRepositories(db *gorm.DB) *Repositories {
 		Users:               usersRepo,
 		Organizations:       orgRepo,
 		OrganizationMembers: orgMembersRepo,
+		OrganizationSounds:  orgSoundsRepo,
+		Files:               filesRepo,
 		Invites:             invitesRepo,
 		Rooms:               roomRepo,
 		RoomGroups:          roomGroupsRepo,

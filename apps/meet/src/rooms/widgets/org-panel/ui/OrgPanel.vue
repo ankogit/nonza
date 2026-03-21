@@ -51,7 +51,9 @@
         tabindex="0"
         @click="$emit('create')"
       >
-        <span class="org-item__icon">+</span>
+        <span class="org-item__icon">
+          <PixelIcon name="add" :size="26" />
+        </span>
       </button>
     </div>
     <div class="org-panel__divider" />
@@ -64,8 +66,8 @@
         tabindex="0"
         @click="$emit('settings')"
       >
-        <span class="org-item__icon">
-          <PixelIcon name="settings-alt" variant="large" />
+        <span class="org-item__icon org-item__icon--pair">
+          <PixelIcon name="settings-alt" :size="20" />
         </span>
       </button>
     </div>
@@ -363,5 +365,9 @@ onMounted(async () => {
   text-align: center;
   position: relative;
   top: 1px;
+}
+
+.org-item__icon--pair {
+  gap: 1px;
 }
 </style>

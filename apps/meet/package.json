@@ -46,6 +46,8 @@
     "livekit-client": "^2.17.0",
     "pinia": "^2.3.0",
     "vue": "^3.5.26",
+    "vue3-emoji-picker": "^1.1.8",
+    "wavesurfer.js": "^7.12.4",
     "y-prosemirror": "^1.3.7",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.29"

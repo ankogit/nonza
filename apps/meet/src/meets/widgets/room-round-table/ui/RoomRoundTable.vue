@@ -143,6 +143,11 @@
         >
           <PixelIcon name="document" variant="large" />
         </Button>
+        <SoundBar
+          :org-id="props.room?.organization_id ?? null"
+          :livekit-room="props.livekitRoom"
+          :preview-mode="previewMode"
+        />
       </template>
     </CallMenu>
 
@@ -471,6 +476,7 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
+import { SoundBar } from "@features/sound-bar";
 import {
   useParticipantReplica,
   ReplicaInput,

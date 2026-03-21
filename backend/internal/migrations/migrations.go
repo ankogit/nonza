@@ -11,6 +11,8 @@ func RunMigrations(db *gorm.DB) error {
 		&models.User{},
 		&models.Organization{},
 		&models.OrganizationMember{},
+		&models.StoredFile{},
+		&models.OrganizationSound{},
 		&models.Invite{},
 		&models.RoomGroup{},
 		&models.Room{},

@@ -26,4 +26,7 @@ export * from "./useAppUpdate";
 export * from "./output-mute";
 export * from "./dice";
 export * from "./text-links";
+export * from "./playAudioUrl";
+export * from "./soundBarPlayback";
+export * from "./renderSoundBarClipForUpload";
 
