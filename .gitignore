@@ -44,3 +44,5 @@ logs/
 # Build artifacts
 build/
 tmp/
+
+node_modules/
