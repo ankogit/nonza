@@ -1,6 +1,10 @@
 <template>
   <img
-    :src="variant === 'withBackground' ? '/images/nonza-icon-512.png' : '/images/nonza-logo-512-t.png'"
+    :src="
+      variant === 'withBackground'
+        ? '/images/nonza-icon-512.png'
+        : '/images/nonza_logo_tp.png'
+    "
     alt="Nonza"
     class="app-logo"
     :class="[`app-logo--${size}`, { 'app-logo--circle': circle }]"

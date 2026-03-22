@@ -200,6 +200,27 @@
       />
     </div>
     <ToastContainer />
+    <audio
+      ref="ostAudioEl"
+      :src="APP_OST_SRC"
+      loop
+      preload="auto"
+      class="rooms-app__ost-audio"
+    />
+    <Teleport to="body">
+      <Button
+        v-if="shouldPlayOst"
+        type="icon"
+        size="tiny"
+        variant="default"
+        class="rooms-app__ost-mute"
+        :title="ostMuted ? 'Включить музыку' : 'Выключить музыку'"
+        :aria-label="ostMuted ? 'Включить музыку' : 'Выключить музыку'"
+        @click="toggleOstMute"
+      >
+        <PixelIcon :name="ostIconName" variant="small" />
+      </Button>
+    </Teleport>
     <Button
       v-if="isTauriDesktop()"
       type="icon"
@@ -224,6 +245,7 @@ import {
   onUnmounted,
   provide,
   defineAsyncComponent,
+  useTemplateRef,
 } from "vue";
 import { storeToRefs } from "pinia";
 import { OrganizationApi } from "@shared/entities";
@@ -253,6 +275,8 @@ import {
   // openCallInNewWindow, // временно скрыта кнопка "открыть в отдельном окне"
   isTauriDesktop,
   getStoredShortcuts,
+  useAppOst,
+  APP_OST_SRC,
 } from "@shared/lib";
 import { useAppStore, useOrganizationsStore } from "@rooms/app/stores";
 
@@ -327,6 +351,32 @@ const showOrgSoundbarModal = ref(false);
 const orgSoundbarCanEdit = ref(true);
 
 const unlistenAppMenuLogout = ref<(() => void) | null>(null);
+
+const shouldPlayOst = computed(() => {
+  if (appStore.showReconnectScreen || appStore.roomCode) return false;
+  if (appStore.page === "login" || appStore.page === "register") return true;
+  if (isAuthenticated() && appStore.page === "organizations") return true;
+  if (
+    !isAuthenticated() &&
+    appStore.page !== "invite" &&
+    appStore.page !== "create-org" &&
+    appStore.page !== "settings"
+  ) {
+    return true;
+  }
+  return false;
+});
+
+const ostAudioEl = useTemplateRef<HTMLAudioElement>("ostAudioEl");
+
+const { muted: ostMuted, toggleMute: toggleOstMute } = useAppOst(
+  shouldPlayOst,
+  ostAudioEl,
+);
+
+const ostIconName = computed(() =>
+  ostMuted.value ? "volume-off" : "volume-high",
+);
 
 const isMainView = computed(
   () =>
@@ -577,7 +627,12 @@ function syncAppMenu() {
         }),
       ]),
     )
-    .catch((err) => console.error("[syncAppMenu] set_shortcut_bindings / update_app_menu failed:", err));
+    .catch((err) =>
+      console.error(
+        "[syncAppMenu] set_shortcut_bindings / update_app_menu failed:",
+        err,
+      ),
+    );
 }
 
 watch(
@@ -718,6 +773,39 @@ onUnmounted(() => {
 
 .rooms-app__open-in-new-window:hover {
   opacity: 1;
+}
+
+.rooms-app__ost-audio {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rooms-app__ost-mute {
+  position: fixed;
+  bottom: 16px;
+  right: 12px;
+  z-index: 10020;
+  pointer-events: auto;
+  opacity: 0.4;
+}
+
+.rooms-app__ost-mute:hover {
+  opacity: 1;
+  color: var(--color-text, #fff);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.rooms-app__ost-mute:hover:not(.button--disabled) {
+  scale: 1;
+}
+
+.rooms-app__ost-mute :deep(.pi) {
+  --pi-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .rooms-app__refresh {
