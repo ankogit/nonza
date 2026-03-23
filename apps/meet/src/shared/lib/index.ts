@@ -28,6 +28,7 @@ export * from "./dice";
 export * from "./text-links";
 export * from "./playAudioUrl";
 export * from "./soundBarPlayback";
+export * from "./soundBarEmojiParticles";
 export * from "./renderSoundBarClipForUpload";
 export * from "./useAppOst";
 

@@ -1,7 +1,15 @@
 import { onUnmounted, watch, ref } from "vue";
 import type { LocalParticipant, RemoteParticipant, Room as LiveKitRoom } from "livekit-client";
 import { RoomEvent } from "livekit-client";
-import { startSoundBarSession, stopSoundBarSession } from "@shared/lib";
+import {
+  startSoundBarSession,
+  stopSoundBarSession,
+  startSoundBarEmojiGate,
+  stopSoundBarEmojiGate,
+  triggerSoundBarEmojiBurst,
+  triggerSoundBarEmojiLoopIntro,
+  triggerSoundBarEmojiLoopPulse,
+} from "@shared/lib";
 import type { SoundBarActionMessage } from "../model/types";
 
 const DATA_TOPIC = "sound_bar";
@@ -56,16 +64,38 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
     opts?: { onPlaybackEnded?: () => void },
   ) {
     if (payload.action === "start") {
+      const { emoji, sessionId, gateEnabled, loopEnabled } = payload;
+      let clipDurationSec = 2.5;
+
       await startSoundBarSession({
-        sessionId: payload.sessionId,
+        sessionId,
         audioUrl: payload.audioUrl,
-        loopEnabled: payload.loopEnabled,
+        loopEnabled,
         onEnded: opts?.onPlaybackEnded,
+        onGateNonLoopClipEnded:
+          gateEnabled && !loopEnabled
+            ? () => stopSoundBarEmojiGate(sessionId)
+            : undefined,
+        onPlaybackReady: ({ durationSec }) => {
+          clipDurationSec = durationSec;
+          if (gateEnabled) {
+            startSoundBarEmojiGate(sessionId, emoji, durationSec);
+          } else if (loopEnabled) {
+            triggerSoundBarEmojiLoopIntro(emoji, durationSec);
+          } else {
+            triggerSoundBarEmojiBurst(emoji, durationSec);
+          }
+        },
+        onLoopTick:
+          loopEnabled && !gateEnabled
+            ? () => triggerSoundBarEmojiLoopPulse(emoji, clipDurationSec)
+            : undefined,
       });
       return;
     }
 
     if (payload.action === "stop") {
+      stopSoundBarEmojiGate(payload.sessionId);
       stopSoundBarSession(payload.sessionId);
       removeSessionBySessionId(payload.sessionId);
     }

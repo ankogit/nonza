@@ -11,6 +11,7 @@
     "build:tauri": "npm run build:tauri --workspace=@nonza/meet",
     "dev": "turbo dev",
     "dev:rooms": "turbo run dev:rooms",
+    "dev:ui-kit": "turbo run dev --filter=@nonza/ui-kit",
     "dev:tauri": "npm run dev:tauri --workspace=@nonza/meet",
     "lint": "turbo lint",
     "type-check": "turbo type-check"
