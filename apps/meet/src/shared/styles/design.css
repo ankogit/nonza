@@ -487,6 +487,23 @@
   margin-left: 0;
 }
 
+.room-button__codes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.room-button .room-session-timer {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .room-button--create {
   background: transparent !important;
   border: 1px dashed rgba(255, 255, 255, 0.3) !important;
@@ -607,29 +624,6 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
-.organization-footer-avatar {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--color-primary, #2980b9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.9rem;
-  font-weight: 500;
-  font-family: "Bebas Neue", sans-serif;
-  color: #fff;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: filter 0.15s ease;
-}
-
-.organization-footer-avatar:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
 .organization-footer-details {
   flex: 1;
   min-width: 0;
@@ -644,150 +638,8 @@
   text-overflow: ellipsis;
 }
 
-.organization-footer-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.organization-footer-colors {
-  position: absolute;
-  left: 100%;
-  margin-left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.25);
-  z-index: 1;
-  height: fit-content;
-}
-
 .organization-footer--colors-expanded .organization-footer-details {
   filter: blur(4px);
-}
-
-.organization-footer-colors--expanded {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.organization-footer-colors--expanded .organization-footer-color:not(.organization-footer-color--trigger) {
-  animation: organization-footer-color-in 0.15s ease-out;
-}
-
-@keyframes organization-footer-color-in {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.organization-footer-color {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 2px solid #444;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    filter 0.15s ease;
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.organization-footer-color-picker {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  border: 0;
-}
-
-.organization-footer-color--custom {
-  background: rgba(255, 255, 255, 0.06);
-  border-style: solid;
-  border-color: rgba(255, 255, 255, 0.35);
-  position: relative;
-  overflow: hidden;
-}
-
-.organization-footer-color--custom::before {
-  content: "";
-  position: absolute;
-  inset: -25%;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 90deg,
-    #ff4d4d,
-    #ffcc3d,
-    #4dff9a,
-    #4dc3ff,
-    #7d4dff,
-    #ff4dc4,
-    #ff4d4d
-  );
-  animation: organization-footer-rgb-spin 1.8s linear infinite;
-  z-index: 0;
-}
-
-.organization-footer-color--custom::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 30% 30%,
-    rgba(255, 255, 255, 0.35),
-    rgba(255, 255, 255, 0) 55%
-  );
-  z-index: 1;
-}
-
-@keyframes organization-footer-rgb-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .organization-footer-color--custom::before {
-    animation: none;
-  }
-}
-
-.organization-footer-color:hover:not(:disabled) {
-  filter: brightness(1.15);
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.organization-footer-color--active {
-  border-color: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-
-.organization-footer-color--reset {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
 }
 
 .organization-footer-controls {
@@ -818,10 +670,6 @@
 @media (max-width: 480px) {
   .organization-footer-menu {
     display: flex;
-  }
-
-  .organization-footer-colors {
-    margin-bottom: 8px;
   }
 }
 

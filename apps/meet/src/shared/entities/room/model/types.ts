@@ -14,6 +14,8 @@ export interface Room {
   conference_hall_leader_id?: string | null;
   created_by_user_id?: string | null;
   allow_anonymous_join?: boolean;
+  room_timer_enabled?: boolean;
+  room_timer_started_at?: string | null;
   password_protected?: boolean;
   position?: number;
   created_at: string;

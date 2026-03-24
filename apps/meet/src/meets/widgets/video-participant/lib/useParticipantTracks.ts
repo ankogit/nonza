@@ -7,8 +7,14 @@ import {
 } from "livekit-client";
 import type { RemoteParticipant, RemoteAudioTrack } from "livekit-client";
 import { applyStoredOutputDevice } from "@shared/lib";
+import {
+  isFullscreenPipDebugEnabled,
+  logFullscreenPip,
+} from "@shared/lib/fullscreenPipDebug";
 
 type ParticipantLike = RemoteParticipant | LocalParticipant | null;
+
+let lastRemoteCameraDebugKey = "";
 
 function isRemoteParticipant(p: ParticipantLike): p is RemoteParticipant {
   return p !== null && !(p instanceof LocalParticipant);
@@ -145,11 +151,36 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
           if (videoElement.value) videoElement.value.srcObject = null;
         }
       } else {
-        if (videoPubEffective?.track && videoPubEffective.isSubscribed) {
+        if (
+          videoPubEffective?.track &&
+          videoPubEffective.isSubscribed !== false
+        ) {
           videoTrack.value = videoPubEffective.track.mediaStreamTrack;
         } else {
           videoTrack.value = null;
           if (videoElement.value) videoElement.value.srcObject = null;
+        }
+        if (
+          isFullscreenPipDebugEnabled() &&
+          preferred === "camera" &&
+          !isLocal &&
+          !videoTrack.value
+        ) {
+          const key = `${participant.identity}:${Boolean(videoPubEffective)}:${videoPubEffective?.isSubscribed}:${Boolean(videoPubEffective?.track)}:${videoPubEffective?.track?.mediaStreamTrack?.readyState ?? ""}`;
+          if (key !== lastRemoteCameraDebugKey) {
+            lastRemoteCameraDebugKey = key;
+            logFullscreenPip("remote camera track not attached", {
+              identity: participant.identity,
+              videoPub: videoPubEffective
+                ? {
+                    isSubscribed: videoPubEffective.isSubscribed,
+                    hasTrack: Boolean(videoPubEffective.track),
+                    readyState:
+                      videoPubEffective.track?.mediaStreamTrack?.readyState,
+                  }
+                : null,
+            });
+          }
         }
       }
 

@@ -14,6 +14,7 @@ export * from "./notification-sounds";
 export * from "./yjs-websocket-provider";
 export * from "./screen-wake-lock";
 export * from "./useDraggablePiP";
+export * from "./fullscreenPipDebug";
 export * from "./useMeetingHotkeys";
 export * from "./useTauriGlobalShortcuts";
 export * from "./useToasts";

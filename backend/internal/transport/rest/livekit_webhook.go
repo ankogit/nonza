@@ -1,12 +1,15 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	roomsvc "nonza/backend/internal/service/rooms"
 	"nonza/backend/internal/transport/websocket"
 
 	"github.com/gin-gonic/gin"
@@ -74,14 +77,33 @@ func (h *Handler) HandleLiveKitWebhook(c *gin.Context) {
 		return
 	}
 
+	if (payload.Event == "participant_joined" || payload.Event == "participant_left") && h.livekit != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		parts, err := h.livekit.ListParticipants(ctx, room.LiveKitRoomName())
+		if err != nil {
+			log.Printf("[webhook] livekit room timer ListParticipants err=%v", err)
+		} else if roomsvc.ApplyParticipantCountToRoomTimer(room, len(parts)) {
+			if err := h.services.Rooms.Update(room); err != nil {
+				log.Printf("[webhook] livekit room timer Update err=%v", err)
+			}
+		}
+	}
+
 	orgChannel := "org:" + room.OrganizationID.String()
 	log.Printf("[webhook] livekit broadcasting participants_changed org=%s (room=%s)", orgChannel, roomName)
+	wsPayload := map[string]interface{}{
+		"room": roomName,
+	}
+	if room.Settings != nil {
+		if v, ok := room.Settings["room_timer_started_at"].(string); ok && v != "" {
+			wsPayload["room_timer_started_at"] = v
+		}
+	}
 	msg := websocket.Message{
-		Type:   "participants_changed",
-		RoomID: orgChannel,
-		Payload: map[string]interface{}{
-			"room": roomName,
-		},
+		Type:    "participants_changed",
+		RoomID:  orgChannel,
+		Payload: wsPayload,
 	}
 	if err := h.wsHub.BroadcastToRoom(orgChannel, msg); err != nil {
 		log.Printf("[webhook] livekit BroadcastToRoom err=%v", err)

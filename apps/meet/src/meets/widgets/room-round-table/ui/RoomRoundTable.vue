@@ -5,7 +5,7 @@
       class="round-table__top-menu room-header bg-dark-20"
     >
       <div class="room-info color-white font-bebas">
-        <h2 class="room-info-title">{{ room?.name ?? 'Созвон' }}</h2>
+        <h2 class="room-info-title">{{ room?.name ?? "Созвон" }}</h2>
       </div>
       <div class="room-indicators">
         <Button
@@ -60,17 +60,34 @@
       </div>
 
       <div
-        v-if="props.showDocument"
-        v-show="isDocumentOpen"
-        class="round-table-document"
-        aria-label="Совместный документ"
+        v-if="
+          props.showDocument &&
+          (isDocumentOpen || (isWhiteboardOpen && !whiteboardFullscreen))
+        "
+        class="round-table-collab"
+        aria-label="Совместная работа"
       >
-        <CollaborativeDocument
-          :room="props.room"
-          :api-base-u-r-l="props.apiBaseURL"
-          :participant-name="props.participantName"
-          :participant-color="participantColorForDocument"
-        />
+        <div
+          v-if="isDocumentOpen"
+          class="round-table-document"
+          aria-label="Совместный документ"
+        >
+          <CollaborativeDocument
+            :room="props.room"
+            :participant-name="props.participantName"
+            :participant-color="participantColorForDocument"
+          />
+        </div>
+        <div
+          v-if="isWhiteboardOpen && !whiteboardFullscreen"
+          class="round-table-whiteboard"
+          aria-label="Совместная доска"
+        >
+          <CollaborativeWhiteboardShell
+            :participant-color="participantColorForDocument"
+            :room-id="props.room?.id ?? null"
+          />
+        </div>
       </div>
     </div>
 
@@ -143,6 +160,15 @@
         >
           <PixelIcon name="document" variant="large" />
         </Button>
+        <Button
+          v-if="props.showDocument"
+          variant="default"
+          :class="{ active: isWhiteboardOpen }"
+          :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="edit" variant="large" />
+        </Button>
         <SoundBar
           :org-id="props.room?.organization_id ?? null"
           :livekit-room="props.livekitRoom"
@@ -150,6 +176,128 @@
         />
       </template>
     </CallMenu>
+
+    <Teleport to="body">
+      <div
+        v-if="isWhiteboardOpen && props.showDocument && whiteboardFullscreen"
+        class="room-fullscreen"
+        role="dialog"
+        aria-label="Совместная доска"
+      >
+        <Button
+          variant="default"
+          size="small"
+          class="room-fullscreen__close"
+          title="Закрыть доску"
+          aria-label="Закрыть доску"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+        <div class="room-fullscreen__editor">
+          <CollaborativeWhiteboardShell
+            :participant-color="participantColorForDocument"
+            :room-id="props.room?.id ?? null"
+          />
+        </div>
+        <div class="room-fullscreen__menu-wrapper">
+          <CallMenu
+            menu-class="room-fullscreen__menu"
+            @disconnect="handleDisconnect"
+          >
+            <template #left>
+              <Button
+                :class="{
+                  active: mediaState.isAudioEnabled,
+                  default: !mediaState.isAudioEnabled,
+                }"
+                :title="
+                  mediaState.isAudioEnabled
+                    ? 'Выключить микрофон'
+                    : 'Включить микрофон'
+                "
+                @click="toggleAudio"
+              >
+                <PixelIcon
+                  :name="mediaState.isAudioEnabled ? 'mic-on' : 'mic-off'"
+                  variant="large"
+                />
+              </Button>
+              <Button
+                :class="{
+                  active: mediaState.isVideoEnabled,
+                  default: !mediaState.isVideoEnabled,
+                }"
+                :title="
+                  mediaState.isVideoEnabled
+                    ? 'Выключить видео'
+                    : 'Включить видео'
+                "
+                @click="toggleVideo"
+              >
+                <PixelIcon
+                  :name="mediaState.isVideoEnabled ? 'video-on' : 'video-off'"
+                  variant="large"
+                />
+              </Button>
+              <Button
+                v-if="!previewMode"
+                :class="{
+                  active: mediaState.isScreenSharing,
+                  default: !mediaState.isScreenSharing,
+                }"
+                title="Трансляция экрана"
+                @click="toggleScreenShare"
+              >
+                <PixelIcon
+                  :name="
+                    mediaState.isScreenSharing ? 'screen-on' : 'screen-off'
+                  "
+                  variant="large"
+                />
+              </Button>
+              <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+            </template>
+            <template #right>
+              <Button
+                v-if="settingsInCallMenu"
+                variant="default"
+                size="small"
+                title="Настройки"
+                @click="handleSettings"
+              >
+                <PixelIcon name="settings" variant="large" />
+              </Button>
+              <Button
+                v-if="props.showDocument"
+                variant="default"
+                :class="{ active: isDocumentOpen }"
+                :title="
+                  isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'
+                "
+                @click="toggleDocument"
+              >
+                <PixelIcon name="document" variant="large" />
+              </Button>
+              <Button
+                v-if="props.showDocument"
+                variant="default"
+                :class="{ active: isWhiteboardOpen }"
+                :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
+                @click="toggleWhiteboard"
+              >
+                <PixelIcon name="edit" variant="large" />
+              </Button>
+              <SoundBar
+                :org-id="props.room?.organization_id ?? null"
+                :livekit-room="props.livekitRoom"
+                :preview-mode="previewMode"
+              />
+            </template>
+          </CallMenu>
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div
@@ -211,7 +359,9 @@
             :participant="localParticipant"
             :participant-name="props.participantName"
             :participant-color="
-              localParticipant ? participantColorFor(localParticipant) : undefined
+              localParticipant
+                ? participantColorFor(localParticipant)
+                : undefined
             "
             :is-speaking="
               fullscreenParticipant
@@ -246,7 +396,7 @@
         </div>
         <div
           v-if="showFullscreenCameraPiP && fullscreenParticipant"
-          class="room-fullscreen__pip"
+          class="room-fullscreen__pip room-fullscreen__pip--remote-camera"
           :style="fullscreenCameraPiPStyle"
           @pointerdown="fullscreenCameraPiPDraggable.handlePointerDown"
         >
@@ -271,6 +421,7 @@
                 : undefined
             "
             preferred-video-source="camera"
+            :on-tracks-updated="() => fullscreenTracksVersion++"
           />
           <div
             data-pip-resize-handle
@@ -342,7 +493,9 @@
                 @click="toggleScreenShare"
               >
                 <PixelIcon
-                  :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'"
+                  :name="
+                    mediaState.isScreenSharing ? 'screen-on' : 'screen-off'
+                  "
                   variant="large"
                 />
               </Button>
@@ -359,6 +512,15 @@
                 @click="toggleDocument"
               >
                 <PixelIcon name="document" variant="large" />
+              </Button>
+              <Button
+                v-if="props.showDocument"
+                variant="default"
+                :class="{ active: isWhiteboardOpen }"
+                :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
+                @click="toggleWhiteboard"
+              >
+                <PixelIcon name="edit" variant="large" />
               </Button>
             </template>
           </CallMenu>
@@ -420,6 +582,18 @@
         </div>
 
         <div class="settings-section">
+          <h3 class="settings-section-title">Совместная работа</h3>
+          <div class="settings-item">
+            <Switch
+              v-model="settingsWhiteboardFullscreen"
+              aria-label="Доска на весь экран"
+            >
+              <span>Открывать доску на весь экран</span>
+            </Switch>
+          </div>
+        </div>
+
+        <div class="settings-section">
           <h3 class="settings-section-title">Видео</h3>
           <div class="settings-item">
             <label class="settings-label">Качество по умолчанию</label>
@@ -472,7 +646,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, provide, toRef } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
@@ -491,7 +665,12 @@ import {
 } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";
+import {
+  MEET_ROOM_COLLABORATION_KEY,
+  useMeetRoomYCollaboration,
+} from "@features/room-collaboration";
 import { CollaborativeDocument } from "@widgets/collaborative-document";
+import { CollaborativeWhiteboardShell } from "@widgets/collaborative-whiteboard";
 import {
   setParticipantName,
   getStoredAudioInputDevice,
@@ -499,6 +678,10 @@ import {
   getStoredMediaState,
   setStoredMediaState,
   useDraggablePiP,
+  evaluateFullscreenCameraPip,
+  logFullscreenPipGateIfChanged,
+  resetFullscreenPipGateLog,
+  logFullscreenPip,
   useMeetingHotkeys,
   useTauriGlobalShortcuts,
   getReplicaTtsEnabled,
@@ -514,7 +697,7 @@ import {
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@shared/entities";
-import { RoomEvent, Track } from "livekit-client";
+import { RoomEvent } from "livekit-client";
 import type {
   Room as LiveKitRoom,
   RemoteParticipant,
@@ -547,11 +730,28 @@ const participantColorForDocument = computed(() => {
   return DEFAULT_PARTICIPANT_COLOR;
 });
 
+const collaborationEnabled = computed(() =>
+  Boolean(props.showDocument && props.room?.id && props.apiBaseURL),
+);
+
+const meetCollab = useMeetRoomYCollaboration({
+  room: toRef(props, "room"),
+  apiBaseURL: toRef(props, "apiBaseURL"),
+  userId: toRef(props, "participantName"),
+  userName: toRef(props, "participantName"),
+  userColor: participantColorForDocument,
+  enabled: collaborationEnabled,
+});
+
+provide(MEET_ROOM_COLLABORATION_KEY, meetCollab);
+
 function participantColorFor(p: LocalParticipant | RemoteParticipant): string {
   const name =
     p.identity === localParticipant.value?.identity
       ? props.participantName
-      : (props.getDisplayName?.(p) ?? (p as RemoteParticipant).name ?? p.identity);
+      : (props.getDisplayName?.(p) ??
+        (p as RemoteParticipant).name ??
+        p.identity);
   return parseParticipantColorFromMetadata(
     (p as { metadata?: string }).metadata,
     name,
@@ -584,6 +784,11 @@ const { replicaByParticipant, sendReplica } = useParticipantReplica(
 const isDocumentOpen = ref(false);
 function toggleDocument() {
   isDocumentOpen.value = !isDocumentOpen.value;
+}
+
+const isWhiteboardOpen = ref(false);
+function toggleWhiteboard() {
+  isWhiteboardOpen.value = !isWhiteboardOpen.value;
 }
 
 const localParticipant = computed<LocalParticipant | null>(() => {
@@ -672,21 +877,44 @@ watch(
 const isLocal = (p: LocalParticipant | RemoteParticipant) =>
   localParticipant.value?.identity === p.identity;
 
+function resolveParticipant(
+  p: LocalParticipant | RemoteParticipant | null,
+): LocalParticipant | RemoteParticipant | null {
+  if (!p) return null;
+  const room = props.livekitRoom;
+  const fromRoom =
+    room?.getParticipantByIdentity?.(p.identity) ??
+    room?.remoteParticipants?.get?.(p.identity);
+  return (fromRoom ?? p) as LocalParticipant | RemoteParticipant | null;
+}
+
 const fullscreenIdentity = ref<string | null>(null);
 
 const fullscreenParticipant = computed(() => {
   const id = fullscreenIdentity.value;
   if (!id) return null;
-  return roundTableParticipants.value.find((p) => p.identity === id) ?? null;
+  const p = roundTableParticipants.value.find((p) => p.identity === id) ?? null;
+  return resolveParticipant(p);
 });
 
 function handleFullSize(identity: string) {
   fullscreenIdentity.value = identity;
+  resetFullscreenPipGateLog();
+  void nextTick(() => {
+    const part = fullscreenParticipant.value;
+    if (!part) return;
+    const ev = evaluateFullscreenCameraPip(
+      part,
+      localParticipant.value?.identity,
+    );
+    logFullscreenPip("opened fullscreen", { identity, ...ev });
+  });
 }
 
 function closeFullscreen() {
   fullscreenIdentity.value = null;
   fullscreenSelfPiPVisible.value = true;
+  resetFullscreenPipGateLog();
 }
 
 const {
@@ -706,6 +934,7 @@ const fullscreenSelfPiPVisible = ref(true);
 const fullscreenSelfPiPDraggable = useDraggablePiP(undefined, undefined, {
   getBottomOffset: () => (fullscreenMenuRef.value?.offsetHeight ?? 88) + 36,
   defaultSide: "right",
+  defaultVertical: "bottom",
 });
 const showFullscreenSelfPiP = computed(
   () => fullscreenParticipant.value && !isLocal(fullscreenParticipant.value!),
@@ -724,31 +953,49 @@ function toggleFullscreenSelfPiPVisible() {
 function participantHasBothCameraAndScreen(
   p: LocalParticipant | RemoteParticipant | null,
 ): boolean {
-  if (!p?.videoTrackPublications) return false;
-  type VideoPub = {
-    source: Track.Source;
-    track?: { mediaStreamTrack: MediaStreamTrack };
-    isSubscribed?: boolean;
-  };
-  const pubs = Array.from(
-    p.videoTrackPublications.values() as unknown as Iterable<VideoPub>,
+  const participant = resolveParticipant(p);
+  const ev = evaluateFullscreenCameraPip(
+    participant,
+    localParticipant.value?.identity,
   );
-  const isLocalP = localParticipant.value?.identity === p.identity;
-  const has = (source: Track.Source) =>
-    pubs.some(
-      (pub) =>
-        pub.source === source &&
-        pub.track &&
-        pub.track.mediaStreamTrack?.readyState !== "ended" &&
-        (isLocalP || pub.isSubscribed),
-    );
-  return has(Track.Source.Camera) && has(Track.Source.ScreenShare);
+  logFullscreenPipGateIfChanged(participant?.identity ?? undefined, ev);
+  return ev.show;
 }
 
 const fullscreenTracksVersion = ref(0);
+
+watch(
+  () => [props.livekitRoom, fullscreenIdentity.value] as const,
+  ([room, identity]) => {
+    if (!room || !identity) return;
+    const bump = () => {
+      fullscreenTracksVersion.value++;
+    };
+    const onTrackPublished = (
+      _pub: unknown,
+      participant: { identity: string },
+    ) => {
+      if (participant.identity === identity) bump();
+    };
+    const onTrackUnpublished = (
+      _pub: unknown,
+      participant: { identity: string },
+    ) => {
+      if (participant.identity === identity) bump();
+    };
+    room.on(RoomEvent.TrackPublished, onTrackPublished);
+    room.on(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    return () => {
+      room.off(RoomEvent.TrackPublished, onTrackPublished);
+      room.off(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    };
+  },
+);
+
 const fullscreenCameraPiPDraggable = useDraggablePiP(undefined, undefined, {
   getBottomOffset: () => (fullscreenMenuRef.value?.offsetHeight ?? 88) + 36,
   defaultSide: "left",
+  defaultVertical: "top",
 });
 const fullscreenCameraPiPStyle = computed(() => ({
   left: fullscreenCameraPiPDraggable.position.value.x + "px",
@@ -806,7 +1053,10 @@ watch(
 );
 
 watch(
-  [() => mediaState.value.isAudioEnabled, () => mediaState.value.isVideoEnabled],
+  [
+    () => mediaState.value.isAudioEnabled,
+    () => mediaState.value.isVideoEnabled,
+  ],
   () => {
     const code = props.room?.short_code;
     if (code) {
@@ -829,6 +1079,30 @@ const settingsDefaultVideoQuality = ref<VideoQualityLevel>(
   getStoredDefaultVideoQuality(),
 );
 
+const WB_FULLSCREEN_KEY = "nonza_settings_wb_fullscreen";
+
+function readWbFullscreen(): boolean {
+  try {
+    const v = localStorage.getItem(WB_FULLSCREEN_KEY);
+    if (v === null) return false;
+    return v === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeWbFullscreen(v: boolean) {
+  try {
+    localStorage.setItem(WB_FULLSCREEN_KEY, v ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+const whiteboardFullscreen = ref(readWbFullscreen());
+const initialWhiteboardFullscreen = ref(readWbFullscreen());
+const settingsWhiteboardFullscreen = ref(readWbFullscreen());
+
 const isAnonymousForSettings = computed(() => !getAuthState()?.user);
 
 const hasUnsavedSettingsChanges = computed(() => {
@@ -845,12 +1119,19 @@ const hasUnsavedSettingsChanges = computed(() => {
     audioChanged = (audioSettingsRef.value as any).hasUnsavedChanges();
   }
 
-  const ttsChanged =
-    replicaTtsEnabled.value !== initialReplicaTtsEnabled.value;
+  const ttsChanged = replicaTtsEnabled.value !== initialReplicaTtsEnabled.value;
   const videoQualityChanged =
     settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value;
+  const wbFullscreenChanged =
+    settingsWhiteboardFullscreen.value !== initialWhiteboardFullscreen.value;
 
-  return nameChanged || audioChanged || ttsChanged || videoQualityChanged;
+  return (
+    nameChanged ||
+    audioChanged ||
+    ttsChanged ||
+    videoQualityChanged ||
+    wbFullscreenChanged
+  );
 });
 
 watch(
@@ -868,6 +1149,7 @@ function handleSettings() {
   settingsParticipantName.value = initialParticipantName.value;
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
   settingsDefaultVideoQuality.value = initialDefaultVideoQuality.value;
+  settingsWhiteboardFullscreen.value = initialWhiteboardFullscreen.value;
   if (
     audioSettingsRef.value &&
     typeof (audioSettingsRef.value as any).resetSettings === "function"
@@ -879,10 +1161,7 @@ function handleSettings() {
 
 async function handleSaveSettings() {
   try {
-    if (
-      isAnonymousForSettings.value &&
-      settingsParticipantName.value.trim()
-    ) {
+    if (isAnonymousForSettings.value && settingsParticipantName.value.trim()) {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
@@ -944,9 +1223,19 @@ async function handleSaveSettings() {
       initialReplicaTtsEnabled.value = replicaTtsEnabled.value;
     }
 
-    if (settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value) {
+    if (
+      settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value
+    ) {
       setStoredDefaultVideoQuality(settingsDefaultVideoQuality.value);
       initialDefaultVideoQuality.value = settingsDefaultVideoQuality.value;
+    }
+
+    if (
+      settingsWhiteboardFullscreen.value !== initialWhiteboardFullscreen.value
+    ) {
+      writeWbFullscreen(settingsWhiteboardFullscreen.value);
+      whiteboardFullscreen.value = settingsWhiteboardFullscreen.value;
+      initialWhiteboardFullscreen.value = settingsWhiteboardFullscreen.value;
     }
 
     isSettingsOpen.value = false;
@@ -962,6 +1251,7 @@ function handleCancelSettings() {
   }
   replicaTtsEnabled.value = initialReplicaTtsEnabled.value;
   settingsDefaultVideoQuality.value = initialDefaultVideoQuality.value;
+  settingsWhiteboardFullscreen.value = initialWhiteboardFullscreen.value;
   if (
     audioSettingsRef.value &&
     typeof (audioSettingsRef.value as any).resetSettings === "function"
@@ -1026,20 +1316,50 @@ function handleModalClose() {
   gap: 0px;
 }
 
+.round-table-collab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 auto;
+  width: 100%;
+}
+
 .round-table-document {
   flex: 0 0 400px;
   min-height: 400px;
   max-height: 600px;
-  padding: 20px;
-  margin-bottom: 50px;
+  padding: 20px 20px 0 0;
+  margin-bottom: 0;
+}
+
+.round-table-whiteboard {
+  flex: 1 1 360px;
+  min-height: 280px;
+  max-height: min(50vh, 560px);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 20px 0 0;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.round-table-whiteboard:first-child {
+  padding-top: 20px;
+  border-top: none;
 }
 
 @media (min-width: 768px) {
-  .round-table-document {
+  .round-table-collab {
     width: 400px;
-    margin-bottom: 0px;
     max-height: calc(100% - 90px);
   }
+
+  .round-table-document {
+    width: 100%;
+    margin-bottom: 0px;
+    max-height: calc(50vh - 60px);
+  }
+
   .round-table-content {
     flex-direction: row;
   }
@@ -1054,5 +1374,4 @@ function handleModalClose() {
     padding: 12px;
   }
 }
-
 </style>

@@ -4,6 +4,7 @@
       <Button
         type="icon"
         size="large"
+        variant="default"
         :class="{ active: popoverOpen }"
         title="Звуки организации"
         @click.stop="togglePopover"

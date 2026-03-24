@@ -29,3 +29,4 @@ export * from "./Skeleton";
 export * from "./Toast";
 export * from "./DiceRoller";
 export * from "./Knob";
+export * from "./ParticipantColorPalette";

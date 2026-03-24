@@ -19,8 +19,7 @@ const (
 	// Send pings to peer with this period (must be less than pongWait)
 	pingPeriod = (pongWait * 9) / 10
 
-	// Maximum message size allowed from peer
-	maxMessageSize = 512 * 1024 // 512KB
+	maxMessageSize = 16 << 20 // 16MiB — Y.js updates with embedded PNG canvas can exceed 512KiB
 )
 
 // Client is a middleman between the websocket connection and the hub

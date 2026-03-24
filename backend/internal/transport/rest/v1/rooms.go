@@ -12,6 +12,7 @@ import (
 	"nonza/backend/internal/models"
 	"nonza/backend/internal/pkg/orgroles"
 	"nonza/backend/internal/service"
+	roomsvc "nonza/backend/internal/service/rooms"
 	"nonza/backend/internal/transport/websocket"
 	"nonza/backend/internal/webrtc/livekit"
 
@@ -290,6 +291,7 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 
 	var req struct {
 		AllowAnonymousJoin *bool   `json:"allow_anonymous_join"`
+		RoomTimerEnabled   *bool   `json:"room_timer_enabled"`
 		RoomType           *string `json:"room_type"`
 		Name               *string `json:"name"`
 		RoomGroupID        *string `json:"room_group_id"`
@@ -308,6 +310,10 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 	}
 	if req.AllowAnonymousJoin != nil {
 		newSettings["allow_anonymous_join"] = *req.AllowAnonymousJoin
+	}
+	if req.RoomTimerEnabled != nil {
+		newSettings["room_timer_enabled"] = *req.RoomTimerEnabled
+		delete(newSettings, "room_timer_started_at")
 	}
 	if req.Password != nil {
 		allowAnonymous := false
@@ -572,18 +578,37 @@ func (h *RoomsHandler) NotifyParticipantLeft(c *gin.Context) {
 		}
 	}
 
+	if h.LiveKit != nil {
+		listCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+		defer cancel()
+		parts, err := h.LiveKit.ListParticipants(listCtx, room.LiveKitRoomName())
+		if err != nil {
+			log.Printf("[rooms] NotifyParticipantLeft ListParticipants err=%v", err)
+		} else if roomsvc.ApplyParticipantCountToRoomTimer(room, len(parts)) {
+			if err := h.Services.Rooms.Update(room); err != nil {
+				log.Printf("[rooms] NotifyParticipantLeft room timer Update err=%v", err)
+			}
+		}
+	}
+
 	if h.WsHub == nil {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 		return
 	}
 
 	orgChannel := "org:" + room.OrganizationID.String()
+	wsPayload := map[string]interface{}{
+		"room": room.LiveKitRoomName(),
+	}
+	if room.Settings != nil {
+		if v, ok := room.Settings["room_timer_started_at"].(string); ok && v != "" {
+			wsPayload["room_timer_started_at"] = v
+		}
+	}
 	msg := websocket.Message{
-		Type:   "participants_changed",
-		RoomID: orgChannel,
-		Payload: map[string]interface{}{
-			"room": room.LiveKitRoomName(),
-		},
+		Type:    "participants_changed",
+		RoomID:  orgChannel,
+		Payload: wsPayload,
 	}
 	if err := h.WsHub.BroadcastToRoom(orgChannel, msg); err != nil {
 		log.Printf("[rooms] NotifyParticipantLeft BroadcastToRoom err=%v", err)

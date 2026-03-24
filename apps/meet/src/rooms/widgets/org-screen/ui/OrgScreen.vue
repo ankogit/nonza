@@ -201,16 +201,29 @@
                         <span class="room-name">{{ room.name }}</span>
                       </span>
                       <span
-                        v-if="room.allow_anonymous_join && room.short_code"
-                        class="room-code room-code--copyable"
-                        role="button"
-                        tabindex="0"
-                        title="Копировать код"
-                        @click.stop="copyRoomCode(room.short_code)"
-                        @keydown.enter.prevent="copyRoomCode(room.short_code)"
-                        @keydown.space.prevent="copyRoomCode(room.short_code)"
-                        >{{ room.short_code }}</span
+                        v-if="
+                          (room.allow_anonymous_join && room.short_code) ||
+                          (room.room_timer_enabled &&
+                            room.room_timer_started_at)
+                        "
+                        class="room-button__codes"
                       >
+                        <span
+                          v-if="room.allow_anonymous_join && room.short_code"
+                          class="room-code room-code--copyable"
+                          role="button"
+                          tabindex="0"
+                          title="Копировать код"
+                          @click.stop="copyRoomCode(room.short_code)"
+                          @keydown.enter.prevent="copyRoomCode(room.short_code)"
+                          @keydown.space.prevent="copyRoomCode(room.short_code)"
+                          >{{ room.short_code }}</span
+                        >
+                        <RoomListTimer
+                          :enabled="!!room.room_timer_enabled"
+                          :started-at="room.room_timer_started_at ?? null"
+                        />
+                      </span>
                     </span>
                     <span class="room-button__indicators">
                       <Button
@@ -353,20 +366,33 @@
                             <span class="room-name">{{ room.name }}</span>
                           </span>
                           <span
-                            v-if="room.allow_anonymous_join && room.short_code"
-                            class="room-code room-code--copyable"
-                            role="button"
-                            tabindex="0"
-                            title="Копировать код"
-                            @click.stop="copyRoomCode(room.short_code)"
-                            @keydown.enter.prevent="
-                              copyRoomCode(room.short_code)
+                            v-if="
+                              (room.allow_anonymous_join && room.short_code) ||
+                              (room.room_timer_enabled &&
+                                room.room_timer_started_at)
                             "
-                            @keydown.space.prevent="
-                              copyRoomCode(room.short_code)
-                            "
-                            >{{ room.short_code }}</span
+                            class="room-button__codes"
                           >
+                            <span
+                              v-if="room.allow_anonymous_join && room.short_code"
+                              class="room-code room-code--copyable"
+                              role="button"
+                              tabindex="0"
+                              title="Копировать код"
+                              @click.stop="copyRoomCode(room.short_code)"
+                              @keydown.enter.prevent="
+                                copyRoomCode(room.short_code)
+                              "
+                              @keydown.space.prevent="
+                                copyRoomCode(room.short_code)
+                              "
+                              >{{ room.short_code }}</span
+                            >
+                            <RoomListTimer
+                              :enabled="!!room.room_timer_enabled"
+                              :started-at="room.room_timer_started_at ?? null"
+                            />
+                          </span>
                         </span>
                         <span class="room-button__indicators">
                           <Button
@@ -518,77 +544,23 @@
           >
             <PixelIcon name="burger" variant="small" />
           </button>
-          <div class="organization-footer-avatar-wrap">
-            <button
-              type="button"
-              class="organization-footer-avatar"
-              :style="{
-                backgroundColor: footerColor,
-                color: '#fff',
-              }"
-              title="Мой цвет в орге"
-              aria-label="Развернуть палитру"
-              :aria-expanded="footerColorsExpanded"
-              :disabled="footerColorSaving"
-              @click="footerColorsExpanded = !footerColorsExpanded"
-            >
-              {{ currentUserLetter }}
-            </button>
-            <div
-              ref="footerColorsRef"
-              class="organization-footer-colors"
-              :class="{
-                'organization-footer-colors--expanded': footerColorsExpanded,
-              }"
-            >
-              <template v-if="footerColorsExpanded">
-                <button
-                  v-for="c in footerColorPalette"
-                  :key="c"
-                  type="button"
-                  class="organization-footer-color"
-                  :class="{
-                    'organization-footer-color--active': footerColor === c,
-                  }"
-                  :style="{ backgroundColor: c }"
-                  :title="c"
-                  aria-label="Выбрать цвет"
-                  :disabled="footerColorSaving"
-                  @click="setFooterColor(c)"
-                />
-                <button
-                  type="button"
-                  class="organization-footer-color organization-footer-color--custom organization-footer-color--trigger"
-                  title="Выбрать любой цвет"
-                  aria-label="Выбрать любой цвет"
-                  :disabled="footerColorSaving"
-                  @click="openFooterColorPicker()"
-                />
-                <input
-                  ref="footerColorPickerRef"
-                  class="organization-footer-color-picker"
-                  type="color"
-                  :value="footerColor"
-                  aria-label="Выбрать любой цвет"
-                  :disabled="footerColorSaving"
-                  @change="onFooterColorPickerInput($event)"
-                />
-                <button
-                  type="button"
-                  class="organization-footer-color organization-footer-color--reset"
-                  :class="{
-                    'organization-footer-color--active': !currentMember?.color,
-                  }"
-                  title="Сбросить цвет"
-                  aria-label="Сбросить цвет"
-                  :disabled="footerColorSaving"
-                  @click="setFooterColor(null)"
-                >
-                  −
-                </button>
-              </template>
-            </div>
-          </div>
+          <ParticipantColorPalette
+            :model-value="footerColor"
+            v-model:expanded="footerColorsExpanded"
+            :palette="footerColorPalette"
+            :disabled="footerColorSaving"
+            show-reset
+            :reset-active="!currentMember?.color"
+            swatch-title="Мой цвет в орге"
+            swatch-aria-label="Развернуть палитру"
+            custom-title="Выбрать любой цвет"
+            custom-aria-label="Выбрать любой цвет"
+            native-picker-aria-label="Выбрать любой цвет"
+            @update:model-value="setFooterColor"
+            @reset="setFooterColor(null)"
+          >
+            <template #swatch>{{ currentUserLetter }}</template>
+          </ParticipantColorPalette>
           <div class="organization-footer-details">
             <span class="organization-footer-username">{{
               currentUserName
@@ -875,6 +847,19 @@
           </FormSection>
           <hr class="HR" />
           <FormSection
+            label="Общий таймер комнаты"
+            hint="Считает время с первого входа в пустую комнату (ч:м:с). Сбрасывается, когда в комнате никого нет."
+          >
+            <PixelSelect
+              :model-value="roomSettingsTimerSelect"
+              :options="roomTimerOptions"
+              :disabled="!canEditRoom"
+              aria-label="Общий таймер комнаты"
+              @update:model-value="roomSettingsTimerSelect = $event"
+            />
+          </FormSection>
+          <hr class="HR" />
+          <FormSection
             label="Разрешить подключение по коду (анонимно)"
             hint="Если включено, по коду комнаты смогут подключаться и из приложения meets, и по ссылке в rooms без входа в организацию."
           >
@@ -1031,6 +1016,7 @@ import {
   AudioSettings,
   Skeleton,
   Switch,
+  ParticipantColorPalette,
 } from "@shared/ui";
 import type { PixelSelectOption } from "@shared/ui";
 import RadioButtonGroup from "@shared/ui/RadioButtonGroup/RadioButtonGroup.vue";
@@ -1042,6 +1028,7 @@ import {
   RoomParticipantsList,
   type RoomParticipantListItem,
 } from "@widgets/room-participants-list";
+import RoomListTimer from "./RoomListTimer.vue";
 import {
   getAuthState,
   getParticipantInfoFromAuth,
@@ -1269,6 +1256,7 @@ const showInviteModal = ref(false);
 const roomSettingsRoom = ref<Room | null>(null);
 const roomSettingsName = ref("");
 const roomSettingsAllowAnonymous = ref(false);
+const roomSettingsRoomTimer = ref(false);
 const roomSettingsRoomType = ref<RoomType>("conference_hall");
 const roomSettingsPassword = ref("");
 const roomSettingsGroupId = ref<string>("");
@@ -1676,8 +1664,6 @@ const footerColor = computed(
 );
 const footerColorSaving = ref(false);
 const footerColorsExpanded = ref(false);
-const footerColorsRef = ref<HTMLElement | null>(null);
-const footerColorPickerRef = ref<HTMLInputElement | null>(null);
 
 async function setFooterColor(color: string | null) {
   if (!props.orgId) return;
@@ -1695,32 +1681,6 @@ async function setFooterColor(color: string | null) {
     footerColorSaving.value = false;
   }
 }
-
-function openFooterColorPicker() {
-  footerColorPickerRef.value?.click();
-}
-
-function onFooterColorPickerInput(e: Event) {
-  const value = (e.target as HTMLInputElement).value;
-  setFooterColor(value);
-}
-
-let footerColorsClose: ((e: MouseEvent) => void) | null = null;
-watch(footerColorsExpanded, (expanded) => {
-  if (footerColorsClose) {
-    document.removeEventListener("click", footerColorsClose);
-    footerColorsClose = null;
-  }
-  if (!expanded) return;
-  footerColorsClose = (e: MouseEvent) => {
-    const el = footerColorsRef.value;
-    if (el?.contains(e.target as Node)) return;
-    footerColorsExpanded.value = false;
-  };
-  requestAnimationFrame(() =>
-    document.addEventListener("click", footerColorsClose!),
-  );
-});
 
 const canCreateRoom = computed(() =>
   canRole(currentMember.value?.role ?? "", ORG_PERMISSION_CREATE_ROOM),
@@ -1758,8 +1718,12 @@ const joinedRoom = computed(() => {
   return list.find((x) => x.short_code === joinedRoomShortCode.value) ?? null;
 });
 
-function roomTypeIcon(roomType: RoomType): "conference" | "round-table" {
-  return roomType === "conference_hall" ? "conference" : "round-table";
+function roomTypeIcon(
+  roomType: RoomType,
+): "conference" | "round-table" | "people" {
+  if (roomType === "conference_hall") return "conference";
+  if (roomType === "table_circle") return "people";
+  return "round-table";
 }
 
 const roomTypeOptions: RadioButtonOption[] = [
@@ -1770,6 +1734,11 @@ const roomTypeOptions: RadioButtonOption[] = [
 const allowAnonymousOptions: PixelSelectOption[] = [
   { value: "true", label: "Разрешить" },
   { value: "false", label: "Запретить" },
+];
+
+const roomTimerOptions: PixelSelectOption[] = [
+  { value: "true", label: "Включить" },
+  { value: "false", label: "Выключить" },
 ];
 
 const roomGroupSelectOptions = computed<PixelSelectOption[]>(() => {
@@ -1785,6 +1754,13 @@ const roomSettingsAllowAnonymousSelect = computed<string>({
   get: () => (roomSettingsAllowAnonymous.value ? "true" : "false"),
   set: (v: string) => {
     roomSettingsAllowAnonymous.value = v === "true";
+  },
+});
+
+const roomSettingsTimerSelect = computed<string>({
+  get: () => (roomSettingsRoomTimer.value ? "true" : "false"),
+  set: (v: string) => {
+    roomSettingsRoomTimer.value = v === "true";
   },
 });
 
@@ -2181,6 +2157,7 @@ function openRoomSettings(room: Room) {
   roomSettingsRoom.value = room;
   roomSettingsName.value = room.name;
   roomSettingsAllowAnonymous.value = room.allow_anonymous_join ?? false;
+  roomSettingsRoomTimer.value = room.room_timer_enabled ?? false;
   roomSettingsRoomType.value =
     room.room_type === "conference_hall" || room.room_type === "round_table"
       ? room.room_type
@@ -2195,12 +2172,14 @@ async function saveRoomSettings() {
   try {
     const payload: {
       allow_anonymous_join: boolean;
+      room_timer_enabled: boolean;
       room_type: RoomType;
       name?: string;
       room_group_id?: string | null;
       password?: string | null;
     } = {
       allow_anonymous_join: roomSettingsAllowAnonymous.value,
+      room_timer_enabled: roomSettingsRoomTimer.value,
       room_type: roomSettingsRoomType.value,
     };
     const nameTrimmed = roomSettingsName.value.trim();
@@ -2404,6 +2383,7 @@ watch(joinedRoomShortCode, (code) => {
 watch(roomSettingsRoom, (room) => {
   roomSettingsName.value = room?.name ?? "";
   roomSettingsAllowAnonymous.value = room?.allow_anonymous_join ?? false;
+  roomSettingsRoomTimer.value = room?.room_timer_enabled ?? false;
   roomSettingsRoomType.value =
     room?.room_type === "conference_hall" || room?.room_type === "round_table"
       ? room.room_type

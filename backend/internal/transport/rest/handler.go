@@ -20,9 +20,10 @@ type Handler struct {
 	services  *service.Services
 	wsHub     *websocket.Hub
 	wsHandler *websocket.Handler
+	livekit   *livekit.Client
 }
 
-func NewHandler(services *service.Services, redisClient *redis.Client, roomsRepo repository.Rooms, documentTTL string) *Handler {
+func NewHandler(services *service.Services, redisClient *redis.Client, roomsRepo repository.Rooms, documentTTL string, cfg *config.Config) *Handler {
 	wsHub := websocket.NewHub(redisClient, roomsRepo)
 	wsHandler := websocket.NewHandler(wsHub)
 
@@ -33,6 +34,7 @@ func NewHandler(services *service.Services, redisClient *redis.Client, roomsRepo
 		services:  services,
 		wsHub:     wsHub,
 		wsHandler: wsHandler,
+		livekit:   livekit.NewClient(cfg),
 	}
 }
 
@@ -209,9 +211,9 @@ func (h *Handler) initAuthRoutes(api *gin.RouterGroup) {
 	authHandler := v1.NewAuthHandler(h.services)
 	auth := api.Group("/auth")
 	{
-	auth.POST("/register", authHandler.Register)
-	auth.POST("/login", authHandler.Login)
-	auth.POST("/refresh", authHandler.Refresh)
-	auth.PATCH("/me", authHandler.UpdateMe)
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.Refresh)
+		auth.PATCH("/me", authHandler.UpdateMe)
 	}
 }

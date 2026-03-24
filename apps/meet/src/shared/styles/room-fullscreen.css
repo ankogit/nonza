@@ -21,6 +21,21 @@
   justify-content: center;
 }
 
+.room-fullscreen__editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+.room-fullscreen .wb-shell__header {
+  padding-right: 72px;
+  box-sizing: border-box;
+}
+
 .room-fullscreen__video .player {
   width: 100%;
   height: 100%;
@@ -62,6 +77,10 @@
   box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5);
   background: #1a1a1a;
   cursor: move;
+}
+
+.room-fullscreen__pip.room-fullscreen__pip--remote-camera {
+  z-index: 10005;
 }
 
 .room-fullscreen__pip .player {

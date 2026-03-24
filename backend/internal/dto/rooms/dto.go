@@ -41,6 +41,8 @@ type RoomResponse struct {
 	ConferenceHallLeaderID *string    `json:"conference_hall_leader_id"`
 	CreatedByUserID        *string    `json:"created_by_user_id,omitempty"`
 	AllowAnonymousJoin     bool       `json:"allow_anonymous_join"`
+	RoomTimerEnabled       bool       `json:"room_timer_enabled"`
+	RoomTimerStartedAt     *time.Time `json:"room_timer_started_at,omitempty"`
 	PasswordProtected      bool       `json:"password_protected"`
 	Position               int        `json:"position"`
 	CreatedAt              time.Time  `json:"created_at"`
@@ -53,6 +55,8 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 	var conferenceHallLeaderID *string
 	var createdByUserID *string
 	allowAnonymousJoin := false
+	roomTimerEnabled := false
+	var roomTimerStartedAt *time.Time
 	passwordProtected := false
 	if room.Settings != nil {
 		if v, ok := room.Settings["e2ee_enabled"].(bool); ok {
@@ -66,6 +70,16 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 		}
 		if v, ok := room.Settings["allow_anonymous_join"].(bool); ok {
 			allowAnonymousJoin = v
+		}
+		if v, ok := room.Settings["room_timer_enabled"].(bool); ok {
+			roomTimerEnabled = v
+		}
+		if v, ok := room.Settings["room_timer_started_at"].(string); ok && v != "" {
+			if t, err := time.Parse(time.RFC3339Nano, v); err == nil {
+				roomTimerStartedAt = &t
+			} else if t, err := time.Parse(time.RFC3339, v); err == nil {
+				roomTimerStartedAt = &t
+			}
 		}
 		if v, ok := room.Settings["room_password_hash"].(string); ok && v != "" {
 			passwordProtected = true
@@ -85,6 +99,8 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 		ConferenceHallLeaderID: conferenceHallLeaderID,
 		CreatedByUserID:        createdByUserID,
 		AllowAnonymousJoin:     allowAnonymousJoin,
+		RoomTimerEnabled:       roomTimerEnabled,
+		RoomTimerStartedAt:     roomTimerStartedAt,
 		PasswordProtected:      passwordProtected,
 		Position:               room.Position,
 		CreatedAt:              room.CreatedAt,

@@ -4,6 +4,17 @@ import {
   encodeAwarenessUpdate,
 } from "y-protocols/awareness";
 
+const B64_ENCODE_CHUNK = 8192;
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += B64_ENCODE_CHUNK) {
+    const end = Math.min(i + B64_ENCODE_CHUNK, bytes.length);
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, end)));
+  }
+  return btoa(binary);
+}
+
 export interface YjsWebSocketProviderOptions {
   url: string;
   roomId: string;
@@ -40,7 +51,7 @@ export class YjsWebSocketProvider {
   private pendingUpdates: Uint8Array[] = [];
   private awarenessDebounceTimeout: number | null = null;
   private pendingAwarenessUpdate: Uint8Array | null = null;
-  private readonly UPDATE_DEBOUNCE_MS = 250; // Debounce delay for document updates
+  private readonly UPDATE_DEBOUNCE_MS = 600;
   private readonly AWARENESS_DEBOUNCE_MS = 100; // Smaller debounce for awareness (cursors should be more responsive)
 
   constructor(options: YjsWebSocketProviderOptions) {
@@ -240,44 +251,48 @@ export class YjsWebSocketProvider {
     if (event.data instanceof ArrayBuffer) {
       const update = new Uint8Array(event.data);
 
-      // Try to apply as document update first (most common case)
-      // If it fails and update is small, try as awareness update
-      const isSmallUpdate = update.length < 500;
-
-      if (isSmallUpdate && this.awareness && update.length > 0) {
-        // Try as awareness update first for small non-empty updates
-        // Empty updates are always document updates (document cleared)
-        try {
-          // Try to apply as awareness update
-          // Get states before update for comparison
-          applyAwarenessUpdate(this.awareness, update, this);
-          return;
-        } catch {
-          // If awareness update fails, try as document update
-        }
-      }
-
-      // Apply as document update (either because it's large, awareness failed, or it's empty)
-      // Empty updates are valid - they represent document clearing
       try {
         Y.applyUpdate(this.doc, update, this);
         if (!this.synced) {
           this.synced = true;
           this.emitSynced();
         }
-      } catch (error) {
-        console.error(
-          "[YjsWebSocketProvider] Error applying document update:",
-          error,
-        );
-        console.error("[YjsWebSocketProvider] Update details:", {
-          length: update.length,
-          firstBytes:
-            update.length > 0
-              ? Array.from(update.slice(0, Math.min(10, update.length)))
-              : [],
-          errorMessage: error instanceof Error ? error.message : String(error),
-        });
+      } catch (docErr) {
+        if (this.awareness && update.length > 0) {
+          try {
+            applyAwarenessUpdate(this.awareness, update, this);
+          } catch (awarenessErr) {
+            console.error(
+              "[YjsWebSocketProvider] Error applying document update:",
+              docErr,
+            );
+            console.error(
+              "[YjsWebSocketProvider] Error applying awareness update:",
+              awarenessErr,
+            );
+            console.error("[YjsWebSocketProvider] Update details:", {
+              length: update.length,
+              firstBytes:
+                update.length > 0
+                  ? Array.from(update.slice(0, Math.min(10, update.length)))
+                  : [],
+            });
+          }
+        } else {
+          console.error(
+            "[YjsWebSocketProvider] Error applying document update:",
+            docErr,
+          );
+          console.error("[YjsWebSocketProvider] Update details:", {
+            length: update.length,
+            firstBytes:
+              update.length > 0
+                ? Array.from(update.slice(0, Math.min(10, update.length)))
+                : [],
+            errorMessage:
+              docErr instanceof Error ? docErr.message : String(docErr),
+          });
+        }
       }
       return;
     }
@@ -376,9 +391,7 @@ export class YjsWebSocketProvider {
       this.updateDebounceTimeout = null;
 
       // Send merged update
-      const base64 = btoa(
-        String.fromCharCode.apply(null, Array.from(mergedUpdate)),
-      );
+      const base64 = uint8ArrayToBase64(mergedUpdate);
       const message = {
         type: "yjs_update",
         room_id: this.roomId,
@@ -422,7 +435,7 @@ export class YjsWebSocketProvider {
       this.pendingAwarenessUpdate = null;
       this.awarenessDebounceTimeout = null;
 
-      const base64 = btoa(String.fromCharCode.apply(null, Array.from(update)));
+      const base64 = uint8ArrayToBase64(update);
       const message = {
         type: "yjs_awareness",
         room_id: this.roomId,
@@ -445,7 +458,7 @@ export class YjsWebSocketProvider {
     }
 
     try {
-      const base64 = btoa(String.fromCharCode.apply(null, Array.from(update)));
+      const base64 = uint8ArrayToBase64(update);
       const message = {
         type: "yjs_awareness",
         room_id: this.roomId,
@@ -478,6 +491,10 @@ export class YjsWebSocketProvider {
     this.ws.send(JSON.stringify(message));
   }
 
+  persistRoomDocument(): void {
+    this.sendFullState();
+  }
+
   /** Sends full document state (Y.encodeStateAsUpdate) so server can store it for new joiners. */
   private sendFullState(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -485,9 +502,7 @@ export class YjsWebSocketProvider {
     }
     try {
       const stateUpdate = Y.encodeStateAsUpdate(this.doc);
-      const base64 = btoa(
-        String.fromCharCode.apply(null, Array.from(stateUpdate)),
-      );
+      const base64 = uint8ArrayToBase64(stateUpdate);
       const message = {
         type: "yjs_full_state",
         room_id: this.roomId,

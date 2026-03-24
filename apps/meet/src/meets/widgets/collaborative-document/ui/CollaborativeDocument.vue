@@ -179,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, inject, computed } from "vue";
 import { PixelIcon, Button } from "@shared/ui";
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
@@ -188,177 +188,94 @@ import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Link from "@tiptap/extension-link";
 import { Markdown } from "@tiptap/markdown";
 import * as Y from "yjs";
-import * as awarenessProtocol from "y-protocols/awareness";
-import { encodeAwarenessUpdate } from "y-protocols/awareness";
-import {
-  YjsWebSocketProvider,
-  DEFAULT_PARTICIPANT_COLOR,
-} from "@shared/lib";
+import { DEFAULT_PARTICIPANT_COLOR, type YjsWebSocketProvider } from "@shared/lib";
 import type { Room as RoomEntity } from "@shared/entities";
+import { MEET_ROOM_COLLABORATION_KEY } from "@features/room-collaboration";
 
 const props = defineProps<{
   room: RoomEntity | null;
-  apiBaseURL: string;
   participantName: string;
   participantColor?: string | null;
 }>();
 
-// Y.js document
-// TipTap Collaboration will create the "content" XmlFragment automatically
-const ydoc = new Y.Doc();
+const collab = inject(MEET_ROOM_COLLABORATION_KEY, null);
 
-// Create awareness for tracking cursor positions and user info
-const awareness = new awarenessProtocol.Awareness(ydoc);
-
-// Editor instance
-const editor = ref<Editor>();
-const provider = ref<YjsWebSocketProvider | null>(null);
-const connectionStatus = ref<"connecting" | "connected" | "disconnected">(
-  "disconnected",
-);
-
-function handleBeforeUnload() {
-  if (awareness && provider.value?.connected) {
-    try {
-      awareness.setLocalState(null);
-      const p = provider.value as any;
-      if (p?.ws?.readyState === WebSocket.OPEN) {
-        const update = encodeAwarenessUpdate(awareness, [awareness.clientID]);
-        if (update.length > 0) {
-          const base64 = btoa(
-            String.fromCharCode.apply(null, Array.from(update)),
-          );
-          p.ws.send(
-            JSON.stringify({
-              type: "yjs_awareness",
-              room_id: p.roomId,
-              payload: { update: base64 },
-            }),
-          );
-        }
-      }
-    } catch (error) {
-      console.error(
-        "[CollaborativeDocument] Error sending final awareness update:",
-        error,
-      );
-    }
-  }
+if (!collab && import.meta.env.DEV) {
+  console.error(
+    "[CollaborativeDocument] Missing MEET_ROOM_COLLABORATION_KEY — wrap with RoomRoundTable provide",
+  );
 }
 
-const initializeEditor = () => {
-  if (!props.room || !props.apiBaseURL) {
-    console.warn("[CollaborativeDocument] Missing room or apiBaseURL");
-    return;
-  }
+const connectionStatus = computed(() => {
+  if (!collab) return "disconnected" as const;
+  return collab.connectionStatus.value;
+});
 
-  // Convert http:// to ws:// and https:// to wss://
-  const wsProtocol = props.apiBaseURL.startsWith("https://")
-    ? "wss://"
-    : "ws://";
-  const wsHost = props.apiBaseURL.replace(/^https?:\/\//, "");
-  const wsUrl = `${wsProtocol}${wsHost}`;
+const editor = ref<Editor>();
+const mounted = ref(false);
 
-  // Clean up existing provider if it exists
-  if (provider.value) {
-    provider.value.destroy();
-    provider.value = null;
-  }
+function destroyEditor() {
+  editor.value?.destroy();
+  editor.value = undefined;
+}
 
+function createEditor(doc: Y.Doc, prov: YjsWebSocketProvider) {
+  if (editor.value) return;
   const userColor =
     props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR;
-  awareness.setLocalStateField("user", {
-    name: props.participantName,
-    color: userColor,
-  });
-
-  // Create WebSocket provider with awareness
-  provider.value = new YjsWebSocketProvider({
-    url: wsUrl,
-    roomId: props.room.id,
-    userId: props.participantName,
-    doc: ydoc,
-    awareness: awareness,
-  });
-
-  provider.value.onStatus((status) => {
-    connectionStatus.value = status;
-  });
-
-  // Initialize TipTap editor with Y.js collaboration
-  // Only create editor if it doesn't exist
-  if (!editor.value) {
-    try {
-      editor.value = new Editor({
-        onCreate: ({ editor: currentEditor }) => {
-          const userColor =
-            props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR;
-          currentEditor
-            .chain()
-            .focus()
-            .updateUser({
-              name: props.participantName,
-              color: userColor,
-            })
-            .run();
-
-          if (
-            provider.value &&
-            typeof (provider.value as any).on === "function"
-          ) {
-            (provider.value as any).on("synced", () => {});
-          }
-
-          if (provider.value?.awareness) {
-            provider.value.awareness.on("change", () => {});
-          }
-        },
-        extensions: [
-          StarterKit.configure({
-            // Disable undoRedo as Collaboration extension provides its own history
-            undoRedo: false,
-            // Disable Link in StarterKit since we configure it separately
-            link: false,
-          }),
-          Link.configure({
-            openOnClick: false,
-            HTMLAttributes: {
-              class: "collaborative-document__link",
-            },
-          }),
-          Collaboration.extend().configure({
-            document: ydoc,
-          }),
-          CollaborationCaret.extend().configure({
-            provider: provider.value as any,
-            user: {
-              name: props.participantName,
-              color:
-                props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR,
-            },
-          }),
-          Markdown.configure({
-            // Enable GitHub Flavored Markdown for better support
-            markedOptions: {
-              gfm: true,
-            },
-          }),
-        ],
-        editorProps: {
-          attributes: {
-            class: "collaborative-document__editor-content",
-            spellcheck: "false",
+  try {
+    editor.value = new Editor({
+      onCreate: ({ editor: currentEditor }) => {
+        currentEditor
+          .chain()
+          .focus()
+          .updateUser({
+            name: props.participantName,
+            color: userColor,
+          })
+          .run();
+      },
+      extensions: [
+        StarterKit.configure({
+          undoRedo: false,
+          link: false,
+        }),
+        Link.configure({
+          openOnClick: false,
+          HTMLAttributes: {
+            class: "collaborative-document__link",
           },
+        }),
+        Collaboration.extend().configure({
+          document: doc,
+        }),
+        CollaborationCaret.extend().configure({
+          provider: prov as never,
+          user: {
+            name: props.participantName,
+            color: userColor,
+          },
+        }),
+        Markdown.configure({
+          markedOptions: {
+            gfm: true,
+          },
+        }),
+      ],
+      editorProps: {
+        attributes: {
+          class: "collaborative-document__editor-content",
+          spellcheck: "false",
         },
-      });
-    } catch (error) {
-      console.error(
-        "[CollaborativeDocument] Error initializing editor:",
-        error,
-      );
-    }
+      },
+    });
+  } catch (error) {
+    console.error(
+      "[CollaborativeDocument] Error initializing editor:",
+      error,
+    );
   }
-};
+}
 
 const handleCopy = async () => {
   if (!editor.value) return;
@@ -419,60 +336,44 @@ const handleLink = () => {
     .run();
 };
 
-// Track if component is mounted
-const isMounted = ref(false);
-
 watch(
-  () => [props.room?.id, props.apiBaseURL],
-  () => {
-    // Only reinitialize if component is mounted
-    if (!isMounted.value) return;
-
-    // Clean up existing editor and provider
-    if (editor.value) {
-      editor.value.destroy();
-      editor.value = undefined;
-    }
-    if (provider.value) {
-      provider.value.destroy();
-      provider.value = null;
-    }
-
-    // Initialize new editor only if room and apiBaseURL are available
-    if (props.room && props.apiBaseURL) {
-      // Use nextTick to ensure DOM is ready
-      setTimeout(() => {
-        initializeEditor();
-      }, 0);
-    }
+  () =>
+    [
+      mounted.value,
+      collab?.ydoc.value ?? null,
+      collab?.provider.value ?? null,
+    ] as const,
+  ([ready, doc, prov]) => {
+    destroyEditor();
+    if (!ready || !doc || !prov) return;
+    void nextTick(() => {
+      createEditor(doc, prov);
+    });
   },
-  { immediate: false },
+  { immediate: true },
 );
 
-onMounted(async () => {
-  isMounted.value = true;
-  window.addEventListener("beforeunload", handleBeforeUnload);
-  window.addEventListener("pagehide", handleBeforeUnload);
+watch(
+  () => [props.participantName, props.participantColor] as const,
+  () => {
+    const userColor =
+      props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR;
+    editor.value
+      ?.chain()
+      .updateUser({
+        name: props.participantName,
+        color: userColor,
+      })
+      .run();
+  },
+);
 
-  if (props.room && props.apiBaseURL) {
-    await nextTick();
-    initializeEditor();
-  }
+onMounted(() => {
+  mounted.value = true;
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("beforeunload", handleBeforeUnload);
-  window.removeEventListener("pagehide", handleBeforeUnload);
-
-  if (provider.value) {
-    provider.value.destroy();
-  }
-
-  editor.value?.destroy();
-  if (awareness && typeof awareness.destroy === "function") {
-    awareness.destroy();
-  }
-  ydoc.destroy();
+  destroyEditor();
 });
 </script>
 

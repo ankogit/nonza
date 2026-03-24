@@ -104,7 +104,7 @@ func Run(cfg *config.Config) error {
 		ObjectStorage:     objectStorage,
 	})
 
-	restHandler := rest.NewHandler(services, redisCli, repositories.Rooms, cfg.DocumentTTL)
+	restHandler := rest.NewHandler(services, redisCli, repositories.Rooms, cfg.DocumentTTL, cfg)
 	router := restHandler.InitRoutes(cfg)
 
 	// Setup cron for expired rooms cleanup

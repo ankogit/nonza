@@ -437,7 +437,7 @@
         </div>
         <div
           v-if="showFullscreenCameraPiP && fullscreenResolvedParticipant"
-          class="room-fullscreen__pip"
+          class="room-fullscreen__pip room-fullscreen__pip--remote-camera"
           :style="fullscreenCameraPiPStyle"
           @pointerdown="fullscreenCameraPiPDraggable.handlePointerDown"
         >
@@ -470,6 +470,7 @@
                 : undefined
             "
             preferred-video-source="camera"
+            :on-tracks-updated="() => fullscreenTracksVersion++"
           />
           <div
             data-pip-resize-handle
@@ -709,6 +710,10 @@ import {
   setStoredDefaultVideoQuality,
   type VideoQualityLevel,
   useDraggablePiP,
+  evaluateFullscreenCameraPip,
+  logFullscreenPipGateIfChanged,
+  resetFullscreenPipGateLog,
+  logFullscreenPip,
   toggleOutputMuted,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
@@ -1035,10 +1040,21 @@ const fullscreenParticipantColor = computed(() => {
 
 function handleFullSize(identity: string) {
   fullscreenIdentity.value = identity;
+  resetFullscreenPipGateLog();
+  void nextTick(() => {
+    const part = fullscreenParticipant.value;
+    if (!part) return;
+    const ev = evaluateFullscreenCameraPip(
+      part,
+      localParticipant.value?.identity,
+    );
+    logFullscreenPip("opened fullscreen", { identity, ...ev });
+  });
 }
 
 function closeFullscreen() {
   fullscreenIdentity.value = null;
+  resetFullscreenPipGateLog();
 }
 
 function participantHasBothCameraAndScreen(
@@ -1046,31 +1062,48 @@ function participantHasBothCameraAndScreen(
 ): boolean {
   if (!p) return false;
   const participant = resolveParticipant(p);
-  if (!participant?.videoTrackPublications) return false;
-  type VideoPub = {
-    source: Track.Source;
-    track?: { mediaStreamTrack: MediaStreamTrack };
-    isSubscribed?: boolean;
-  };
-  const pubs = Array.from(
-    participant.videoTrackPublications.values() as unknown as Iterable<VideoPub>,
+  const ev = evaluateFullscreenCameraPip(
+    participant,
+    localParticipant.value?.identity,
   );
-  const isLocal = participant === localParticipant.value;
-  const has = (source: Track.Source) =>
-    pubs.some(
-      (pub) =>
-        pub.source === source &&
-        pub.track &&
-        pub.track.mediaStreamTrack?.readyState !== "ended" &&
-        (isLocal || pub.isSubscribed),
-    );
-  return has(Track.Source.Camera) && has(Track.Source.ScreenShare);
+  logFullscreenPipGateIfChanged(participant?.identity ?? undefined, ev);
+  return ev.show;
 }
 
 const fullscreenTracksVersion = ref(0);
+
+watch(
+  () => [props.livekitRoom, fullscreenIdentity.value] as const,
+  ([room, identity]) => {
+    if (!room || !identity) return;
+    const bump = () => {
+      fullscreenTracksVersion.value++;
+    };
+    const onTrackPublished = (
+      _pub: unknown,
+      participant: { identity: string },
+    ) => {
+      if (participant.identity === identity) bump();
+    };
+    const onTrackUnpublished = (
+      _pub: unknown,
+      participant: { identity: string },
+    ) => {
+      if (participant.identity === identity) bump();
+    };
+    room.on(RoomEvent.TrackPublished, onTrackPublished);
+    room.on(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    return () => {
+      room.off(RoomEvent.TrackPublished, onTrackPublished);
+      room.off(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    };
+  },
+);
+
 const fullscreenCameraPiPDraggable = useDraggablePiP(undefined, undefined, {
   getBottomOffset: () => 88,
   defaultSide: "left",
+  defaultVertical: "top",
 });
 const fullscreenCameraPiPStyle = computed(() => ({
   left: fullscreenCameraPiPDraggable.position.value.x + "px",

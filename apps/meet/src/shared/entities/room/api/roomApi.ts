@@ -65,6 +65,7 @@ export class RoomApi {
     shortCode: string,
     data: {
       allow_anonymous_join?: boolean;
+      room_timer_enabled?: boolean;
       room_type?: import("@shared/lib").RoomType;
       name?: string;
       room_group_id?: string | null;
