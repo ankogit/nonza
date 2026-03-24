@@ -25,6 +25,7 @@
         v-if="mode === 'simple'"
         embedded
         :participant-color="participantColor"
+        :room-id="roomId"
       />
       <p v-else class="wb-shell__studio-placeholder">
         Студия открыта на весь экран. Закройте студию крестиком в углу.
@@ -84,14 +85,14 @@ const connectionStatus = computed(() => {
 .wb-shell {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
   min-height: 0;
-  flex: 1;
   background: #1f1f1f;
   border: 2px solid #444;
   box-sizing: border-box;
-  overflow-x: visible;
-  overflow-y: hidden;
+  overflow: visible;
 }
 
 .wb-shell__header {
@@ -127,10 +128,10 @@ const connectionStatus = computed(() => {
 }
 
 .wb-shell__body {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   overflow: visible;
 }
 

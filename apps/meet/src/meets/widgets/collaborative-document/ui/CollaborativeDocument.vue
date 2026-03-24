@@ -5,7 +5,8 @@
       <div class="collaborative-document__actions">
         <Button
           type="icon"
-          size="small"
+          size="tiny"
+          variant="default"
           class="collaborative-document__button"
           title="Копировать"
           aria-label="Копировать"
@@ -15,7 +16,8 @@
         </Button>
         <Button
           type="icon"
-          size="small"
+          size="tiny"
+          variant="default"
           class="collaborative-document__button"
           title="Скачать"
           aria-label="Скачать"
@@ -42,7 +44,7 @@
     <div v-if="editor" class="collaborative-document__toolbar">
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('bold') ? 'active' : 'default'"
         title="Жирный"
@@ -53,7 +55,7 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('italic') ? 'active' : 'default'"
         title="Курсив"
@@ -64,7 +66,7 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('strike') ? 'active' : 'default'"
         title="Зачеркнутый"
@@ -76,9 +78,11 @@
       <div class="collaborative-document__toolbar-separator"></div>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
-        :variant="editor.isActive('heading', { level: 1 }) ? 'active' : 'default'"
+        :variant="
+          editor.isActive('heading', { level: 1 }) ? 'active' : 'default'
+        "
         title="Заголовок 1"
         aria-label="Заголовок 1"
         @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
@@ -87,9 +91,11 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
-        :variant="editor.isActive('heading', { level: 2 }) ? 'active' : 'default'"
+        :variant="
+          editor.isActive('heading', { level: 2 }) ? 'active' : 'default'
+        "
         title="Заголовок 2"
         aria-label="Заголовок 2"
         @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
@@ -98,9 +104,11 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
-        :variant="editor.isActive('heading', { level: 3 }) ? 'active' : 'default'"
+        :variant="
+          editor.isActive('heading', { level: 3 }) ? 'active' : 'default'
+        "
         title="Заголовок 3"
         aria-label="Заголовок 3"
         @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
@@ -110,7 +118,7 @@
       <div class="collaborative-document__toolbar-separator"></div>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('bulletList') ? 'active' : 'default'"
         title="Маркированный список"
@@ -121,7 +129,7 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('orderedList') ? 'active' : 'default'"
         title="Нумерованный список"
@@ -132,7 +140,7 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('blockquote') ? 'active' : 'default'"
         title="Цитата"
@@ -143,7 +151,7 @@
       </Button>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('code') ? 'active' : 'default'"
         title="Код"
@@ -155,7 +163,7 @@
       <div class="collaborative-document__toolbar-separator"></div>
       <Button
         type="icon"
-        size="small"
+        size="tiny"
         class="collaborative-document__toolbar-button"
         :variant="editor.isActive('link') ? 'active' : 'default'"
         title="Ссылка"
@@ -179,7 +187,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, inject, computed } from "vue";
+import {
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  nextTick,
+  inject,
+  computed,
+} from "vue";
 import { PixelIcon, Button } from "@shared/ui";
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
@@ -188,7 +204,10 @@ import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Link from "@tiptap/extension-link";
 import { Markdown } from "@tiptap/markdown";
 import * as Y from "yjs";
-import { DEFAULT_PARTICIPANT_COLOR, type YjsWebSocketProvider } from "@shared/lib";
+import {
+  DEFAULT_PARTICIPANT_COLOR,
+  type YjsWebSocketProvider,
+} from "@shared/lib";
 import type { Room as RoomEntity } from "@shared/entities";
 import { MEET_ROOM_COLLABORATION_KEY } from "@features/room-collaboration";
 
@@ -221,8 +240,7 @@ function destroyEditor() {
 
 function createEditor(doc: Y.Doc, prov: YjsWebSocketProvider) {
   if (editor.value) return;
-  const userColor =
-    props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR;
+  const userColor = props.participantColor?.trim() || DEFAULT_PARTICIPANT_COLOR;
   try {
     editor.value = new Editor({
       onCreate: ({ editor: currentEditor }) => {
@@ -270,10 +288,7 @@ function createEditor(doc: Y.Doc, prov: YjsWebSocketProvider) {
       },
     });
   } catch (error) {
-    console.error(
-      "[CollaborativeDocument] Error initializing editor:",
-      error,
-    );
+    console.error("[CollaborativeDocument] Error initializing editor:", error);
   }
 }
 

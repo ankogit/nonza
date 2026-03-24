@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard bg-dark">
+  <div class="dashboard bg-dark round-table-room">
     <header
       v-if="settingsInUpperMenu"
       class="round-table__top-menu room-header bg-dark-20"
@@ -786,7 +786,44 @@ function toggleDocument() {
   isDocumentOpen.value = !isDocumentOpen.value;
 }
 
+const WB_ROOM_OPEN_PREFIX = "nonza_meet_wb_open_";
+
+function readStoredWhiteboardOpen(roomId: string | undefined): boolean {
+  if (!roomId) return false;
+  try {
+    return localStorage.getItem(WB_ROOM_OPEN_PREFIX + roomId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredWhiteboardOpen(roomId: string | undefined, open: boolean) {
+  if (!roomId) return;
+  try {
+    localStorage.setItem(WB_ROOM_OPEN_PREFIX + roomId, open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
 const isWhiteboardOpen = ref(false);
+
+watch(
+  () => [props.room?.id, props.showDocument] as const,
+  ([id, showDoc]) => {
+    if (!id || !showDoc) return;
+    isWhiteboardOpen.value = readStoredWhiteboardOpen(id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isWhiteboardOpen.value] as const,
+  () => {
+    writeStoredWhiteboardOpen(props.room?.id, isWhiteboardOpen.value);
+  },
+);
+
 function toggleWhiteboard() {
   isWhiteboardOpen.value = !isWhiteboardOpen.value;
 }
@@ -1278,6 +1315,15 @@ function handleModalClose() {
 </script>
 
 <style scoped>
+.round-table-room {
+  flex: 1;
+  min-height: 0;
+}
+
+.round-table-room :deep(.menu) {
+  z-index: 100;
+}
+
 .room-info h2 {
   margin: 0;
   font-size: 1.5rem;
@@ -1322,6 +1368,11 @@ function handleModalClose() {
   gap: 12px;
   flex: 0 0 auto;
   width: 100%;
+  min-height: 0;
+  max-height: calc(100dvh - 200px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .round-table-document {
@@ -1333,9 +1384,7 @@ function handleModalClose() {
 }
 
 .round-table-whiteboard {
-  flex: 1 1 360px;
-  min-height: 280px;
-  max-height: min(50vh, 560px);
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   padding: 10px 20px 0 0;
@@ -1371,7 +1420,40 @@ function handleModalClose() {
     width: 100%;
     max-width: 100%;
     min-height: 280px;
-    padding: 12px;
+  }
+}
+
+@media (max-width: 767px) {
+  .round-table-content {
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .round-table-content > .call-grid {
+    flex: 0 0 auto;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
+    overflow-y: visible;
+    padding-bottom: 20px;
+  }
+
+  .round-table-collab {
+    padding-bottom: 0;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .round-table-document {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
+  }
+
+  .round-table-whiteboard {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
   }
 }
 </style>

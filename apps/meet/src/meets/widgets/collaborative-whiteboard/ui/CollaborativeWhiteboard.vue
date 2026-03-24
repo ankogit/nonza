@@ -9,11 +9,22 @@
         <Button
           type="icon"
           size="small"
+          variant="default"
+          class="collab-whiteboard__button"
+          title="Сохранить как JPG"
+          aria-label="Сохранить как JPG"
+          @click="exportToJpg"
+        >
+          <PixelIcon name="download" variant="small" />
+        </Button>
+        <Button
+          type="icon"
+          size="small"
           variant="danger"
           class="collab-whiteboard__button"
           title="Очистить доску"
           aria-label="Очистить доску"
-          @click="handleClearAll"
+          @click="showClearConfirm = true"
         >
           <PixelIcon name="delete" variant="small" />
         </Button>
@@ -44,7 +55,7 @@
           swatch-title="Цвет линии"
           swatch-aria-label="Развернуть палитру"
           native-picker-aria-label="Выбор цвета"
-          @update:model-value="isEraser = false"
+          @pick="isEraser = false"
         />
         <div
           class="collab-whiteboard__sizes"
@@ -78,11 +89,22 @@
           <Button
             type="icon"
             size="tiny"
+            variant="default"
+            class="collab-whiteboard__button"
+            title="Сохранить как JPG"
+            aria-label="Сохранить как JPG"
+            @click="exportToJpg"
+          >
+            <PixelIcon name="download" variant="small" />
+          </Button>
+          <Button
+            type="icon"
+            size="tiny"
             variant="danger"
             class="collab-whiteboard__button"
             title="Очистить доску"
             aria-label="Очистить доску"
-            @click="handleClearAll"
+            @click="showClearConfirm = true"
           >
             <PixelIcon name="delete" variant="small" />
           </Button>
@@ -91,34 +113,68 @@
     </div>
 
     <div
-      ref="surfaceRef"
-      class="collab-whiteboard__surface"
-      :class="{ 'collab-whiteboard__surface--eraser': isEraser }"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
-      @pointerleave="onPointerLeave"
+      class="collab-whiteboard__surface-slot"
+      :class="{ 'collab-whiteboard__surface-slot--embedded': embedded }"
     >
-      <canvas ref="canvasRef" class="collab-whiteboard__canvas" />
-      <div class="collab-whiteboard__cursors">
-        <div
-          v-for="p in remoteCursors"
-          :key="p.clientId"
-          class="collab-whiteboard__cursor"
-          :style="{
-            transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`,
-            borderColor: p.color,
-          }"
-        >
-          <span
-            class="collab-whiteboard__cursor-label"
-            :style="{ background: p.color }"
-            >{{ p.name }}</span
+      <div
+        ref="surfaceRef"
+        class="collab-whiteboard__surface"
+        :class="{ 'collab-whiteboard__surface--eraser': isEraser }"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
+        @pointerleave="onPointerLeave"
+      >
+        <canvas ref="canvasRef" class="collab-whiteboard__canvas" />
+        <div class="collab-whiteboard__cursors">
+          <div
+            v-for="p in remoteCursors"
+            :key="p.clientId"
+            class="collab-whiteboard__cursor"
+            :style="{
+              transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`,
+              borderColor: p.color,
+            }"
           >
+            <span
+              class="collab-whiteboard__cursor-label"
+              :style="{ background: p.color }"
+              >{{ p.name }}</span
+            >
+          </div>
         </div>
       </div>
     </div>
+
+    <Modal
+      :model-value="showClearConfirm"
+      title="Очистить доску?"
+      @update:model-value="showClearConfirm = $event"
+    >
+      <p class="collab-whiteboard__confirm-text">
+        Все штрихи на доске будут удалены для всех участников. Это действие
+        нельзя отменить.
+      </p>
+      <template #footer>
+        <Button
+          type="text"
+          variant="danger"
+          size="small"
+          @click="confirmClearAll"
+        >
+          Очистить
+        </Button>
+        <Button
+          type="text"
+          variant="secondary"
+          size="small"
+          @click="showClearConfirm = false"
+        >
+          Отмена
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -133,7 +189,12 @@ import {
   onBeforeUnmount,
 } from "vue";
 import * as Y from "yjs";
-import { Button, PixelIcon, ParticipantColorPalette } from "@shared/ui";
+import {
+  Button,
+  Modal,
+  PixelIcon,
+  ParticipantColorPalette,
+} from "@shared/ui";
 import { PARTICIPANT_COLOR_PALETTE } from "@shared/lib";
 import { MEET_ROOM_COLLABORATION_KEY } from "@features/room-collaboration";
 import {
@@ -145,7 +206,33 @@ import type { WhiteboardAwarenessPayload } from "../model/types";
 const props = defineProps<{
   participantColor: string;
   embedded?: boolean;
+  roomId?: string | null;
 }>();
+
+const WB_ROOM_BRUSH_COLOR_PREFIX = "nonza_meet_wb_brush_color_";
+
+function readStoredBrushColor(roomId: string): string | null {
+  try {
+    const v = localStorage.getItem(WB_ROOM_BRUSH_COLOR_PREFIX + roomId);
+    if (typeof v !== "string" || v.trim() === "") return null;
+    return v.trim();
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredBrushColor(roomId: string | undefined, color: string) {
+  if (!roomId) return;
+  try {
+    localStorage.setItem(WB_ROOM_BRUSH_COLOR_PREFIX + roomId, color);
+  } catch {
+    /* ignore */
+  }
+}
+
+function isLikelyHexColor(s: string): boolean {
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s.trim());
+}
 
 const collab = inject(MEET_ROOM_COLLABORATION_KEY, null);
 
@@ -165,15 +252,41 @@ const colorPalette = [...PARTICIPANT_COLOR_PALETTE];
 const brushColor = ref(props.participantColor);
 const isEraser = ref(false);
 const colorPanelOpen = ref(false);
+const showClearConfirm = ref(false);
+
+watch(
+  () => props.roomId,
+  (id) => {
+    if (id) {
+      const stored = readStoredBrushColor(id);
+      if (stored && isLikelyHexColor(stored)) {
+        brushColor.value = stored;
+        return;
+      }
+    }
+    const c = props.participantColor;
+    if (typeof c === "string" && c.trim() !== "") {
+      brushColor.value = c.trim();
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => props.participantColor,
   (c) => {
+    if (props.roomId) return;
     if (typeof c === "string" && c.trim() !== "") {
       brushColor.value = c.trim();
     }
   },
 );
+
+watch(brushColor, (c) => {
+  if (props.roomId && isLikelyHexColor(c)) {
+    writeStoredBrushColor(props.roomId, c);
+  }
+});
 
 const connectionStatus = computed(() => {
   if (!collab) return "disconnected" as const;
@@ -469,7 +582,7 @@ function onPointerLeave() {
   updateRemoteCursors();
 }
 
-function handleClearAll() {
+function performClearAll() {
   const doc = collab?.ydoc.value;
   const arr = strokesArray.value;
   if (!doc || !arr) return;
@@ -478,6 +591,40 @@ function handleClearAll() {
       arr.delete(0, 1);
     }
   });
+}
+
+function confirmClearAll() {
+  performClearAll();
+  showClearConfirm.value = false;
+}
+
+function exportToJpg() {
+  const canvas = canvasRef.value;
+  if (!canvas) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  if (w < 1 || h < 1) return;
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d");
+  if (!octx) return;
+  octx.fillStyle = "#141414";
+  octx.fillRect(0, 0, w, h);
+  octx.drawImage(canvas, 0, 0);
+  out.toBlob(
+    (blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `whiteboard-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.jpg`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    "image/jpeg",
+    0.92,
+  );
 }
 
 watch(
@@ -536,6 +683,7 @@ onBeforeUnmount(() => {
 .collab-whiteboard {
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   height: 100%;
   min-height: 240px;
   background: #1a1a1a;
@@ -547,7 +695,12 @@ onBeforeUnmount(() => {
 
 .collab-whiteboard--embedded {
   border: none;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  max-height: none;
   min-height: 0;
+  overflow: visible;
 }
 
 .collab-whiteboard__toolbar {
@@ -624,10 +777,32 @@ onBeforeUnmount(() => {
   color: #e2534b;
 }
 
+.collab-whiteboard__surface-slot {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+}
+
+.collab-whiteboard__surface-slot--embedded {
+  flex: 0 0 auto;
+  min-height: unset;
+  overflow: visible;
+  align-items: center;
+  justify-content: center;
+}
+
 .collab-whiteboard__surface {
   position: relative;
-  flex: 1;
-  min-height: 200px;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 376 / 444;
+  box-sizing: border-box;
   touch-action: none;
   cursor: crosshair;
   background: #141414;
@@ -635,10 +810,6 @@ onBeforeUnmount(() => {
 
 .collab-whiteboard__surface--eraser {
   cursor: cell;
-}
-
-.collab-whiteboard--embedded .collab-whiteboard__surface {
-  min-height: 180px;
 }
 
 .collab-whiteboard__canvas {
@@ -678,5 +849,12 @@ onBeforeUnmount(() => {
   border-radius: 3px;
   white-space: nowrap;
   opacity: 0.9;
+}
+
+.collab-whiteboard__confirm-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #bab1a8;
 }
 </style>

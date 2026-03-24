@@ -78,6 +78,7 @@ const expanded = defineModel<boolean>("expanded", { default: false });
 
 const emit = defineEmits<{
   reset: [];
+  pick: [];
 }>();
 
 const props = withDefaults(
@@ -122,6 +123,7 @@ function toggle() {
 function select(c: string) {
   modelValue.value = c;
   expanded.value = false;
+  emit("pick");
 }
 
 function openNativePicker() {
@@ -133,6 +135,7 @@ function onNativeInput(ev: Event) {
   if (el.value) {
     modelValue.value = el.value;
     expanded.value = false;
+    emit("pick");
   }
 }
 
