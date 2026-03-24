@@ -1,19 +1,19 @@
 <template>
-  <div class="wb-shell">
+  <div class="wb-shell" :class="{ 'wb-shell--expanded': expanded }">
     <div class="wb-shell__header">
       <h3 class="wb-shell__title">Совместная доска</h3>
-      <!--
       <Button
-        type="text"
+        type="icon"
         size="tiny"
         variant="default"
-        class="wb-shell__studio"
-        title="Открыть студию"
-        @click="mode = 'studio'"
+        class="wb-shell__expand"
+        :title="expanded ? 'Свернуть' : 'На весь экран'"
+        :aria-label="expanded ? 'Свернуть' : 'На весь экран'"
+        :aria-pressed="expanded"
+        @click="expanded = !expanded"
       >
-        Студия
+        <PixelIcon :name="expanded ? 'close' : 'fullscreen'" variant="small" />
       </Button>
-      -->
       <div v-if="connectionStatus !== 'connected'" class="wb-shell__status">
         {{
           connectionStatus === "connecting" ? "Подключение..." : "Отключено"
@@ -73,6 +73,7 @@ defineProps<{
 }>();
 
 const mode = ref<"simple" | "studio">("simple");
+const expanded = ref(false);
 
 const collab = inject(MEET_ROOM_COLLABORATION_KEY, null);
 const connectionStatus = computed(() => {
@@ -115,9 +116,48 @@ const connectionStatus = computed(() => {
   letter-spacing: 0.02em;
 }
 
-.wb-shell__studio {
+.wb-shell__expand {
   margin-left: auto;
   flex-shrink: 0;
+}
+
+.wb-shell--expanded {
+  --wb-fs-chrome: 200px;
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  box-sizing: border-box;
+  width: min(100vw, 100dvw);
+  height: min(100vh, 100dvh);
+  max-width: 100vw;
+  max-height: 100dvh;
+  flex: none;
+  border-width: 0;
+  border-radius: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.wb-shell--expanded .wb-shell__header {
+  padding-right: 16px;
+}
+
+.wb-shell--expanded .wb-shell__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 16px 20px;
+  box-sizing: border-box;
+}
+
+.wb-shell--expanded :deep(.collab-whiteboard--embedded) {
+  width: min(
+    calc(100vw - 32px),
+    calc((100dvh - var(--wb-fs-chrome)) * 376 / 444)
+  );
+  max-width: 100%;
 }
 
 .wb-shell__status {
