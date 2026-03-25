@@ -2,6 +2,7 @@ package turn
 
 import (
 	"crypto/hmac"
+	// #nosec G505 -- coturn lt-cred-mech uses HMAC-SHA1.
 	"crypto/sha1"
 	"encoding/base64"
 	"testing"
@@ -10,7 +11,7 @@ import (
 // Credential must be base64(hmac_sha1(secret, username)) to match coturn lt-cred-mech.
 // To verify on host: echo -n "<username>" | openssl dgst -sha1 -hmac "<secret>" -binary | base64
 func TestLongTermCredentials_Deterministic(t *testing.T) {
-	secret := "test_secret_32_chars_long!!!!!!!!"
+	secret := "test_secret_32_chars_long!!!!!!!!" // #nosec G101 -- test-only secret
 	ttl := 3600
 
 	u1, c1 := LongTermCredentials(secret, ttl)

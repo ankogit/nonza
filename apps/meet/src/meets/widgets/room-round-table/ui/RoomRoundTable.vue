@@ -1041,9 +1041,9 @@ const fullscreenCameraPiPStyle = computed(() => ({
   height: fullscreenCameraPiPDraggable.size.value.height + "px",
 }));
 const showFullscreenCameraPiP = computed(() => {
-  fullscreenTracksVersion.value;
+  const tracksVersion = fullscreenTracksVersion.value;
   const p = fullscreenParticipant.value;
-  return p !== null && participantHasBothCameraAndScreen(p);
+  return tracksVersion >= 0 && p !== null && participantHasBothCameraAndScreen(p);
 });
 
 const handleDisconnect = () => {

@@ -28,7 +28,7 @@
         @keydown="onListKeydown"
       >
         <li
-          v-for="opt in options"
+          v-for="opt in optionsMeta"
           :id="opt.id"
           :key="String(opt.value)"
           class="pixel-select__option"
@@ -91,7 +91,7 @@ const optionsWithMeta = computed(() =>
   })),
 );
 
-const options = optionsWithMeta;
+const optionsMeta = optionsWithMeta;
 
 const displayLabel = computed(() => {
   const opt = props.options.find((o) => o.value === props.modelValue);
@@ -99,7 +99,7 @@ const displayLabel = computed(() => {
 });
 
 const highlightedId = computed(() => {
-  const opt = optionsWithMeta.value[highlightedIndex.value];
+  const opt = optionsMeta.value[highlightedIndex.value];
   return opt?.id ?? null;
 });
 

@@ -11,6 +11,7 @@ import (
 
 	"nonza/backend/internal/service"
 	"nonza/backend/internal/service/organization_sounds"
+	orgSoundsDto "nonza/backend/internal/dto/organization_sounds"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,18 +23,6 @@ type OrganizationSoundsHandler struct {
 
 func NewOrganizationSoundsHandler(services *service.Services) *OrganizationSoundsHandler {
 	return &OrganizationSoundsHandler{Services: services}
-}
-
-type OrganizationSoundResponse struct {
-	ID          string `json:"id"`
-	Emoji       string `json:"emoji"`
-	Title       string `json:"title"`
-	AudioUrl    string `json:"audioUrl"`
-	Version     int    `json:"version"`
-	LoopEnabled bool   `json:"loopEnabled"`
-	GateEnabled bool   `json:"gateEnabled"`
-	Volume      int    `json:"volume"`
-	Speed       int    `json:"speed"`
 }
 
 func (h *OrganizationSoundsHandler) GetByOrganizationID(c *gin.Context) {
@@ -57,13 +46,13 @@ func (h *OrganizationSoundsHandler) GetByOrganizationID(c *gin.Context) {
 		return
 	}
 
-	resp := make([]OrganizationSoundResponse, 0, len(rows))
+	resp := make([]orgSoundsDto.OrganizationSoundResponse, 0, len(rows))
 	for _, s := range rows {
-		resp = append(resp, OrganizationSoundResponse{
+		resp = append(resp, orgSoundsDto.OrganizationSoundResponse{
 			ID:          s.ID,
 			Emoji:       s.Emoji,
 			Title:       s.Title,
-			AudioUrl:    s.AudioURL,
+			AudioURL:    s.AudioURL,
 			Version:     s.Version,
 			LoopEnabled: s.LoopEnabled,
 			GateEnabled: s.GateEnabled,
@@ -153,7 +142,7 @@ func (h *OrganizationSoundsHandler) Upsert(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "audio file required"})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	tmp, err := os.CreateTemp("", "soundbar-upload-*")
 	if err != nil {
@@ -210,11 +199,11 @@ func (h *OrganizationSoundsHandler) Upsert(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, OrganizationSoundResponse{
+	c.JSON(http.StatusOK, orgSoundsDto.OrganizationSoundResponse{
 		ID:          row.ID,
 		Emoji:       row.Emoji,
 		Title:       row.Title,
-		AudioUrl:    row.AudioURL,
+		AudioURL:    row.AudioURL,
 		Version:     row.Version,
 		LoopEnabled: row.LoopEnabled,
 		GateEnabled: row.GateEnabled,

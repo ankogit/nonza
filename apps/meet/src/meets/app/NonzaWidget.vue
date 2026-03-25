@@ -336,7 +336,7 @@ watch(
   { immediate: false }
 );
 const error = ref<string | null>(null);
-const room = ref<RoomEntity | null>(null);
+const connectedRoom = ref<RoomEntity | null>(null);
 const passwordRequired = ref(false);
 const roomPassword = ref("");
 
@@ -452,7 +452,7 @@ watch(displayRoomType, (t) => {
 const inCall = computed(
   () =>
     isConnected.value &&
-    !!room.value &&
+    !!connectedRoom.value &&
     !!connectionState.value.livekitRoom
 );
 
@@ -525,7 +525,7 @@ const handleConnect = async (ev?: unknown) => {
       ...(forceRelay && { iceTransportPolicy: "relay" }),
       password,
     }, identity);
-    room.value = connectionState.value.room;
+    connectedRoom.value = connectionState.value.room;
     passwordRequired.value = false;
     roomPassword.value = "";
     if (password) setStoredRoomPassword(code, password);
@@ -541,7 +541,7 @@ const handleConnect = async (ev?: unknown) => {
             ...(forceRelay && { iceTransportPolicy: "relay" }),
             password: stored,
           }, identity);
-          room.value = connectionState.value.room;
+          connectedRoom.value = connectionState.value.room;
           passwordRequired.value = false;
           roomPassword.value = "";
           setRoomShortCode(code);
@@ -570,7 +570,7 @@ const handleReconnect = async () => {
   error.value = null;
   try {
     await reconnect();
-    room.value = connectionState.value.room;
+    connectedRoom.value = connectionState.value.room;
     replaceUrlRoomCode(connectionState.value.room?.short_code ?? (shortCode.value?.trim() || null));
   } catch (err) {
     error.value =
@@ -584,7 +584,7 @@ const handleDisconnect = async () => {
     roomApi.notifyParticipantLeft(code).catch(() => {});
   }
   await disconnect();
-  room.value = null;
+  connectedRoom.value = null;
   error.value = null;
   passwordRequired.value = false;
   roomPassword.value = "";

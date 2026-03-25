@@ -54,14 +54,17 @@ type Message struct {
 func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("ws: failed to close conn for user=%s: %v", c.userID, err)
+		}
 	}()
 
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		return
+	}
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
 	for {
@@ -76,7 +79,9 @@ func (c *Client) readPump() {
 		// Handle binary messages (Y.js updates)
 		if messageType == websocket.BinaryMessage {
 			if c.roomID != "" {
-				c.hub.BroadcastBinaryToRoom(c.roomID, messageBytes, c)
+				if err := c.hub.BroadcastBinaryToRoom(c.roomID, messageBytes, c); err != nil {
+					log.Printf("ws: broadcast binary failed room=%q: %v", c.roomID, err)
+				}
 			}
 			continue
 		}
@@ -86,7 +91,9 @@ func (c *Client) readPump() {
 		if len(messageBytes) > 0 && (messageBytes[0] < 32 && messageBytes[0] != 9 && messageBytes[0] != 10 && messageBytes[0] != 13) {
 			// This looks like binary data sent as text, treat it as binary
 			if c.roomID != "" {
-				c.hub.BroadcastBinaryToRoom(c.roomID, messageBytes, c)
+				if err := c.hub.BroadcastBinaryToRoom(c.roomID, messageBytes, c); err != nil {
+					log.Printf("ws: broadcast binary failed room=%q: %v", c.roomID, err)
+				}
 			}
 			continue
 		}
@@ -128,7 +135,9 @@ func (c *Client) readPump() {
 		default:
 			// Broadcast custom message to room
 			if c.roomID != "" {
-				c.hub.BroadcastToRoom(c.roomID, message)
+				if err := c.hub.BroadcastToRoom(c.roomID, message); err != nil {
+					log.Printf("ws: broadcast message failed room=%q: %v", c.roomID, err)
+				}
 			}
 		}
 	}
@@ -139,16 +148,22 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("ws: failed to close conn for user=%s: %v", c.userID, err)
+		}
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				return
+			}
 			if !ok {
 				// The hub closed the channel
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					return
+				}
 				return
 			}
 
@@ -156,13 +171,19 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			if _, err := w.Write(message); err != nil {
+				return
+			}
 
 			// Add queued messages to the current websocket message
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
+				if _, err := w.Write([]byte{'\n'}); err != nil {
+					return
+				}
+				if _, err := w.Write(<-c.send); err != nil {
+					return
+				}
 			}
 
 			if err := w.Close(); err != nil {
@@ -170,10 +191,14 @@ func (c *Client) writePump() {
 			}
 
 		case binaryMessage, ok := <-c.sendBinary:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				return
+			}
 			if !ok {
 				// The hub closed the channel
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					return
+				}
 				return
 			}
 
@@ -196,7 +221,9 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -226,7 +253,7 @@ func (c *Client) handleJoinRoom(message Message) {
 		c.hub.mu.Unlock()
 
 		// Notify others in the room
-		c.hub.BroadcastToRoom(roomID, Message{
+		if err := c.hub.BroadcastToRoom(roomID, Message{
 			Type:   "user_joined",
 			RoomID: roomID,
 			UserID: c.userID,
@@ -234,18 +261,20 @@ func (c *Client) handleJoinRoom(message Message) {
 				"user_id": c.userID,
 				"room_id": roomID,
 			},
-		})
+		}); err != nil {
+			log.Printf("ws: broadcast user_joined failed room=%q: %v", roomID, err)
+		}
 	}
 }
 
 // handleLeaveRoom handles a leave room message
-func (c *Client) handleLeaveRoom(message Message) {
+func (c *Client) handleLeaveRoom(_ Message) {
 	if c.roomID != "" {
 		roomID := c.roomID
 		c.roomID = ""
 
 		// Notify others in the room
-		c.hub.BroadcastToRoom(roomID, Message{
+		if err := c.hub.BroadcastToRoom(roomID, Message{
 			Type:   "user_left",
 			RoomID: roomID,
 			UserID: c.userID,
@@ -253,7 +282,9 @@ func (c *Client) handleLeaveRoom(message Message) {
 				"user_id": c.userID,
 				"room_id": roomID,
 			},
-		})
+		}); err != nil {
+			log.Printf("ws: broadcast user_left failed room=%q: %v", roomID, err)
+		}
 	}
 }
 
@@ -282,7 +313,9 @@ func (c *Client) handleYjsUpdate(message Message) {
 				return
 			}
 			log.Printf("Broadcasting Y.js update (size: %d bytes) to room %s", len(updateBytes), c.roomID)
-			c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c)
+			if err := c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c); err != nil {
+				log.Printf("ws: broadcast yjs update failed room=%q: %v", c.roomID, err)
+			}
 			return
 		}
 		log.Printf("Invalid payload format for Y.js update: %T", message.Payload)
@@ -304,7 +337,9 @@ func (c *Client) handleYjsUpdate(message Message) {
 
 	log.Printf("Broadcasting Y.js update (size: %d bytes) to room %s", len(updateBytes), c.roomID)
 	// Broadcast binary update to room (excluding sender)
-	c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c)
+	if err := c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c); err != nil {
+		log.Printf("ws: broadcast yjs update failed room=%q: %v", c.roomID, err)
+	}
 }
 
 // Helper function to get map keys for logging
@@ -333,13 +368,15 @@ func getFirstChars(s string, n int) string {
 }
 
 // handleYjsSync handles Y.js sync requests
-func (c *Client) handleYjsSync(message Message) {
+func (c *Client) handleYjsSync(_ Message) {
 	log.Printf("Received Y.js sync request from client %s in room %s", c.userID, c.roomID)
 
 	// Check if room has expired
 	if c.hub.isRoomExpired(c.roomID) {
 		log.Printf("Room %s has expired, not syncing document", c.roomID)
-		c.hub.redisClient.DeleteDocumentState(c.roomID)
+		if err := c.hub.redisClient.DeleteDocumentState(c.roomID); err != nil {
+			log.Printf("ws: delete document state failed room=%q: %v", c.roomID, err)
+		}
 		c.sendSyncAck(false)
 		return
 	}
@@ -352,7 +389,7 @@ func (c *Client) handleYjsSync(message Message) {
 		return
 	}
 
-	hasState := docState != nil && len(docState) > 0
+	hasState := len(docState) > 0
 	if hasState {
 		select {
 		case c.sendBinary <- docState:
@@ -399,7 +436,9 @@ func (c *Client) handleYjsFullState(message Message) {
 	log.Printf("Received Y.js full state from client %s in room %s (size: %d bytes)", c.userID, c.roomID, len(updateBytes))
 	// Store in Redis - this will also reset the TTL
 	c.hub.StoreRoomDocumentState(c.roomID, updateBytes)
-	c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c)
+	if err := c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c); err != nil {
+		log.Printf("ws: broadcast yjs full state failed room=%q: %v", c.roomID, err)
+	}
 }
 
 // handleYjsAwareness handles Y.js awareness updates (cursor positions, user info).
@@ -447,5 +486,7 @@ func (c *Client) handleYjsAwareness(message Message) {
 
 	log.Printf("Broadcasting Y.js awareness update from client %s in room %s (size: %d bytes)", c.userID, c.roomID, len(updateBytes))
 	// Broadcast awareness update as binary (don't store - awareness is ephemeral)
-	c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c)
+	if err := c.hub.BroadcastBinaryToRoom(c.roomID, updateBytes, c); err != nil {
+		log.Printf("ws: broadcast yjs awareness failed room=%q: %v", c.roomID, err)
+	}
 }

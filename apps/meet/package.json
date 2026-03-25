@@ -28,7 +28,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "type-check": "vue-tsc --noEmit",
-    "lint": "eslint . --fix"
+    "lint": "eslint .",
+    "lint:strict": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

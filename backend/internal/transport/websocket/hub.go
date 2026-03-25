@@ -235,7 +235,9 @@ func (h *Hub) loadDocumentForClient(client *Client) {
 	// Check if room has expired
 	if h.isRoomExpired(client.roomID) {
 		log.Printf("Room %s has expired, not loading document", client.roomID)
-		h.redisClient.DeleteDocumentState(client.roomID)
+		if err := h.redisClient.DeleteDocumentState(client.roomID); err != nil {
+			log.Printf("ws: delete document state failed room=%q: %v", client.roomID, err)
+		}
 		return
 	}
 	
@@ -269,7 +271,9 @@ func (h *Hub) StoreRoomDocumentState(roomID string, data []byte) {
 	// Check if room has expired
 	if h.isRoomExpired(roomID) {
 		log.Printf("Room %s has expired, deleting document", roomID)
-		h.redisClient.DeleteDocumentState(roomID)
+		if err := h.redisClient.DeleteDocumentState(roomID); err != nil {
+			log.Printf("ws: delete document state failed room=%q: %v", roomID, err)
+		}
 		return
 	}
 	
@@ -292,7 +296,9 @@ func (h *Hub) StoreRoomDocumentState(roomID string, data []byte) {
 		ttl = time.Until(*room.ExpiresAt) + time.Hour // TTL until expiration + 1h buffer
 		if ttl < 0 {
 			// Should not happen (isRoomExpired already checked), but just in case
-			h.redisClient.DeleteDocumentState(roomID)
+			if err := h.redisClient.DeleteDocumentState(roomID); err != nil {
+				log.Printf("ws: delete document state failed room=%q: %v", roomID, err)
+			}
 			return
 		}
 	} else {

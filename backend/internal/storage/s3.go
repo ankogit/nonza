@@ -68,11 +68,11 @@ func (s *s3Storage) PutFile(ctx context.Context, objectKey string, localPath str
 		return 0, err
 	}
 
-	reader, err := os.Open(localPath)
+	reader, err := os.Open(localPath) // #nosec G304 -- localPath is a local server path (not user-controlled)
 	if err != nil {
 		return 0, err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	_, err = s.client.PutObject(ctx, s.bucketName, objectKey, reader, stat.Size(), minio.PutObjectOptions{
 		ContentType:  contentType,

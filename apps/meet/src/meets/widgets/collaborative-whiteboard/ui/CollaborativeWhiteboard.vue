@@ -129,18 +129,32 @@
         <canvas ref="canvasRef" class="collab-whiteboard__canvas" />
         <div class="collab-whiteboard__cursors">
           <div
+            v-if="localCursor"
+            class="collab-whiteboard__cursor"
+            :class="{ 'collab-whiteboard__cursor--eraser': localCursor.erase }"
+            :style="{
+              transform: `translate(${localCursor.x}px, ${localCursor.y}px) translate(-50%, -50%)`,
+              '--cursor-size': `${localCursor.sizePx}px`,
+              '--cursor-border': `${localCursor.borderWidthPx}px`,
+              borderColor: localCursor.erase ? '#e0e0e0' : localCursor.color,
+            }"
+          />
+          <div
             v-for="p in remoteCursors"
             :key="p.clientId"
             class="collab-whiteboard__cursor"
+            :class="{ 'collab-whiteboard__cursor--eraser': p.erase }"
             :style="{
               transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`,
-              borderColor: p.color,
+              '--cursor-size': `${p.sizePx}px`,
+              '--cursor-border': `${p.borderWidthPx}px`,
+              borderColor: p.erase ? '#e0e0e0' : p.color,
             }"
           >
             <span
               class="collab-whiteboard__cursor-label"
-              :style="{ background: p.color }"
-              >{{ p.name }}</span
+              :style="{ background: p.erase ? '#9e9e9e' : p.color }"
+              >{{ p.name }}{{ p.erase ? " — ластик" : "" }}</span
             >
           </div>
         </div>
@@ -311,14 +325,83 @@ const remoteCursors = ref<
     y: number;
     color: string;
     name: string;
+    erase: boolean;
+    sizePx: number;
+    borderWidthPx: number;
   }>
 >([]);
 
+const localCursorPos = ref<{ nx: number; ny: number } | null>(null);
+const localCursor = ref<{
+  x: number;
+  y: number;
+  color: string;
+  erase: boolean;
+  sizePx: number;
+  borderWidthPx: number;
+} | null>(null);
+
+type StrokeSnapshot = {
+  pts: [number, number][];
+  color: string;
+  width: number;
+  erase: boolean;
+};
+
+let strokesSnapshotsCache: StrokeSnapshot[] = [];
+let strokesSnapshotsDirty = true;
+
+let surfaceW = 0;
+let surfaceH = 0;
+
+function computeCursorPx(sizeNorm: number, minDim: number) {
+  // Ensure the cursor stays visible even for the thinnest brush.
+  const sizePx = Math.max(8, Math.round(sizeNorm * minDim));
+  const borderWidthPx = Math.max(2, Math.round(sizePx / 6));
+  return { sizePx, borderWidthPx };
+}
+
+function updateLocalCursor() {
+  const surface = surfaceRef.value;
+  if (!surface) return;
+  if (!localCursorPos.value) {
+    localCursor.value = null;
+    return;
+  }
+
+  let { w, h } = getSurfaceSize();
+  if (w < 1 || h < 1) {
+    refreshSurfaceMetrics();
+    const m = getSurfaceSize();
+    if (m.w < 1 || m.h < 1) return;
+    w = m.w;
+    h = m.h;
+  }
+  const minDim = Math.min(w, h);
+  const { nx, ny } = localCursorPos.value;
+  const widthNorm = brushWidthNorm.value;
+  const { sizePx, borderWidthPx } = computeCursorPx(widthNorm, minDim);
+
+  localCursor.value = {
+    x: nx * w,
+    y: ny * h,
+    color: brushColor.value,
+    erase: isEraser.value,
+    sizePx,
+    borderWidthPx,
+  };
+}
+
 function getSurfaceSize() {
+  return { w: surfaceW, h: surfaceH };
+}
+
+function refreshSurfaceMetrics() {
   const el = surfaceRef.value;
-  if (!el) return { w: 0, h: 0 };
+  if (!el) return;
   const r = el.getBoundingClientRect();
-  return { w: r.width, h: r.height };
+  surfaceW = r.width;
+  surfaceH = r.height;
 }
 
 function scheduleAwareness(payload: WhiteboardAwarenessPayload) {
@@ -346,12 +429,7 @@ function clearWhiteboardAwareness() {
 }
 
 function snapshotStrokes(arr: Y.Array<Y.Map<unknown>>) {
-  const out: Array<{
-    pts: [number, number][];
-    color: string;
-    width: number;
-    erase: boolean;
-  }> = [];
+  const out: StrokeSnapshot[] = [];
   for (let i = 0; i < arr.length; i++) {
     const m = arr.get(i);
     if (!(m instanceof Y.Map)) continue;
@@ -382,14 +460,23 @@ function paintCanvas() {
   const surface = surfaceRef.value;
   if (!canvas || !surface) return;
 
-  const { w, h } = getSurfaceSize();
+  let { w, h } = getSurfaceSize();
+  if (w < 1 || h < 1) {
+    refreshSurfaceMetrics();
+    ({ w, h } = getSurfaceSize());
+  }
   if (w < 1 || h < 1) return;
 
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.floor(w * dpr));
-  canvas.height = Math.max(1, Math.floor(h * dpr));
-  canvas.style.width = `${w}px`;
-  canvas.style.height = `${h}px`;
+  const targetW = Math.max(1, Math.floor(w * dpr));
+  const targetH = Math.max(1, Math.floor(h * dpr));
+  const sizeChanged = canvas.width !== targetW || canvas.height !== targetH;
+  if (sizeChanged) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+  }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -400,7 +487,11 @@ function paintCanvas() {
 
   const arr = strokesArray.value;
   if (arr) {
-    const snapshots = snapshotStrokes(arr);
+    if (strokesSnapshotsDirty) {
+      strokesSnapshotsCache = snapshotStrokes(arr);
+      strokesSnapshotsDirty = false;
+    }
+    const snapshots = strokesSnapshotsCache;
     const minDim = Math.min(w, h);
     for (const s of snapshots) {
       ctx.beginPath();
@@ -456,19 +547,26 @@ function requestPaint() {
   });
 }
 
+function onStrokesChanged() {
+  strokesSnapshotsDirty = true;
+  requestPaint();
+}
+
 function bindStrokes(doc: Y.Doc | null) {
   const prev = strokesArray.value;
   if (prev) {
-    prev.unobserve(requestPaint);
+    prev.unobserve(onStrokesChanged);
   }
   strokesArray.value = null;
+  strokesSnapshotsCache = [];
+  strokesSnapshotsDirty = true;
   if (!doc) {
     requestPaint();
     return;
   }
   const arr = doc.getArray<Y.Map<unknown>>(WHITEBOARD_YARRAY_KEY);
   strokesArray.value = arr;
-  arr.observe(requestPaint);
+  arr.observe(onStrokesChanged);
   requestPaint();
 }
 
@@ -479,19 +577,31 @@ function updateRemoteCursors() {
     remoteCursors.value = [];
     return;
   }
-  const { w, h } = getSurfaceSize();
+  let { w, h } = getSurfaceSize();
+  if (w < 1 || h < 1) {
+    refreshSurfaceMetrics();
+    ({ w, h } = getSurfaceSize());
+  }
+  const minDim = Math.min(w, h);
   const list: (typeof remoteCursors.value)[number][] = [];
   aw.getStates().forEach((state, clientId) => {
     if (clientId === aw.clientID) return;
     const wb = state.whiteboard as WhiteboardAwarenessPayload | undefined;
     const user = state.user as { name?: string; color?: string } | undefined;
     if (!wb || !user?.name) return;
+    const erase = wb.erase === true;
+    const widthNorm = typeof wb.width === "number" ? wb.width : 0.02;
+    const sizePx = Math.max(8, Math.round(widthNorm * minDim));
+    const borderWidthPx = Math.max(2, Math.round(sizePx / 6));
     list.push({
       clientId,
       x: wb.nx * w,
       y: wb.ny * h,
-      color: user.color ?? "#888",
+      color: typeof wb.color === "string" ? wb.color : user.color ?? "#888",
       name: user.name,
+      erase,
+      sizePx,
+      borderWidthPx,
     });
   });
   remoteCursors.value = list;
@@ -517,7 +627,16 @@ function onPointerDown(ev: PointerEvent) {
   const { nx, ny } = normFromEvent(ev);
   isDrawing.value = true;
   localDraft.value = [[nx, ny]];
-  scheduleAwareness({ phase: "drawing", nx, ny });
+  localCursorPos.value = { nx, ny };
+  updateLocalCursor();
+  scheduleAwareness({
+    phase: "drawing",
+    nx,
+    ny,
+    width: brushWidthNorm.value,
+    erase: isEraser.value,
+    color: brushColor.value,
+  });
   requestPaint();
 }
 
@@ -529,12 +648,30 @@ function onPointerMove(ev: PointerEvent) {
     if (!last || last[0] !== nx || last[1] !== ny) {
       localDraft.value = [...localDraft.value, [nx, ny]];
     }
-    scheduleAwareness({ phase: "drawing", nx, ny });
+    localCursorPos.value = { nx, ny };
+    updateLocalCursor();
+    scheduleAwareness({
+      phase: "drawing",
+      nx,
+      ny,
+      width: brushWidthNorm.value,
+      erase: isEraser.value,
+      color: brushColor.value,
+    });
     requestPaint();
     return;
   }
   if (surfaceRef.value?.contains(ev.target as Node)) {
-    scheduleAwareness({ phase: "hover", nx, ny });
+    localCursorPos.value = { nx, ny };
+    updateLocalCursor();
+    scheduleAwareness({
+      phase: "hover",
+      nx,
+      ny,
+      width: brushWidthNorm.value,
+      erase: isEraser.value,
+      color: brushColor.value,
+    });
   }
 }
 
@@ -571,7 +708,16 @@ function onPointerUp(ev: PointerEvent) {
     commitStroke();
     localDraft.value = [];
     const { nx, ny } = normFromEvent(ev);
-    scheduleAwareness({ phase: "hover", nx, ny });
+    localCursorPos.value = { nx, ny };
+    updateLocalCursor();
+    scheduleAwareness({
+      phase: "hover",
+      nx,
+      ny,
+      width: brushWidthNorm.value,
+      erase: isEraser.value,
+      color: brushColor.value,
+    });
     requestPaint();
   }
 }
@@ -579,6 +725,8 @@ function onPointerUp(ev: PointerEvent) {
 function onPointerLeave() {
   if (isDrawing.value) return;
   clearWhiteboardAwareness();
+  localCursorPos.value = null;
+  localCursor.value = null;
   updateRemoteCursors();
 }
 
@@ -650,11 +798,14 @@ watch(
 );
 
 onMounted(() => {
+  refreshSurfaceMetrics();
   const surface = surfaceRef.value;
   if (!surface || typeof ResizeObserver === "undefined") return;
   ro = new ResizeObserver(() => {
+    refreshSurfaceMetrics();
     requestPaint();
     updateRemoteCursors();
+    updateLocalCursor();
   });
   ro.observe(surface);
 });
@@ -672,10 +823,12 @@ onBeforeUnmount(() => {
   }
   const arr = strokesArray.value;
   if (arr) {
-    arr.unobserve(requestPaint);
+    arr.unobserve(onStrokesChanged);
   }
   collab?.awareness.value?.off("change", updateRemoteCursors);
   clearWhiteboardAwareness();
+  localCursorPos.value = null;
+  localCursor.value = null;
 });
 </script>
 
@@ -804,12 +957,12 @@ onBeforeUnmount(() => {
   aspect-ratio: 376 / 444;
   box-sizing: border-box;
   touch-action: none;
-  cursor: crosshair;
+  cursor: none;
   background: #141414;
 }
 
 .collab-whiteboard__surface--eraser {
-  cursor: cell;
+  cursor: none;
 }
 
 .collab-whiteboard__canvas {
@@ -829,19 +982,25 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   top: 0;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #fff;
+  width: var(--cursor-size, 12px);
+  height: var(--cursor-size, 12px);
+  border-width: var(--cursor-border, 2px);
+  border-style: solid;
+  border-color: #fff;
   border-radius: 50%;
   box-sizing: border-box;
   pointer-events: none;
   will-change: transform;
 }
 
+.collab-whiteboard__cursor--eraser {
+  border-style: dashed;
+}
+
 .collab-whiteboard__cursor-label {
   position: absolute;
-  left: 10px;
-  top: -20px;
+  left: calc(var(--cursor-size, 12px) * 0.7);
+  top: calc(-1 * var(--cursor-size, 12px));
   font-size: 11px;
   font-weight: 600;
   color: #fff;

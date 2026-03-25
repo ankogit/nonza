@@ -1,0 +1,53 @@
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - unused
+    - revive
+    - gocritic
+    - gosec
+    - bodyclose
+    - misspell
+    - unparam
+    - prealloc
+
+  settings:
+    revive:
+      severity: warning
+      # Keep revive focused on code-quality rules, not doc coverage.
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-strings
+        - name: errorf
+        - name: if-return
+        - name: increment-decrement
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: var-declaration
+        - name: var-naming
+
+    misspell:
+      locale: US
+
+    gosec:
+      severity: medium
+

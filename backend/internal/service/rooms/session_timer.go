@@ -29,12 +29,13 @@ func ApplyParticipantCountToRoomTimer(room *models.Room, participantCount int) b
 	}
 	newSettings := cloneJSONB(room.Settings)
 	changed := false
-	if participantCount == 0 {
+	switch participantCount {
+	case 0:
 		if _, ok := newSettings["room_timer_started_at"]; ok {
 			delete(newSettings, "room_timer_started_at")
 			changed = true
 		}
-	} else if participantCount == 1 {
+	case 1:
 		if _, ok := newSettings["room_timer_started_at"]; !ok {
 			newSettings["room_timer_started_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 			changed = true

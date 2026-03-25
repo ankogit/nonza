@@ -279,10 +279,7 @@ func (s *organizationsService) UpdateMemberColor(orgID uuid.UUID, userID string,
 		if org.OwnerID == nil || *org.OwnerID != userID {
 			return errors.New("user is not a member")
 		}
-		if err := s.members.Add(orgID, userID, orgroles.RoleOwner, color); err != nil {
-			return err
-		}
-		return nil
+		return s.members.Add(orgID, userID, orgroles.RoleOwner, color)
 	}
 	return s.members.UpdateColor(orgID, userID, color)
 }

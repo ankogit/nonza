@@ -131,6 +131,7 @@ func trimToOgg(
 		filter = fmt.Sprintf("%s,atempo=%.6f", filter, speedMul)
 	}
 
+	// #nosec G204 -- ffmpeg args are passed as a fixed argv slice; user input is sanitized/treated as plain filenames.
 	cmd := exec.Command(
 		"ffmpeg",
 		"-y",
@@ -159,6 +160,7 @@ func trimToOgg(
 }
 
 func transcodeToOgg(inputPath string, outputPath string) error {
+	// #nosec G204 -- ffmpeg args are passed as a fixed argv slice; user input is treated as plain filenames.
 	cmd := exec.Command(
 		"ffmpeg",
 		"-y",

@@ -1,4 +1,4 @@
-.PHONY: up down restart logs build clean dev-up dev-down
+.PHONY: up down restart logs build clean dev-up dev-down dev-logs backend-logs livekit-logs postgres-logs redis-logs go-lint go-fmt go-test
 
 up:
 	docker-compose up -d
@@ -39,3 +39,12 @@ postgres-logs:
 
 redis-logs:
 	docker-compose logs -f redis
+
+go-fmt:
+	cd backend && gofmt -w .
+
+go-test:
+	cd backend && go test ./...
+
+go-lint:
+	cd backend && golangci-lint run ./...

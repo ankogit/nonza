@@ -2,6 +2,7 @@ package turn
 
 import (
 	"crypto/hmac"
+	// #nosec G505 -- coturn lt-cred-mech uses HMAC-SHA1.
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"

@@ -15,6 +15,6 @@ export default defineConfig({
   publicDir: resolve(meetRoot, "./public"),
   server: {
     port: 3001,
-    strictPort: true,
+    strictPort: false,
   },
 });

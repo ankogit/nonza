@@ -52,7 +52,7 @@ function encodeWavPcm16(buffer: AudioBuffer): Blob {
   let offset = 44;
   for (let i = 0; i < buffer.length; i++) {
     for (let c = 0; c < numChannels; c++) {
-      let s = Math.max(-1, Math.min(1, buffer.getChannelData(c)[i]));
+      const s = Math.max(-1, Math.min(1, buffer.getChannelData(c)[i]));
       const v = s < 0 ? s * 0x8000 : s * 0x7fff;
       view.setInt16(offset, v, true);
       offset += 2;

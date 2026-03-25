@@ -5,11 +5,24 @@ import {
 } from "@vue/eslint-config-typescript";
 
 export default defineConfigWithVueTs(
-  ...pluginVue.configs["flat/essential"],
-  ...vueTsConfigs.recommended,
+  {
+    ignores: ["dist/**"],
+  },
+  pluginVue.configs["flat/essential"],
+  vueTsConfigs.recommended,
   {
     rules: {
       "vue/multi-word-component-names": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-unused-expressions": [
+        "error",
+        { allowShortCircuit: true, allowTernary: true, allowTaggedTemplates: true },
+      ],
     },
   },
 );

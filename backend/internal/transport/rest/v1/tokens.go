@@ -155,14 +155,16 @@ func (h *TokensHandler) GenerateToken(c *gin.Context) {
 	if h.WSHub != nil {
 		// Get room ID from room (you may need to adjust this based on your room model)
 		roomID := room.LiveKitRoomName()
-		h.WSHub.BroadcastToRoom(roomID, websocket.Message{
+		if err := h.WSHub.BroadcastToRoom(roomID, websocket.Message{
 			Type:   "participant_joining",
 			RoomID: roomID,
 			Payload: map[string]interface{}{
 				"participant_id":   participantID,
 				"participant_name": req.ParticipantName,
 			},
-		})
+		}); err != nil {
+			log.Printf("[tokens] failed to broadcast participant joining for room=%q: %v", roomID, err)
+		}
 	}
 
 	log.Printf("[tokens] total %v short_code=%s", time.Since(start), req.ShortCode)

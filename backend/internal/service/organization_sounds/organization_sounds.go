@@ -190,9 +190,6 @@ func (s *organizationSoundsService) Delete(ctx context.Context, orgID uuid.UUID,
 	if err := s.repo.DeleteByID(orgID, soundID); err != nil {
 		return err
 	}
-	if err := s.files.Delete(ctx, fileID); err != nil {
-		return err
-	}
-	return nil
+	return s.files.Delete(ctx, fileID)
 }
 

@@ -21,12 +21,13 @@ type Client struct {
 func (c *Client) roomServiceURL() string {
 	u := c.url
 	var rest string
-	if strings.HasPrefix(u, "wss://") {
+	switch {
+	case strings.HasPrefix(u, "wss://"):
 		rest = strings.TrimPrefix(u, "wss://")
-	} else if strings.HasPrefix(u, "ws://") {
+	case strings.HasPrefix(u, "ws://"):
 		rest = strings.TrimPrefix(u, "ws://")
 		return "http://" + rest
-	} else {
+	default:
 		return u
 	}
 	if strings.HasPrefix(rest, "localhost") || strings.HasPrefix(rest, "127.0.0.1") {
@@ -35,28 +36,12 @@ func (c *Client) roomServiceURL() string {
 	return "https://" + rest
 }
 
-func (c *Client) apiToken() (string, error) {
-	at := auth.NewAccessToken(c.apiKey, c.apiSecret)
-	at.SetVideoGrant(&auth.VideoGrant{RoomAdmin: true}).
-		SetIdentity("sdk").
-		SetValidFor(300)
-	return at.ToJWT()
-}
-
 func (c *Client) apiTokenForRoom(roomName string) (string, error) {
 	at := auth.NewAccessToken(c.apiKey, c.apiSecret)
 	at.SetVideoGrant(&auth.VideoGrant{RoomAdmin: true, Room: roomName}).
 		SetIdentity("sdk").
 		SetValidFor(300)
 	return at.ToJWT()
-}
-
-func (c *Client) roomService() livekit.RoomService {
-	baseURL := c.roomServiceURL()
-	client := &http.Client{
-		Transport: &authTransport{client: http.DefaultTransport, tokenFn: c.apiToken},
-	}
-	return livekit.NewRoomServiceJSONClient(baseURL, client)
 }
 
 func (c *Client) roomServiceForRoom(roomName string) livekit.RoomService {

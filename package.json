@@ -14,6 +14,7 @@
     "dev:ui-kit": "turbo run dev --filter=@nonza/ui-kit",
     "dev:tauri": "npm run dev:tauri --workspace=@nonza/meet",
     "lint": "turbo lint",
+    "lint:go": "make go-lint",
     "type-check": "turbo type-check"
   },
   "devDependencies": {
