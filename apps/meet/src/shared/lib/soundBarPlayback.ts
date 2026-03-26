@@ -1,9 +1,11 @@
 import { applyStoredOutputDevice } from "./audio-devices";
 import { getOutputMuted } from "./output-mute";
+import { subscribeNotificationMasterVolume } from "./notification-sounds";
 
 type SessionId = string;
 
 const activeBySessionId = new Map<SessionId, HTMLAudioElement>();
+const unsubscribeMasterBySessionId = new Map<SessionId, () => void>();
 const onEndedBySessionId = new Map<SessionId, () => void>();
 const loopTickCleanupBySessionId = new Map<SessionId, () => void>();
 const playbackReadyFallbackBySessionId = new Map<
@@ -21,6 +23,12 @@ function clearPlaybackReadyFallback(sessionId: SessionId): void {
 
 function cleanupSession(sessionId: SessionId): void {
   clearPlaybackReadyFallback(sessionId);
+
+  const unsubMaster = unsubscribeMasterBySessionId.get(sessionId);
+  if (unsubMaster) {
+    unsubMaster();
+    unsubscribeMasterBySessionId.delete(sessionId);
+  }
 
   const loopCleanup = loopTickCleanupBySessionId.get(sessionId);
   if (loopCleanup) {
@@ -106,7 +114,13 @@ export async function startSoundBarSession(params: {
   const audio = new Audio(trimmed);
   audio.preload = "auto";
   audio.loop = loopEnabled;
-  audio.volume = 1;
+
+  unsubscribeMasterBySessionId.set(
+    sessionId,
+    subscribeNotificationMasterVolume((v) => {
+      audio.volume = v;
+    }),
+  );
 
   activeBySessionId.set(sessionId, audio);
 

@@ -53,6 +53,8 @@ export const PIXEL_ICON_NAMES = [
   "cancel",
   "pause",
   "stop",
+  "undo",
+  "redo",
 ] as const;
 
 export type PixelIconName = (typeof PIXEL_ICON_NAMES)[number];

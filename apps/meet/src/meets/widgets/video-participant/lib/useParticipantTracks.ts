@@ -189,7 +189,7 @@ export function useParticipantTracks(props: UseParticipantTracksProps) {
         remoteLiveKitAudioTrack.value = null;
         if (audioElement.value) audioElement.value.srcObject = null;
       } else {
-        if (audioPub?.track && audioPub.isSubscribed) {
+        if (audioPub?.track && audioPub.isSubscribed !== false) {
           remoteLiveKitAudioTrack.value = audioPub.track as RemoteAudioTrack;
           audioTrack.value = null;
         } else {

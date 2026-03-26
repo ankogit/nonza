@@ -94,7 +94,7 @@
 import { ref } from "vue";
 
 import SoundBarEditorPanel from "./SoundBarEditorPanel.vue";
-import { useOrganizationSounds } from "../lib";
+import { useOrganizationSounds, notifyOrganizationSoundsChanged } from "../lib";
 import type { OrganizationSound } from "../model/types";
 import { Button, PixelIcon, Skeleton } from "@shared/ui";
 import {
@@ -117,7 +117,7 @@ const editorInitialVolume = ref(100);
 const editorInitialSpeed = ref(100);
 const editorInitialAudioUrl = ref<string | null>(null);
 
-const { sounds, isLoading, refresh, deleteSound } = useOrganizationSounds(
+const { sounds, isLoading, deleteSound } = useOrganizationSounds(
   () => props.orgId,
 );
 const soundsLoading = isLoading;
@@ -145,7 +145,7 @@ function loadSoundForEdit(s: OrganizationSound) {
 }
 
 function onEditorSaved() {
-  void refresh();
+  notifyOrganizationSoundsChanged(props.orgId);
 }
 
 async function confirmDelete(s: OrganizationSound) {

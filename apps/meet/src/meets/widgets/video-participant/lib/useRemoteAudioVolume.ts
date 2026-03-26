@@ -38,9 +38,14 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
   const volumeAudioContextRef = ref<AudioContext | null>(null);
   const volumeGainNodeRef = ref<GainNode | null>(null);
   const volumeSourceNodeRef = ref<MediaStreamAudioSourceNode | null>(null);
+  const volumeDestNodeRef = ref<MediaStreamAudioDestinationNode | null>(null);
   const outputMuted = useOutputMuted();
 
-  function setupVolumeGraphWithContext(track: RemoteAudioTrack, ctx: AudioContext): boolean {
+  function setupVolumeGraphWithContext(
+    track: RemoteAudioTrack,
+    ctx: AudioContext,
+    audioEl: HTMLAudioElement,
+  ): boolean {
     try {
       const baseGain = Math.min(5, Math.max(0, volume.value / 100));
       const gainValue = outputMuted.value ? 0 : baseGain;
@@ -48,11 +53,19 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(gainValue, ctx.currentTime);
+      const dest = ctx.createMediaStreamDestination();
       source.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(dest);
       volumeAudioContextRef.value = ctx;
       volumeGainNodeRef.value = gain;
       volumeSourceNodeRef.value = source;
+      volumeDestNodeRef.value = dest;
+
+      audioEl.srcObject = dest.stream;
+      audioEl.volume = 1;
+      applyStoredOutputDevice(audioEl);
+      audioEl.load();
+      audioEl.play().catch(() => {});
       return ctx.state === "running";
     } catch (err) {
       console.warn("[VP:vol] setupVolumeGraphWithContext failed:", err);
@@ -68,6 +81,7 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
       }
       volumeSourceNodeRef.value = null;
       volumeGainNodeRef.value = null;
+      volumeDestNodeRef.value = null;
       if (volumeAudioContextRef.value?.state !== "closed") {
         volumeAudioContextRef.value?.close();
       }
@@ -86,10 +100,10 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
 
     if (wantGraph) {
       const el = audioElement.value;
-      if (el) el.volume = 0;
+      if (!el) return;
       teardownVolumeGraph();
       const ctx = new AudioContext();
-      setupVolumeGraphWithContext(t, ctx);
+      setupVolumeGraphWithContext(t, ctx, el);
       ctx.resume();
       return;
     }
@@ -97,9 +111,11 @@ export function useRemoteAudioVolume(options: UseRemoteAudioVolumeOptions) {
     const el = audioElement.value;
     if (el) {
       try {
+        if (el.srcObject) el.srcObject = null;
         (t as { attach(el: HTMLMediaElement): HTMLMediaElement }).attach(el);
         t.setVolume(effectiveVol);
         applyStoredOutputDevice(el);
+        el.play().catch(() => {});
       } catch (err) {
         console.warn("[VP:vol] attach failed:", err);
       }

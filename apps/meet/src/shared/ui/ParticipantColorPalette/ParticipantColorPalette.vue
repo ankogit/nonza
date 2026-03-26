@@ -49,6 +49,7 @@
           :aria-label="nativePickerAriaLabel"
           :disabled="disabled"
           @input="onNativeInput"
+          @change="onNativeChange"
         />
         <button
           v-if="showReset"
@@ -134,9 +135,12 @@ function onNativeInput(ev: Event) {
   const el = ev.target as HTMLInputElement;
   if (el.value) {
     modelValue.value = el.value;
-    expanded.value = false;
     emit("pick");
   }
+}
+
+function onNativeChange() {
+  expanded.value = false;
 }
 
 let closeOnDoc: ((e: MouseEvent) => void) | null = null;

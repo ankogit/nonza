@@ -253,3 +253,11 @@
 .pi-stop {
   background-position: calc(-14 * var(--pi-size)) calc(-1 * var(--pi-size));
 }
+
+.pi-undo {
+  background-position: calc(-15 * var(--pi-size)) calc(-1 * var(--pi-size));
+}
+
+.pi-redo {
+  background-position: calc(-16 * var(--pi-size)) calc(-1 * var(--pi-size));
+}

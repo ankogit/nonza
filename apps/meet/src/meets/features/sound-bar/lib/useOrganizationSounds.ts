@@ -2,6 +2,10 @@ import { ref, watch, computed } from "vue";
 import { useApiClient } from "@shared/api";
 import { showToast } from "@shared/lib";
 import type { OrganizationSound } from "../model/types";
+import {
+  getOrganizationSoundsEpoch,
+  notifyOrganizationSoundsChanged,
+} from "./organizationSoundsSync";
 
 // NOTE: endpoint and type are planned; backend may not exist yet.
 const ENDPOINT = (orgId: string) => `/api/v1/org/${encodeURIComponent(orgId)}/sounds`;
@@ -10,6 +14,7 @@ export function useOrganizationSounds(orgId: () => string | null | undefined) {
   const client = useApiClient();
   const soundsRaw = ref<OrganizationSound[]>([]);
   const isLoading = ref(false);
+  const orgSoundsEpoch = getOrganizationSoundsEpoch();
 
   async function refresh() {
     const id = orgId();
@@ -38,7 +43,15 @@ export function useOrganizationSounds(orgId: () => string | null | undefined) {
     }
   }
 
-  watch(orgId, refresh, { immediate: true });
+  watch(
+    () => {
+      const id = orgId();
+      if (!id) return [null, 0] as const;
+      return [id, orgSoundsEpoch.value[id] ?? 0] as const;
+    },
+    () => refresh(),
+    { immediate: true },
+  );
 
   async function deleteSound(soundId: string) {
     const id = orgId();
@@ -47,7 +60,7 @@ export function useOrganizationSounds(orgId: () => string | null | undefined) {
       await client.delete(
         `${ENDPOINT(id)}/${encodeURIComponent(soundId)}`,
       );
-      await refresh();
+      notifyOrganizationSoundsChanged(id);
     } catch {
       showToast("Не удалось удалить звук", { variant: "danger" });
     }

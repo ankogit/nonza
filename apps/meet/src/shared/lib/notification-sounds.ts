@@ -139,6 +139,18 @@ function saveStored(
 const stored = ref(loadStored());
 const masterVolume = ref(loadMasterVolume());
 
+const masterVolumeSubscribers = new Set<(v: number) => void>();
+
+export function subscribeNotificationMasterVolume(
+  cb: (v: number) => void,
+): () => void {
+  masterVolumeSubscribers.add(cb);
+  cb(masterVolume.value);
+  return () => {
+    masterVolumeSubscribers.delete(cb);
+  };
+}
+
 function getEventConfig(id: NotificationSoundEventId): EventSoundConfig {
   const s = stored.value[id];
   return {
@@ -229,6 +241,13 @@ export function useNotificationSounds(): {
     const v = Math.max(0, Math.min(1, value));
     masterVolume.value = v;
     saveMasterVolume(v);
+    for (const fn of masterVolumeSubscribers) {
+      try {
+        fn(v);
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   function setEventEnabled(

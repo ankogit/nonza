@@ -75,15 +75,47 @@
           </Button>
         </div>
         <Button
-          type="text"
+          type="icon"
           size="tiny"
           :variant="isEraser ? 'active' : 'default'"
+          class="collab-whiteboard__button"
           title="Ластик"
           aria-label="Ластик"
           :aria-pressed="isEraser"
           @click="isEraser = !isEraser"
         >
-          Ластик
+          <img
+            src="/icons/eraser.png"
+            alt=""
+            width="15"
+            height="15"
+            class="collab-whiteboard__eraser-icon"
+            decoding="async"
+          />
+        </Button>
+        <Button
+          type="icon"
+          size="tiny"
+          variant="default"
+          class="collab-whiteboard__button"
+          title="Отменить последнее действие"
+          aria-label="Отменить последнее действие"
+          :disabled="!canUndoWhiteboard"
+          @click="undoWhiteboard"
+        >
+          <PixelIcon name="undo" variant="small" />
+        </Button>
+        <Button
+          type="icon"
+          size="tiny"
+          variant="default"
+          class="collab-whiteboard__button"
+          title="Вернуть отменённое"
+          aria-label="Вернуть отменённое"
+          :disabled="!canRedoWhiteboard"
+          @click="redoWhiteboard"
+        >
+          <PixelIcon name="redo" variant="small" />
         </Button>
         <div v-if="embedded" class="collab-whiteboard__toolbar-tail">
           <Button
@@ -125,6 +157,8 @@
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
         @pointerleave="onPointerLeave"
+        @pointerrawupdate="onPointerRawUpdate"
+        @contextmenu.prevent
       >
         <canvas ref="canvasRef" class="collab-whiteboard__canvas" />
         <div class="collab-whiteboard__cursors">
@@ -203,12 +237,7 @@ import {
   onBeforeUnmount,
 } from "vue";
 import * as Y from "yjs";
-import {
-  Button,
-  Modal,
-  PixelIcon,
-  ParticipantColorPalette,
-} from "@shared/ui";
+import { Button, Modal, PixelIcon, ParticipantColorPalette } from "@shared/ui";
 import { PARTICIPANT_COLOR_PALETTE } from "@shared/lib";
 import { MEET_ROOM_COLLABORATION_KEY } from "@features/room-collaboration";
 import {
@@ -252,8 +281,8 @@ const collab = inject(MEET_ROOM_COLLABORATION_KEY, null);
 
 const widthPresets = [
   { id: "s", label: "S", n: 0.004, title: "Тонкая" },
-  { id: "m", label: "M", n: 0.02, title: "Средняя" },
-  { id: "l", label: "L", n: 0.05, title: "Толстая" },
+  { id: "m", label: "M", n: 0.01, title: "Средняя" },
+  { id: "l", label: "L", n: 0.03, title: "Толстая" },
 ] as const;
 
 const activeWidthId = ref<(typeof widthPresets)[number]["id"]>("m");
@@ -312,8 +341,32 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const strokesArray = shallowRef<Y.Array<Y.Map<unknown>> | null>(null);
 
+let whiteboardUndoManager: Y.UndoManager | null = null;
+const canUndoWhiteboard = ref(false);
+const canRedoWhiteboard = ref(false);
+
+function syncWhiteboardUndoUi() {
+  const um = whiteboardUndoManager;
+  canUndoWhiteboard.value = um ? um.canUndo() : false;
+  canRedoWhiteboard.value = um ? um.canRedo() : false;
+}
+
+function undoWhiteboard() {
+  whiteboardUndoManager?.undo();
+}
+
+function redoWhiteboard() {
+  whiteboardUndoManager?.redo();
+}
+
 const localDraft = ref<[number, number][]>([]);
 const isDrawing = ref(false);
+let activeDrawingPointerId = -1;
+
+const usePointerRawUpdate =
+  typeof window !== "undefined" &&
+  typeof PointerEvent !== "undefined" &&
+  "onpointerrawupdate" in window;
 
 let rafAwareness = 0;
 let pendingAwareness: WhiteboardAwarenessPayload | null = null;
@@ -347,6 +400,15 @@ type StrokeSnapshot = {
   width: number;
   erase: boolean;
 };
+
+function isDotLikeStroke(pts: [number, number][]): boolean {
+  if (pts.length === 1) return true;
+  if (pts.length === 2) {
+    const [a, b] = pts;
+    return a[0] === b[0] && a[1] === b[1];
+  }
+  return false;
+}
 
 let strokesSnapshotsCache: StrokeSnapshot[] = [];
 let strokesSnapshotsDirty = true;
@@ -441,7 +503,7 @@ function snapshotStrokes(arr: Y.Array<Y.Map<unknown>>) {
     if (typeof id !== "string" || typeof ptsJson !== "string") continue;
     try {
       const pts = JSON.parse(ptsJson) as [number, number][];
-      if (!Array.isArray(pts) || pts.length < 2) continue;
+      if (!Array.isArray(pts) || pts.length < 1) continue;
       out.push({
         pts,
         color: typeof color === "string" ? color : "#bab1a8",
@@ -494,46 +556,84 @@ function paintCanvas() {
     const snapshots = strokesSnapshotsCache;
     const minDim = Math.min(w, h);
     for (const s of snapshots) {
+      ctx.lineWidth = Math.max(1, s.width * minDim);
+      if (isDotLikeStroke(s.pts)) {
+        const [fx, fy] = s.pts[0];
+        const px = fx * w;
+        const py = fy * h;
+        const r = Math.max(0.5, ctx.lineWidth / 2);
+        ctx.save();
+        if (s.erase) {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.fillStyle = "#000";
+        } else {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = s.color;
+        }
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        const [fx, fy] = s.pts[0];
+        ctx.moveTo(fx * w, fy * h);
+        for (let i = 1; i < s.pts.length; i++) {
+          const [nx, ny] = s.pts[i];
+          ctx.lineTo(nx * w, ny * h);
+        }
+        if (s.erase) {
+          ctx.save();
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.strokeStyle = "#000";
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = s.color;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  if (localDraft.value.length >= 1) {
+    const minDim = Math.min(w, h);
+    ctx.lineWidth = Math.max(1, brushWidthNorm.value * minDim);
+    if (localDraft.value.length === 1) {
+      const [fx, fy] = localDraft.value[0];
+      const px = fx * w;
+      const py = fy * h;
+      const r = Math.max(0.5, ctx.lineWidth / 2);
+      ctx.save();
+      if (isEraser.value) {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.fillStyle = "#000";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = brushColor.value;
+      }
       ctx.beginPath();
-      const [fx, fy] = s.pts[0];
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      const [fx, fy] = localDraft.value[0];
       ctx.moveTo(fx * w, fy * h);
-      for (let i = 1; i < s.pts.length; i++) {
-        const [nx, ny] = s.pts[i];
+      for (let i = 1; i < localDraft.value.length; i++) {
+        const [nx, ny] = localDraft.value[i];
         ctx.lineTo(nx * w, ny * h);
       }
-      ctx.lineWidth = Math.max(1, s.width * minDim);
-      if (s.erase) {
+      if (isEraser.value) {
         ctx.save();
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "#000";
         ctx.stroke();
         ctx.restore();
       } else {
-        ctx.strokeStyle = s.color;
+        ctx.strokeStyle = brushColor.value;
         ctx.stroke();
       }
-    }
-  }
-
-  if (localDraft.value.length >= 2) {
-    const minDim = Math.min(w, h);
-    ctx.beginPath();
-    const [fx, fy] = localDraft.value[0];
-    ctx.moveTo(fx * w, fy * h);
-    for (let i = 1; i < localDraft.value.length; i++) {
-      const [nx, ny] = localDraft.value[i];
-      ctx.lineTo(nx * w, ny * h);
-    }
-    ctx.lineWidth = Math.max(1, brushWidthNorm.value * minDim);
-    if (isEraser.value) {
-      ctx.save();
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "#000";
-      ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.strokeStyle = brushColor.value;
-      ctx.stroke();
     }
   }
 }
@@ -557,6 +657,11 @@ function bindStrokes(doc: Y.Doc | null) {
   if (prev) {
     prev.unobserve(onStrokesChanged);
   }
+  if (whiteboardUndoManager) {
+    whiteboardUndoManager.destroy();
+    whiteboardUndoManager = null;
+  }
+  syncWhiteboardUndoUi();
   strokesArray.value = null;
   strokesSnapshotsCache = [];
   strokesSnapshotsDirty = true;
@@ -567,6 +672,16 @@ function bindStrokes(doc: Y.Doc | null) {
   const arr = doc.getArray<Y.Map<unknown>>(WHITEBOARD_YARRAY_KEY);
   strokesArray.value = arr;
   arr.observe(onStrokesChanged);
+  whiteboardUndoManager = new Y.UndoManager(arr);
+  for (const ev of [
+    "stack-item-added",
+    "stack-item-popped",
+    "stack-cleared",
+    "stack-item-updated",
+  ] as const) {
+    whiteboardUndoManager.on(ev, syncWhiteboardUndoUi);
+  }
+  syncWhiteboardUndoUi();
   requestPaint();
 }
 
@@ -597,7 +712,7 @@ function updateRemoteCursors() {
       clientId,
       x: wb.nx * w,
       y: wb.ny * h,
-      color: typeof wb.color === "string" ? wb.color : user.color ?? "#888",
+      color: typeof wb.color === "string" ? wb.color : (user.color ?? "#888"),
       name: user.name,
       erase,
       sizePx,
@@ -620,9 +735,43 @@ function normFromEvent(ev: PointerEvent) {
   return { nx, ny };
 }
 
+function pushDistinctDraftPoint(ev: PointerEvent): { nx: number; ny: number } {
+  const { nx, ny } = normFromEvent(ev);
+  const last = localDraft.value[localDraft.value.length - 1];
+  if (!last || last[0] !== nx || last[1] !== ny) {
+    localDraft.value = [...localDraft.value, [nx, ny]];
+  }
+  return { nx, ny };
+}
+
+function scheduleDrawingAwareness(nx: number, ny: number) {
+  scheduleAwareness({
+    phase: "drawing",
+    nx,
+    ny,
+    width: brushWidthNorm.value,
+    erase: isEraser.value,
+    color: brushColor.value,
+  });
+}
+
+function onPointerRawUpdate(ev: PointerEvent) {
+  if (!usePointerRawUpdate) return;
+  if (!isDrawing.value || !collab?.ydoc.value) return;
+  if (ev.pointerId !== activeDrawingPointerId) return;
+  ev.preventDefault();
+  const { nx, ny } = pushDistinctDraftPoint(ev);
+  localCursorPos.value = { nx, ny };
+  updateLocalCursor();
+  scheduleDrawingAwareness(nx, ny);
+  requestPaint();
+}
+
 function onPointerDown(ev: PointerEvent) {
+  if (ev.button !== 0) return;
   if (!collab?.ydoc.value || connectionStatus.value !== "connected") return;
   ev.preventDefault();
+  activeDrawingPointerId = ev.pointerId;
   surfaceRef.value?.setPointerCapture(ev.pointerId);
   const { nx, ny } = normFromEvent(ev);
   isDrawing.value = true;
@@ -641,26 +790,34 @@ function onPointerDown(ev: PointerEvent) {
 }
 
 function onPointerMove(ev: PointerEvent) {
-  const { nx, ny } = normFromEvent(ev);
   if (isDrawing.value && collab?.ydoc.value) {
+    if (ev.pointerId !== activeDrawingPointerId) return;
     ev.preventDefault();
-    const last = localDraft.value[localDraft.value.length - 1];
-    if (!last || last[0] !== nx || last[1] !== ny) {
-      localDraft.value = [...localDraft.value, [nx, ny]];
+    let lastNx = 0;
+    let lastNy = 0;
+    if (!usePointerRawUpdate) {
+      const raw =
+        typeof ev.getCoalescedEvents === "function"
+          ? ev.getCoalescedEvents()
+          : [];
+      const queue = raw.length > 0 ? raw : [ev];
+      for (const e of queue) {
+        const p = pushDistinctDraftPoint(e);
+        lastNx = p.nx;
+        lastNy = p.ny;
+      }
+    } else {
+      const p = normFromEvent(ev);
+      lastNx = p.nx;
+      lastNy = p.ny;
     }
-    localCursorPos.value = { nx, ny };
+    localCursorPos.value = { nx: lastNx, ny: lastNy };
     updateLocalCursor();
-    scheduleAwareness({
-      phase: "drawing",
-      nx,
-      ny,
-      width: brushWidthNorm.value,
-      erase: isEraser.value,
-      color: brushColor.value,
-    });
+    scheduleDrawingAwareness(lastNx, lastNy);
     requestPaint();
     return;
   }
+  const { nx, ny } = normFromEvent(ev);
   if (surfaceRef.value?.contains(ev.target as Node)) {
     localCursorPos.value = { nx, ny };
     updateLocalCursor();
@@ -680,12 +837,13 @@ function commitStroke() {
   const arr = strokesArray.value;
   if (!doc || !arr) return;
   const pts = localDraft.value;
-  if (pts.length < 2) return;
+  if (pts.length < 1) return;
+  const normalizedPts = pts.length === 1 ? [pts[0]] : pts;
 
   doc.transact(() => {
     const m = new Y.Map<unknown>();
     m.set("id", crypto.randomUUID());
-    m.set("pts", JSON.stringify(pts));
+    m.set("pts", JSON.stringify(normalizedPts));
     m.set("color", brushColor.value);
     m.set("width", brushWidthNorm.value);
     m.set("erase", isEraser.value);
@@ -694,16 +852,20 @@ function commitStroke() {
       arr.delete(0, 1);
     }
   });
+  whiteboardUndoManager?.stopCapturing();
 }
 
 function onPointerUp(ev: PointerEvent) {
   if (isDrawing.value) {
+    if (ev.pointerId !== activeDrawingPointerId) return;
     ev.preventDefault();
+    pushDistinctDraftPoint(ev);
     try {
       surfaceRef.value?.releasePointerCapture(ev.pointerId);
     } catch {
       /* ignore */
     }
+    activeDrawingPointerId = -1;
     isDrawing.value = false;
     commitStroke();
     localDraft.value = [];
@@ -734,11 +896,13 @@ function performClearAll() {
   const doc = collab?.ydoc.value;
   const arr = strokesArray.value;
   if (!doc || !arr) return;
+  whiteboardUndoManager?.stopCapturing();
   doc.transact(() => {
     while (arr.length > 0) {
       arr.delete(0, 1);
     }
   });
+  whiteboardUndoManager?.stopCapturing();
 }
 
 function confirmClearAll() {
@@ -825,6 +989,11 @@ onBeforeUnmount(() => {
   if (arr) {
     arr.unobserve(onStrokesChanged);
   }
+  if (whiteboardUndoManager) {
+    whiteboardUndoManager.destroy();
+    whiteboardUndoManager = null;
+  }
+  syncWhiteboardUndoUi();
   collab?.awareness.value?.off("change", updateRemoteCursors);
   clearWhiteboardAwareness();
   localCursorPos.value = null;
@@ -875,6 +1044,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   overflow: visible;
+}
+
+.collab-whiteboard__eraser-icon {
+  display: block;
+  object-fit: contain;
+  image-rendering: crisp-edges;
+  pointer-events: none;
 }
 
 .collab-whiteboard__sizes {
@@ -959,6 +1135,9 @@ onBeforeUnmount(() => {
   touch-action: none;
   cursor: none;
   background: #141414;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .collab-whiteboard__surface--eraser {
@@ -969,6 +1148,8 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .collab-whiteboard__cursors {

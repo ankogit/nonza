@@ -279,6 +279,13 @@ let offPreviewEndCheck: (() => void) | null = null;
 
 const waveDurationSeconds = ref(0);
 
+const CLIP_REGION_OPTIONS = {
+  drag: true,
+  resize: true,
+  color: "rgba(120, 200, 245, 0.22)",
+  minLength: 0.05,
+} as const;
+
 function formatWaveTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const secondsRemainder = Math.max(0, Math.round(seconds) % 60);
@@ -652,12 +659,7 @@ async function loadWaveFromFile(file: File) {
     regionsPlugin = found;
 
     const disable = regionsPlugin.enableDragSelection(
-      {
-        drag: true,
-        resize: true,
-        color: "rgba(69, 191, 255, 0.25)",
-        minLength: 0.05,
-      },
+      { ...CLIP_REGION_OPTIONS },
       3,
     );
     disableDragSelection = disable;
@@ -689,10 +691,7 @@ async function loadWaveFromFile(file: File) {
       const r = regionsPlugin.addRegion({
         start: 0,
         end: Math.max(duration, 0.05),
-        drag: true,
-        resize: true,
-        color: "rgba(69, 191, 255, 0.25)",
-        minLength: 0.05,
+        ...CLIP_REGION_OPTIONS,
       });
       selectedRegion.value = r;
     };
@@ -827,10 +826,9 @@ async function handleSave() {
       speed: Math.round(speed.value),
     });
   } catch (e) {
-    showToast(
-      e instanceof Error ? e.message : "Не удалось обработать аудио",
-      { variant: "danger" },
-    );
+    showToast(e instanceof Error ? e.message : "Не удалось обработать аудио", {
+      variant: "danger",
+    });
     return;
   }
 
@@ -1092,7 +1090,7 @@ async function handleSave() {
   width: 100%;
   position: relative;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .sound-bar-editor__wave-hover {
@@ -1172,5 +1170,91 @@ async function handleSave() {
   color: #ddd;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+</style>
+
+<style>
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(region) {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.38),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.28) !important;
+}
+
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(marker) {
+  border-left: none !important;
+  border-radius: 1px !important;
+  box-sizing: content-box !important;
+  width: 1px !important;
+  min-width: 0 !important;
+  padding: 0 6px !important;
+  margin: 0 -6px !important;
+  background-color: #7eb8ff !important;
+  background-clip: content-box !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)) !important;
+  transition: background-color 0.16s ease !important;
+}
+
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(marker):hover {
+  background-color: #9dc8ff !important;
+}
+
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(region-handle-left),
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(region-handle-right) {
+  width: 12px !important;
+  min-width: 12px !important;
+  z-index: 6 !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14) !important;
+  transition: background 0.14s ease !important;
+}
+
+.soundbar-editor-panel
+  .sound-bar-editor__wave
+  > *::part(region-handle-left):hover,
+.soundbar-editor-panel
+  .sound-bar-editor__wave
+  > *::part(region-handle-right):hover {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+.soundbar-editor-panel
+  .sound-bar-editor__wave
+  > *::part(region-handle-left)::after,
+.soundbar-editor-panel
+  .sound-bar-editor__wave
+  > *::part(region-handle-right)::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(
+    90deg,
+    rgba(12, 149, 224, 0.88) 0,
+    rgba(12, 149, 224, 0.88) 1px,
+    transparent 1px,
+    transparent 3px,
+    rgba(12, 149, 224, 0.88) 3px,
+    rgba(12, 149, 224, 0.88) 4px,
+    transparent 4px
+  );
+  pointer-events: none;
+}
+
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(region-handle-left) {
+  border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.32) !important;
+  border-radius: 2px 0 0 2px !important;
+}
+
+.soundbar-editor-panel .sound-bar-editor__wave > *::part(region-handle-right) {
+  border-right: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.32) !important;
+  border-radius: 0 2px 2px 0 !important;
 }
 </style>

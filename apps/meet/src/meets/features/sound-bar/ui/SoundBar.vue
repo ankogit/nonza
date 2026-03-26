@@ -135,6 +135,7 @@ function handlePointerDown(sound: OrganizationSound, ev: PointerEvent) {
   if (previewMode.value) return;
   if (!sound.audioUrl) return;
   if (!sound.gateEnabled) return;
+  if (ev.button !== 0) return;
 
   ev.preventDefault();
 
@@ -218,12 +219,18 @@ function handleRowClick(sound: OrganizationSound) {
   position: relative;
   display: flex;
   align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .sound-bar__anchor {
   position: relative;
   display: flex;
   align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .sound-bar__popover {
@@ -242,6 +249,9 @@ function handleRowClick(sound: OrganizationSound) {
   border-left-color: #444;
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .sound-bar__scroll {
@@ -273,6 +283,9 @@ function handleRowClick(sound: OrganizationSound) {
   gap: 6px;
   justify-items: center;
   width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 :deep(.sound-bar__tile.button) {
@@ -282,6 +295,10 @@ function handleRowClick(sound: OrganizationSound) {
   justify-content: center;
   gap: 2px;
   padding: 3px 2px 4px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 
 :deep(.sound-bar__tile.button.sound-bar__tile--pressed),
