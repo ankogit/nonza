@@ -15,6 +15,31 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+const B64_ASYNC_YIELD_EVERY = 6;
+
+function yieldMacrotask(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+async function uint8ArrayToBase64Async(bytes: Uint8Array): Promise<string> {
+  let binary = "";
+  let steps = 0;
+  for (let i = 0; i < bytes.length; i += B64_ENCODE_CHUNK) {
+    const end = Math.min(i + B64_ENCODE_CHUNK, bytes.length);
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, end)));
+    steps += 1;
+    if (steps % B64_ASYNC_YIELD_EVERY === 0 && end < bytes.length) {
+      await yieldMacrotask();
+    }
+  }
+  if (bytes.length > B64_ENCODE_CHUNK * 2) {
+    await yieldMacrotask();
+  }
+  return btoa(binary);
+}
+
 export interface YjsWebSocketProviderOptions {
   url: string;
   roomId: string;
@@ -53,6 +78,7 @@ export class YjsWebSocketProvider {
   private pendingAwarenessUpdate: Uint8Array | null = null;
   private readonly UPDATE_DEBOUNCE_MS = 600;
   private readonly AWARENESS_DEBOUNCE_MS = 100; // Smaller debounce for awareness (cursors should be more responsive)
+  private persistBackgroundGeneration = 0;
 
   constructor(options: YjsWebSocketProviderOptions) {
     this.url = options.url;
@@ -492,7 +518,40 @@ export class YjsWebSocketProvider {
   }
 
   persistRoomDocument(): void {
+    if (this.updateDebounceTimeout !== null) {
+      window.clearTimeout(this.updateDebounceTimeout);
+      this.updateDebounceTimeout = null;
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    this.flushPendingUpdates();
     this.sendFullState();
+  }
+
+  persistRoomDocumentInBackground(): void {
+    const gen = ++this.persistBackgroundGeneration;
+    void (async () => {
+      try {
+        if (this.updateDebounceTimeout !== null) {
+          window.clearTimeout(this.updateDebounceTimeout);
+          this.updateDebounceTimeout = null;
+        }
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          return;
+        }
+        await yieldMacrotask();
+        if (gen !== this.persistBackgroundGeneration) return;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        this.flushPendingUpdates();
+        await yieldMacrotask();
+        if (gen !== this.persistBackgroundGeneration) return;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        await this.sendFullStateAsync(gen);
+      } catch {
+        /* ignore */
+      }
+    })();
   }
 
   /** Sends full document state (Y.encodeStateAsUpdate) so server can store it for new joiners. */
@@ -503,6 +562,33 @@ export class YjsWebSocketProvider {
     try {
       const stateUpdate = Y.encodeStateAsUpdate(this.doc);
       const base64 = uint8ArrayToBase64(stateUpdate);
+      const message = {
+        type: "yjs_full_state",
+        room_id: this.roomId,
+        payload: { update: base64 },
+      };
+      this.ws.send(JSON.stringify(message));
+    } catch (error) {
+      console.error("[YjsWebSocketProvider] Error sending full state:", error);
+    }
+  }
+
+  private async sendFullStateAsync(
+    expectedGen: number,
+  ): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    if (expectedGen !== this.persistBackgroundGeneration) return;
+    try {
+      const stateUpdate = Y.encodeStateAsUpdate(this.doc);
+      await yieldMacrotask();
+      if (expectedGen !== this.persistBackgroundGeneration) return;
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      const base64 = await uint8ArrayToBase64Async(stateUpdate);
+      await yieldMacrotask();
+      if (expectedGen !== this.persistBackgroundGeneration) return;
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       const message = {
         type: "yjs_full_state",
         room_id: this.roomId,
@@ -580,6 +666,7 @@ export class YjsWebSocketProvider {
   }
 
   disconnect(): void {
+    this.persistBackgroundGeneration += 1;
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;

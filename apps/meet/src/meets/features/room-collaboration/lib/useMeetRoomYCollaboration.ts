@@ -34,7 +34,7 @@ export function useMeetRoomYCollaboration(options: {
     "connecting" | "connected" | "disconnected"
   >("disconnected");
 
-  function handleBeforeUnload() {
+  function handleVisibilityOrUnload() {
     persistRoomDocument();
     const aw = awareness.value;
     const prov = provider.value;
@@ -67,17 +67,30 @@ export function useMeetRoomYCollaboration(options: {
 
   function persistRoomDocument() {
     try {
-      if (provider.value?.connected) {
-        provider.value.persistRoomDocument();
-      }
+      provider.value?.persistRoomDocument();
     } catch {
       /* ignore */
     }
   }
 
+  function persistRoomDocumentInBackground() {
+    try {
+      provider.value?.persistRoomDocumentInBackground();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState === "hidden") {
+      persistRoomDocument();
+    }
+  }
+
   function teardown() {
-    window.removeEventListener("beforeunload", handleBeforeUnload);
-    window.removeEventListener("pagehide", handleBeforeUnload);
+    window.removeEventListener("beforeunload", handleVisibilityOrUnload);
+    window.removeEventListener("pagehide", handleVisibilityOrUnload);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
 
     persistRoomDocument();
 
@@ -127,8 +140,9 @@ export function useMeetRoomYCollaboration(options: {
     awareness.value = aw;
     provider.value = prov;
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handleBeforeUnload);
+    window.addEventListener("beforeunload", handleVisibilityOrUnload);
+    window.addEventListener("pagehide", handleVisibilityOrUnload);
+    document.addEventListener("visibilitychange", onVisibilityChange);
   }
 
   watch(
@@ -162,5 +176,12 @@ export function useMeetRoomYCollaboration(options: {
     teardown();
   });
 
-  return { ydoc, awareness, provider, connectionStatus, persistRoomDocument };
+  return {
+    ydoc,
+    awareness,
+    provider,
+    connectionStatus,
+    persistRoomDocument,
+    persistRoomDocumentInBackground,
+  };
 }

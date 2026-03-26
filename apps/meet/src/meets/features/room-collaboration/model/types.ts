@@ -14,4 +14,5 @@ export type MeetRoomCollaborationBundle = {
   provider: ShallowRef<YjsWebSocketProvider | null>;
   connectionStatus: Ref<MeetRoomConnectionStatus>;
   persistRoomDocument: () => void;
+  persistRoomDocumentInBackground: () => void;
 };

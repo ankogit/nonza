@@ -37,9 +37,8 @@ export function notifyOrganizationSoundsChanged(orgId: string) {
   if (typeof BroadcastChannel !== "undefined") {
     try {
       getOrCreateChannel().postMessage({ orgId });
-      return;
     } catch {
-      /* fall through */
+      /* ignore */
     }
   }
   bumpLocal(orgId);

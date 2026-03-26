@@ -336,6 +336,27 @@ const connectionStatus = computed(() => {
   return collab.connectionStatus.value;
 });
 
+const WB_PERSIST_DEBOUNCE_MS = 1800;
+let persistRoomTimer: ReturnType<typeof setTimeout> | null = null;
+
+function schedulePersistRoom() {
+  if (persistRoomTimer !== null) {
+    window.clearTimeout(persistRoomTimer);
+  }
+  persistRoomTimer = window.setTimeout(() => {
+    persistRoomTimer = null;
+    collab?.persistRoomDocumentInBackground?.();
+  }, WB_PERSIST_DEBOUNCE_MS);
+}
+
+function flushPersistRoomNow() {
+  if (persistRoomTimer !== null) {
+    window.clearTimeout(persistRoomTimer);
+    persistRoomTimer = null;
+  }
+  collab?.persistRoomDocument?.();
+}
+
 const surfaceRef = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -359,9 +380,9 @@ function redoWhiteboard() {
   whiteboardUndoManager?.redo();
 }
 
-const localDraft = ref<[number, number][]>([]);
 const isDrawing = ref(false);
 let activeDrawingPointerId = -1;
+const localDraftPts: [number, number][] = [];
 
 const usePointerRawUpdate =
   typeof window !== "undefined" &&
@@ -596,11 +617,11 @@ function paintCanvas() {
     }
   }
 
-  if (localDraft.value.length >= 1) {
+  if (localDraftPts.length >= 1) {
     const minDim = Math.min(w, h);
     ctx.lineWidth = Math.max(1, brushWidthNorm.value * minDim);
-    if (localDraft.value.length === 1) {
-      const [fx, fy] = localDraft.value[0];
+    if (localDraftPts.length === 1) {
+      const [fx, fy] = localDraftPts[0];
       const px = fx * w;
       const py = fy * h;
       const r = Math.max(0.5, ctx.lineWidth / 2);
@@ -618,10 +639,10 @@ function paintCanvas() {
       ctx.restore();
     } else {
       ctx.beginPath();
-      const [fx, fy] = localDraft.value[0];
+      const [fx, fy] = localDraftPts[0];
       ctx.moveTo(fx * w, fy * h);
-      for (let i = 1; i < localDraft.value.length; i++) {
-        const [nx, ny] = localDraft.value[i];
+      for (let i = 1; i < localDraftPts.length; i++) {
+        const [nx, ny] = localDraftPts[i];
         ctx.lineTo(nx * w, ny * h);
       }
       if (isEraser.value) {
@@ -737,9 +758,9 @@ function normFromEvent(ev: PointerEvent) {
 
 function pushDistinctDraftPoint(ev: PointerEvent): { nx: number; ny: number } {
   const { nx, ny } = normFromEvent(ev);
-  const last = localDraft.value[localDraft.value.length - 1];
+  const last = localDraftPts[localDraftPts.length - 1];
   if (!last || last[0] !== nx || last[1] !== ny) {
-    localDraft.value = [...localDraft.value, [nx, ny]];
+    localDraftPts.push([nx, ny]);
   }
   return { nx, ny };
 }
@@ -775,7 +796,8 @@ function onPointerDown(ev: PointerEvent) {
   surfaceRef.value?.setPointerCapture(ev.pointerId);
   const { nx, ny } = normFromEvent(ev);
   isDrawing.value = true;
-  localDraft.value = [[nx, ny]];
+  localDraftPts.length = 0;
+  localDraftPts.push([nx, ny]);
   localCursorPos.value = { nx, ny };
   updateLocalCursor();
   scheduleAwareness({
@@ -836,9 +858,9 @@ function commitStroke() {
   const doc = collab?.ydoc.value;
   const arr = strokesArray.value;
   if (!doc || !arr) return;
-  const pts = localDraft.value;
-  if (pts.length < 1) return;
-  const normalizedPts = pts.length === 1 ? [pts[0]] : pts;
+  if (localDraftPts.length < 1) return;
+  const normalizedPts =
+    localDraftPts.length === 1 ? [localDraftPts[0]] : localDraftPts;
 
   doc.transact(() => {
     const m = new Y.Map<unknown>();
@@ -853,6 +875,7 @@ function commitStroke() {
     }
   });
   whiteboardUndoManager?.stopCapturing();
+  schedulePersistRoom();
 }
 
 function onPointerUp(ev: PointerEvent) {
@@ -868,7 +891,7 @@ function onPointerUp(ev: PointerEvent) {
     activeDrawingPointerId = -1;
     isDrawing.value = false;
     commitStroke();
-    localDraft.value = [];
+    localDraftPts.length = 0;
     const { nx, ny } = normFromEvent(ev);
     localCursorPos.value = { nx, ny };
     updateLocalCursor();
@@ -903,6 +926,7 @@ function performClearAll() {
     }
   });
   whiteboardUndoManager?.stopCapturing();
+  flushPersistRoomNow();
 }
 
 function confirmClearAll() {
@@ -975,6 +999,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (persistRoomTimer !== null) {
+    window.clearTimeout(persistRoomTimer);
+    persistRoomTimer = null;
+  }
+  flushPersistRoomNow();
   ro?.disconnect();
   ro = null;
   if (rafAwareness) {
