@@ -387,7 +387,8 @@ const localDraftPts: [number, number][] = [];
 const usePointerRawUpdate =
   typeof window !== "undefined" &&
   typeof PointerEvent !== "undefined" &&
-  "onpointerrawupdate" in window;
+  "onpointerrawupdate" in window &&
+  !/firefox/i.test(navigator.userAgent);
 
 let rafAwareness = 0;
 let pendingAwareness: WhiteboardAwarenessPayload | null = null;
@@ -817,18 +818,17 @@ function onPointerMove(ev: PointerEvent) {
     ev.preventDefault();
     let lastNx = 0;
     let lastNy = 0;
-    if (!usePointerRawUpdate) {
-      const raw =
-        typeof ev.getCoalescedEvents === "function"
-          ? ev.getCoalescedEvents()
-          : [];
-      const queue = raw.length > 0 ? raw : [ev];
-      for (const e of queue) {
-        const p = pushDistinctDraftPoint(e);
-        lastNx = p.nx;
-        lastNy = p.ny;
-      }
-    } else {
+    const raw =
+      typeof ev.getCoalescedEvents === "function"
+        ? ev.getCoalescedEvents()
+        : [];
+    const queue = raw.length > 0 ? raw : [ev];
+    for (const e of queue) {
+      const p = pushDistinctDraftPoint(e);
+      lastNx = p.nx;
+      lastNy = p.ny;
+    }
+    if (usePointerRawUpdate && raw.length === 0) {
       const p = normFromEvent(ev);
       lastNx = p.nx;
       lastNy = p.ny;
