@@ -31,6 +31,10 @@
         <div
           v-if="connectionStatus !== 'connected'"
           class="collab-whiteboard__status"
+          role="status"
+          :aria-label="
+            connectionStatus === 'connecting' ? 'Подключение' : 'Отключено'
+          "
           :class="{
             'collab-whiteboard__status--connecting':
               connectionStatus === 'connecting',
@@ -38,9 +42,10 @@
               connectionStatus === 'disconnected',
           }"
         >
-          {{
-            connectionStatus === "connecting" ? "Подключение..." : "Отключено"
-          }}
+          <template v-if="connectionStatus === 'connecting'">
+            Подключение...
+          </template>
+          <PixelIcon v-else name="loading" variant="small" />
         </div>
       </div>
     </div>
@@ -1121,6 +1126,8 @@ onBeforeUnmount(() => {
 }
 
 .collab-whiteboard__status {
+  display: inline-flex;
+  align-items: center;
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;

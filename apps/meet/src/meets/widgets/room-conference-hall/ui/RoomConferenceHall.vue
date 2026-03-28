@@ -8,6 +8,20 @@
         <h2 class="room-info-title">{{ room?.name ?? "Созвон" }}</h2>
       </div>
       <div class="room-indicators">
+        <Indicator
+          v-if="
+            !previewMode &&
+            connectionIndicatorVisible &&
+            connectionStatus !== 'good'
+          "
+          :trigger="false"
+          :variant="connectionVariant"
+          :title="connectionLabel"
+          :aria-label="connectionLabel"
+          role="status"
+        >
+          <PixelIcon :name="connectionIconName" variant="small" />
+        </Indicator>
         <Button
           variant="default"
           size="small"
@@ -668,7 +682,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, toRef } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE } from "@features/e2ee";
@@ -754,10 +768,13 @@ defineExpose({
 
 const { state: e2eeState } = useE2EE(() => props.livekitRoom);
 
-const livekitRoomRef = computed(() => props.livekitRoom);
+const livekitRoomRef = toRef(props, "livekitRoom");
 const {
-  connectionStatus: _connectionStatus,
-  connectionLabel: _connectionLabel,
+  connectionStatus,
+  connectionLabel,
+  connectionVariant,
+  connectionIconName,
+  connectionIndicatorVisible,
 } = useConnectionIndicator(livekitRoomRef);
 
 const localParticipant = computed<LocalParticipant | null>(() => {
@@ -1422,26 +1439,6 @@ function handleModalClose() {
   font-size: 1.5rem;
   font-weight: 400;
   letter-spacing: 0.02em;
-}
-
-.connection-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-.connection-indicator--warning {
-  background: rgba(255, 190, 83, 0.2);
-  color: var(--color-accent, #ffc866);
-}
-.connection-indicator--bad {
-  background: rgba(231, 76, 60, 0.2);
-  color: #e2534b;
-}
-.connection-indicator__label {
-  white-space: nowrap;
 }
 
 .conference-hall__content {

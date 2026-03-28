@@ -1,7 +1,25 @@
 <template>
   <div class="wb-shell" :class="{ 'wb-shell--expanded': expanded }">
     <div class="wb-shell__header">
-      <h3 class="wb-shell__title">Совместная доска</h3>
+      <div class="wb-shell__status-wrap">
+        <h3 class="wb-shell__title">Совместная доска</h3>
+        <div
+          v-if="connectionStatus !== 'connected'"
+          class="wb-shell__status"
+          role="status"
+          :aria-label="
+            connectionStatus === 'connecting' ? 'Подключение' : 'Отключено'
+          "
+          :class="{
+            'wb-shell__status--connecting': connectionStatus === 'connecting',
+          }"
+        >
+          <template v-if="connectionStatus === 'connecting'">
+            Подключение...
+          </template>
+          <PixelIcon v-else name="loading" variant="small" />
+        </div>
+      </div>
       <Button
         type="icon"
         size="tiny"
@@ -14,11 +32,6 @@
       >
         <PixelIcon :name="expanded ? 'close' : 'fullscreen'" variant="small" />
       </Button>
-      <div v-if="connectionStatus !== 'connected'" class="wb-shell__status">
-        {{
-          connectionStatus === "connecting" ? "Подключение..." : "Отключено"
-        }}
-      </div>
     </div>
     <div class="wb-shell__body">
       <CollaborativeWhiteboard
@@ -116,6 +129,11 @@ const connectionStatus = computed(() => {
   letter-spacing: 0.02em;
 }
 
+.wb-shell__status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .wb-shell__expand {
   margin-left: auto;
   flex-shrink: 0;
@@ -161,10 +179,15 @@ const connectionStatus = computed(() => {
 }
 
 .wb-shell__status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   font-size: 12px;
   color: #e2534b;
-  width: 100%;
-  flex-basis: 100%;
+}
+
+.wb-shell__status--connecting {
+  color: #ffc866;
 }
 
 .wb-shell__body {

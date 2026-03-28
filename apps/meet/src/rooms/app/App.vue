@@ -490,6 +490,7 @@ function replaceState() {
 function goToOrganizations() {
   appStore.setPage("organizations");
   replaceState();
+  loadOrganizations();
 }
 
 function handleOrgBack() {
@@ -526,6 +527,7 @@ function handleInviteAccepted(orgId: string) {
     .getById(orgId)
     .then((org) => orgStore.addOrganization(org))
     .catch(() => {});
+  loadOrganizations();
 }
 
 function handleInviteOpenOrg(orgId: string) {

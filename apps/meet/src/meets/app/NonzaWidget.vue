@@ -300,11 +300,14 @@ function updateParticipantColor(color: string | null) {
   updateParticipantMetadata({ color: color ?? DEFAULT_PARTICIPANT_COLOR });
 }
 
+const livekitRoom = computed(() => connectionState.value.livekitRoom);
+
 defineExpose({
   openCallSettings: () => connectedRoomViewRef.value?.openCallSettings?.(),
   updateParticipantColor,
   updateParticipantName,
   disconnect,
+  livekitRoom,
 });
 
 const urlParams = new URLSearchParams(window.location.search);

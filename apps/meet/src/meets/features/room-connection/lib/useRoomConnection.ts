@@ -10,6 +10,8 @@ import {
   ExternalE2EEKeyProvider,
   VideoPresets,
   VideoQuality,
+  setLogLevel,
+  LogLevel,
   type RoomOptions,
 } from "livekit-client";
 import e2eeWorkerUrl from "livekit-client/e2ee-worker?url";
@@ -302,10 +304,13 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       }
 
       if (connectAbortedRef.value) {
+        setLogLevel(LogLevel.silent);
         try {
-          livekitRoom.disconnect();
+          await livekitRoom.disconnect();
         } catch {
-          // already disconnecting
+          /* ignore */
+        } finally {
+          setLogLevel(LogLevel.warn);
         }
         return;
       }
@@ -375,7 +380,21 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       playNotificationSound("participant_left").catch(() => {});
     }
     if (state.value.livekitRoom) {
-      await state.value.livekitRoom.disconnect();
+      const room = state.value.livekitRoom;
+      const muteSignalLeaveNoise =
+        room.state !== ConnectionState.Connected;
+      if (muteSignalLeaveNoise) {
+        setLogLevel(LogLevel.silent);
+      }
+      try {
+        await room.disconnect();
+      } catch {
+        /* ignore */
+      } finally {
+        if (muteSignalLeaveNoise) {
+          setLogLevel(LogLevel.warn);
+        }
+      }
     }
     state.value = {
       ...state.value,

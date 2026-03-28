@@ -261,3 +261,18 @@
 .pi-redo {
   background-position: calc(-16 * var(--pi-size)) calc(-1 * var(--pi-size));
 }
+
+@keyframes pi-loading {
+  from {
+    background-position: calc(-17 * var(--pi-size)) calc(-1 * var(--pi-size));
+  }
+
+  to {
+    background-position: calc(-27 * var(--pi-size)) calc(-1 * var(--pi-size));
+  }
+}
+
+.pi-loading {
+  background-position: calc(-17 * var(--pi-size)) calc(-1 * var(--pi-size));
+  animation: pi-loading 1.2s steps(10) infinite;
+}

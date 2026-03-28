@@ -589,6 +589,20 @@
             </h2>
           </div>
           <div class="room-indicators">
+            <Indicator
+              v-if="
+                joinedRoomShortCode &&
+                connectionIndicatorVisible &&
+                connectionStatus !== 'good'
+              "
+              :trigger="false"
+              :variant="connectionVariant"
+              :title="connectionLabel"
+              :aria-label="connectionLabel"
+              role="status"
+            >
+              <PixelIcon :name="connectionIconName" variant="small" />
+            </Indicator>
             <!-- Временно скрыто: открытие звонка в отдельном окне
             <Button
               v-if="joinedRoomShortCode && isTauriDesktop()"
@@ -981,6 +995,8 @@ import {
   onUnmounted,
   nextTick,
   inject,
+  toValue,
+  type MaybeRef,
 } from "vue";
 import {
   RoomApi,
@@ -1017,6 +1033,7 @@ import {
   Skeleton,
   Switch,
   ParticipantColorPalette,
+  Indicator,
 } from "@shared/ui";
 import type { PixelSelectOption } from "@shared/ui";
 import RadioButtonGroup from "@shared/ui/RadioButtonGroup/RadioButtonGroup.vue";
@@ -1024,6 +1041,8 @@ import type { RadioButtonOption } from "@shared/ui/RadioButtonGroup/RadioButtonG
 import { useOrganizationsStore } from "@rooms/app/stores";
 import CreateRoomForm from "@rooms/features/create-room/ui/CreateRoomForm.vue";
 import NonzaWidget from "@app/NonzaWidget.vue";
+import { useConnectionIndicator } from "@features/room-connection";
+import type { Room as LiveKitRoom } from "livekit-client";
 import {
   RoomParticipantsList,
   type RoomParticipantListItem,
@@ -1271,6 +1290,22 @@ const joinedRoomShortCode = ref<string | null>(null);
 const isMobile = ref(false);
 const mobileView = ref<"list" | "room">("list");
 const nonzaWidgetRef = ref<InstanceType<typeof NonzaWidget> | null>(null);
+
+const orgCallLivekitRoom = computed(() => {
+  const inst = nonzaWidgetRef.value;
+  if (!inst) return null;
+  const exposed = (inst as { livekitRoom?: unknown }).livekitRoom;
+  if (exposed == null) return null;
+  return toValue(exposed as MaybeRef<LiveKitRoom | null>) ?? null;
+});
+const {
+  connectionStatus,
+  connectionLabel,
+  connectionVariant,
+  connectionIconName,
+  connectionIndicatorVisible,
+} = useConnectionIndicator(orgCallLivekitRoom);
+
 const showCallSettingsModal = ref(false);
 const callSettingsParticipantName = ref("");
 const initialCallSettingsParticipantName = ref("");
@@ -2000,7 +2035,10 @@ function displayMemberId(userId: string): string {
 
 function refreshRoomsParticipants() {
   roomApi
-    .listByOrganizationId(props.orgId, { include: "participants" })
+    .listByOrganizationId(props.orgId, {
+      include: "participants",
+      skipNetworkErrorHook: true,
+    })
     .then((list) => {
       rooms.value = list.map((r) => ({
         ...r,
@@ -2008,7 +2046,9 @@ function refreshRoomsParticipants() {
       }));
     })
     .catch((err) => {
-      console.error("[org-ws] refreshRoomsParticipants failed:", err);
+      if (import.meta.env.DEV) {
+        console.warn("[org-ws] refreshRoomsParticipants:", err);
+      }
     });
 }
 
@@ -2963,4 +3003,5 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
 }
+
 </style>

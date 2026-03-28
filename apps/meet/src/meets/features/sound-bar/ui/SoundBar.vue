@@ -19,6 +19,25 @@
         aria-label="Звуки"
         @click.stop
       >
+        <div class="sound-bar__volume">
+          <button
+            class="sound-bar__mute-btn"
+            :title="soundBarMutedRef ? 'Включить звуки' : 'Выключить звуки'"
+            @click.stop="toggleSoundBarMuted"
+          >
+            <PixelIcon :name="soundBarMutedRef ? 'volume-off' : 'volume-high'" variant="small" />
+          </button>
+          <input
+            type="range"
+            class="volume-slider"
+            min="0"
+            max="100"
+            step="5"
+            :value="Math.round(soundBarVolumeRef * 100)"
+            :title="`Громкость: ${Math.round(soundBarVolumeRef * 100)}%`"
+            @input="onVolumeInput"
+          />
+        </div>
         <div class="sound-bar__scroll">
           <div class="sound-bar__emoji-grid">
             <Button
@@ -61,6 +80,14 @@ import type { Room as LiveKitRoom } from "livekit-client";
 import { useOrganizationSounds, useSoundBarRoomChannel } from "../lib";
 import type { OrganizationSound } from "../model/types";
 import { Button, PixelIcon } from "@shared/ui";
+import { soundBarVolume, soundBarMuted, setSoundBarVolume, toggleSoundBarMuted } from "@shared/lib";
+
+const soundBarVolumeRef = soundBarVolume;
+const soundBarMutedRef = soundBarMuted;
+
+function onVolumeInput(e: Event) {
+  setSoundBarVolume(Number((e.target as HTMLInputElement).value) / 100);
+}
 
 const props = defineProps<{
   orgId: string | null;
@@ -252,6 +279,32 @@ function handleRowClick(sound: OrganizationSound) {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+.sound-bar__volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+
+.sound-bar__mute-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.7;
+  color: inherit;
+}
+
+.sound-bar__mute-btn:hover {
+  opacity: 1;
 }
 
 .sound-bar__scroll {

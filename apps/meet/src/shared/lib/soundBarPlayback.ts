@@ -1,6 +1,6 @@
 import { applyStoredOutputDevice } from "./audio-devices";
 import { getOutputMuted } from "./output-mute";
-import { subscribeNotificationMasterVolume } from "./notification-sounds";
+import { subscribeSoundBarVolume } from "./soundBarVolume";
 
 type SessionId = string;
 
@@ -117,7 +117,7 @@ export async function startSoundBarSession(params: {
 
   unsubscribeMasterBySessionId.set(
     sessionId,
-    subscribeNotificationMasterVolume((v) => {
+    subscribeSoundBarVolume((v) => {
       audio.volume = v;
     }),
   );

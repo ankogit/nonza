@@ -28,6 +28,7 @@ export class ApiClient {
     endpoint: string,
     options: RequestInit = {},
     isRetryAfterRefresh = false,
+    skipNetworkErrorHook = false,
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const controller = new AbortController();
@@ -86,20 +87,32 @@ export class ApiClient {
       if (error instanceof Error && !isNetworkOrAbort) {
         throw error;
       }
-      if (isNetworkOrAbort || !(error instanceof Error)) {
+      if (
+        (isNetworkOrAbort || !(error instanceof Error)) &&
+        !skipNetworkErrorHook
+      ) {
         this.onBackendError?.();
       }
       throw new Error("Network error");
     }
   }
 
-  async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  async get<T>(
+    endpoint: string,
+    options?: RequestInit & { skipNetworkErrorHook?: boolean },
+  ): Promise<T> {
+    const { skipNetworkErrorHook, ...rest } = options ?? {};
     const init: RequestInit = {
-      ...options,
+      ...rest,
       method: "GET",
       cache: "no-store",
     };
-    return this.request<T>(endpoint, init);
+    return this.request<T>(
+      endpoint,
+      init,
+      false,
+      Boolean(skipNetworkErrorHook),
+    );
   }
 
   async post<T>(

@@ -8,6 +8,20 @@
         <h2 class="room-info-title">{{ room?.name ?? "Созвон" }}</h2>
       </div>
       <div class="room-indicators">
+        <Indicator
+          v-if="
+            !previewMode &&
+            connectionIndicatorVisible &&
+            connectionStatus !== 'good'
+          "
+          :trigger="false"
+          :variant="connectionVariant"
+          :title="connectionLabel"
+          :aria-label="connectionLabel"
+          role="status"
+        >
+          <PixelIcon :name="connectionIconName" variant="small" />
+        </Indicator>
         <Button
           variant="default"
           size="small"
@@ -662,6 +676,7 @@ import {
   PixelIcon,
   PixelSelect,
   Switch,
+  Indicator,
 } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";
@@ -764,8 +779,14 @@ defineExpose({
 
 const { state: e2eeState } = useE2EE(() => props.livekitRoom);
 
-const livekitRoomRef = computed(() => props.livekitRoom);
-useConnectionIndicator(livekitRoomRef);
+const livekitRoomRef = toRef(props, "livekitRoom");
+const {
+  connectionStatus,
+  connectionLabel,
+  connectionVariant,
+  connectionIconName,
+  connectionIndicatorVisible,
+} = useConnectionIndicator(livekitRoomRef);
 
 const replicaTtsEnabled = ref(getReplicaTtsEnabled());
 const initialReplicaTtsEnabled = ref(replicaTtsEnabled.value);
@@ -1043,7 +1064,9 @@ const fullscreenCameraPiPStyle = computed(() => ({
 const showFullscreenCameraPiP = computed(() => {
   const tracksVersion = fullscreenTracksVersion.value;
   const p = fullscreenParticipant.value;
-  return tracksVersion >= 0 && p !== null && participantHasBothCameraAndScreen(p);
+  return (
+    tracksVersion >= 0 && p !== null && participantHasBothCameraAndScreen(p)
+  );
 });
 
 const handleDisconnect = () => {
@@ -1329,26 +1352,6 @@ function handleModalClose() {
   font-size: 1.5rem;
   font-weight: 400;
   letter-spacing: 0.02em;
-}
-
-.connection-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-}
-.connection-indicator--warning {
-  background: rgba(255, 190, 83, 0.2);
-  color: var(--color-accent, #ffc866);
-}
-.connection-indicator--bad {
-  background: rgba(231, 76, 60, 0.2);
-  color: #e2534b;
-}
-.connection-indicator__label {
-  white-space: nowrap;
 }
 
 .round-table-content {

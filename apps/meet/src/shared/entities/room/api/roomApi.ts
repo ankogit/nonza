@@ -24,7 +24,10 @@ export class RoomApi {
 
   async listByOrganizationId(
     orgId: string,
-    options?: { include?: "participants" },
+    options?: {
+      include?: "participants";
+      skipNetworkErrorHook?: boolean;
+    },
   ): Promise<RoomWithParticipants[]> {
     const params =
       options?.include === "participants"
@@ -33,6 +36,9 @@ export class RoomApi {
     const query = params ? `?${params}` : "";
     return this.client.get<RoomWithParticipants[]>(
       `/api/v1/org/${orgId}/rooms${query}`,
+      options?.skipNetworkErrorHook
+        ? { skipNetworkErrorHook: true }
+        : undefined,
     );
   }
 
