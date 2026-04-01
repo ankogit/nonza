@@ -1,7 +1,11 @@
 import { ref, computed, watch, onUnmounted, type Ref } from "vue";
 import { RoomEvent } from "livekit-client";
 import type { Room, RemoteParticipant } from "livekit-client";
-import { playNotificationSound } from "@shared/lib";
+import { playNotificationSound, isReplicaTtsMutedIdentity } from "@shared/lib";
+import {
+  clampReplicaText,
+  REPLICA_SEND_COOLDOWN_MS,
+} from "./replica-limits";
 
 const REPLICA_TOPIC = "participant-replica";
 
@@ -46,16 +50,17 @@ export function useParticipantReplica(
   options?: UseParticipantReplicaOptions,
 ) {
   const replicaByIdentity = ref<Record<string, ReplicaMessage>>({});
+  let lastReplicaSendAt = 0;
 
   const replicaByParticipant = computed(() => replicaByIdentity.value);
 
-  function sendReplica(text: string): void {
+  function sendReplica(text: string): boolean {
     const r = room.value;
-    if (!r?.localParticipant) return;
-    const trimmed = text.trim();
+    if (!r?.localParticipant) return false;
     const identity = r.localParticipant.identity;
+    const normalized = clampReplicaText(text);
 
-    if (!trimmed) {
+    if (!normalized) {
       const next = { ...replicaByIdentity.value };
       delete next[identity];
       replicaByIdentity.value = next;
@@ -67,10 +72,14 @@ export function useParticipantReplica(
         .catch((err) =>
           console.error("[participant-replica] send failed:", err),
         );
-      return;
+      return true;
     }
 
-    const msg: ReplicaMessage = { text: trimmed, ts: Date.now() };
+    const now = Date.now();
+    if (now - lastReplicaSendAt < REPLICA_SEND_COOLDOWN_MS) return false;
+    lastReplicaSendAt = now;
+
+    const msg: ReplicaMessage = { text: normalized, ts: now };
     replicaByIdentity.value = {
       ...replicaByIdentity.value,
       [identity]: msg,
@@ -85,6 +94,7 @@ export function useParticipantReplica(
 
     playNotificationSound("message").catch(() => {});
     options?.speakReplica?.(msg.text, { identity, isLocal: true });
+    return true;
   }
 
   const offDataReceived = ref<(() => void) | null>(null);
@@ -101,22 +111,24 @@ export function useParticipantReplica(
       if (topic !== REPLICA_TOPIC || !participant) return;
       const msg = decodePayload(payload);
       if (!msg) return;
-      if (msg.text.trim() !== "") {
+      const normalized = clampReplicaText(msg.text);
+      const remoteMuted = isReplicaTtsMutedIdentity(participant.identity);
+      if (normalized !== "") {
         const raised = options?.raisedHands?.();
         const shouldPlay = !raised || raised.includes(participant.identity);
-        if (shouldPlay) {
+        if (shouldPlay && !remoteMuted) {
           playNotificationSound("message").catch(() => {});
-          options?.speakReplica?.(msg.text, {
+          options?.speakReplica?.(normalized, {
             identity: participant.identity,
             isLocal: false,
           });
         }
       }
       const next = { ...replicaByIdentity.value };
-      if (msg.text.trim() === "") {
+      if (normalized === "") {
         delete next[participant.identity];
       } else {
-        next[participant.identity] = msg;
+        next[participant.identity] = { text: normalized, ts: msg.ts };
       }
       replicaByIdentity.value = next;
     };

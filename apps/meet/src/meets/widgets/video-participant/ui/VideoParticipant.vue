@@ -15,7 +15,11 @@
     :on-tracks-updated="onTracksUpdated"
     :pip="false"
     @full-size="emit('full-size')"
-  />
+  >
+    <template #actions>
+      <slot name="actions" />
+    </template>
+  </Player>
 </template>
 
 <script setup lang="ts">

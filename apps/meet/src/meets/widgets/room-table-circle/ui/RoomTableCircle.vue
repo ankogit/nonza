@@ -212,7 +212,7 @@
         >
           <PixelIcon :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'" variant="large" />
         </Button>
-        <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
       </template>
 
       <template #right>
@@ -246,6 +246,7 @@
           </Button>
         </div>
         <SoundBar
+          v-if="showOrganizationSoundBar"
           :org-id="props.room?.organization_id ?? null"
           :livekit-room="props.livekitRoom"
           :preview-mode="previewMode"
@@ -277,7 +278,10 @@ import { RoomEvent } from "livekit-client";
 import type { Room as LiveKitRoom, RemoteParticipant, LocalParticipant } from "livekit-client";
 import type { Room as RoomEntity } from "@shared/entities";
 import { useMediaControl } from "@features/media-control";
-import { useParticipantReplica, ReplicaInput } from "@features/participant-replica";
+import {
+  useParticipantReplica,
+  ReplicaInput,
+} from "@features/participant-replica";
 import { useConferenceHall } from "@features/conference-hall";
 import { useTableCircle } from "@features/table-circle";
 import { SoundBar } from "@features/sound-bar";
@@ -292,6 +296,8 @@ import {
 } from "@shared/lib";
 
 import type { RoomApi } from "@shared/entities";
+
+const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
 
 const props = defineProps<{
   room: RoomEntity | null;
@@ -534,6 +540,13 @@ const { replicaByParticipant, sendReplica } = useParticipantReplica(
   computed(() => props.livekitRoom),
   {},
 );
+
+function handleReplicaSubmit(payload: {
+  text: string;
+  accept: () => void;
+}): void {
+  if (sendReplica(payload.text)) payload.accept();
+}
 
 const { state: mediaState, toggleVideo, toggleAudio, toggleScreenShare } = useMediaControl(
   localParticipant,

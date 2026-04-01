@@ -4,6 +4,19 @@
       <div class="wb-shell__status-wrap">
         <h3 class="wb-shell__title">Совместная доска</h3>
         <div
+          v-if="showPersistUi"
+          class="wb-shell__persist"
+          role="status"
+          :aria-label="persistAriaLabel"
+          :class="{
+            'wb-shell__persist--saving': showSaveSpinner,
+            'wb-shell__persist--error': persistStatus === 'error',
+          }"
+        >
+          <PixelIcon v-if="showSaveSpinner" name="loading" variant="small" />
+          <span v-if="persistStatus === 'error'">{{ persistErrorLabel }}</span>
+        </div>
+        <div
           v-if="connectionStatus !== 'connected'"
           class="wb-shell__status"
           role="status"
@@ -39,6 +52,7 @@
         embedded
         :participant-color="participantColor"
         :room-id="roomId"
+        @draft-active="draftActive = $event"
       />
       <p v-else class="wb-shell__studio-placeholder">
         Студия открыта на весь экран. Закройте студию крестиком в углу.
@@ -87,11 +101,29 @@ defineProps<{
 
 const mode = ref<"simple" | "studio">("simple");
 const expanded = ref(false);
+const draftActive = ref(false);
 
 const collab = inject(MEET_ROOM_COLLABORATION_KEY, null);
 const connectionStatus = computed(() => {
   if (!collab) return "disconnected" as const;
   return collab.connectionStatus.value;
+});
+const persistStatus = computed(() => collab?.persistStatus.value ?? "idle");
+const showSaveSpinner = computed(
+  () => persistStatus.value === "saving" || draftActive.value,
+);
+const showPersistUi = computed(
+  () => showSaveSpinner.value || persistStatus.value === "error",
+);
+const persistErrorLabel = "Ошибка сохранения";
+const persistAriaLabel = computed(() => {
+  if (persistStatus.value === "error") return persistErrorLabel;
+  if (showSaveSpinner.value) {
+    return persistStatus.value === "saving"
+      ? "Сохранение на сервер"
+      : "Рисование, черновик";
+  }
+  return "";
 });
 </script>
 
@@ -133,6 +165,22 @@ const connectionStatus = computed(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.wb-shell__persist {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.wb-shell__persist--saving {
+  color: #ffc866;
+}
+
+.wb-shell__persist--error {
+  color: #e2534b;
 }
 .wb-shell__expand {
   margin-left: auto;

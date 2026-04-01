@@ -374,11 +374,7 @@
             variant="large"
           />
         </Button>
-        <ReplicaInput
-          v-if="!previewMode"
-          @submit="sendReplica"
-          :max-length="32"
-        />
+        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
       </template>
       <template #right>
         <ParticipantsTrigger
@@ -388,6 +384,7 @@
           @toggle="showParticipantsPanel = !showParticipantsPanel"
         />
         <SoundBar
+          v-if="showOrganizationSoundBar"
           :org-id="props.room?.organization_id ?? null"
           :livekit-room="props.livekitRoom"
           :preview-mode="previewMode"
@@ -558,11 +555,7 @@
                 variant="large"
               />
             </Button>
-            <ReplicaInput
-              v-if="!previewMode"
-              @submit="sendReplica"
-              :max-length="32"
-            />
+            <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
           </template>
           <template #right>
             <ParticipantsTrigger
@@ -739,6 +732,8 @@ import type {
   LocalParticipant,
 } from "livekit-client";
 
+const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
+
 const props = defineProps<{
   room: RoomEntity | null;
   roomApi?: RoomApi | null;
@@ -838,6 +833,13 @@ const { replicaByParticipant, sendReplica } = useParticipantReplica(
     },
   },
 );
+
+function handleReplicaSubmit(payload: {
+  text: string;
+  accept: () => void;
+}): void {
+  if (sendReplica(payload.text)) payload.accept();
+}
 
 watch(
   [localParticipant, remoteParticipants, () => props.participantName],

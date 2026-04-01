@@ -2,6 +2,7 @@ const STORAGE_KEY_NAME = "nonza_participant_name";
 const STORAGE_KEY_VOLUMES = "nonza_volumes";
 const STORAGE_KEY_ROOM_SHORT_CODE = "nonza_room_short_code";
 const STORAGE_KEY_REPLICA_TTS = "nonza_replica_tts_enabled";
+const STORAGE_KEY_REPLICA_TTS_MUTED = "nonza_replica_tts_muted_identities";
 const STORAGE_KEY_ROOM_PASSWORD_PREFIX = "nonza_room_password:";
 
 export function getRoomShortCode(): string | null {
@@ -91,14 +92,43 @@ export function getReplicaTtsEnabled(): boolean {
 
 export function setReplicaTtsEnabled(value: boolean): void {
   try {
-    if (value) {
-      localStorage.setItem(STORAGE_KEY_REPLICA_TTS, "1");
-    } else {
-      localStorage.removeItem(STORAGE_KEY_REPLICA_TTS);
-    }
+    localStorage.setItem(STORAGE_KEY_REPLICA_TTS, value ? "1" : "0");
   } catch {
     /* ignore */
   }
+}
+
+function parseReplicaTtsMutedSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_REPLICA_TTS_MUTED);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveReplicaTtsMutedSet(set: Set<string>): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_REPLICA_TTS_MUTED, JSON.stringify([...set]));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isReplicaTtsMutedIdentity(identity: string): boolean {
+  return parseReplicaTtsMutedSet().has(identity);
+}
+
+export function toggleReplicaTtsMutedIdentity(identity: string): boolean {
+  const set = parseReplicaTtsMutedSet();
+  const muted = !set.has(identity);
+  if (muted) set.add(identity);
+  else set.delete(identity);
+  saveReplicaTtsMutedSet(set);
+  return muted;
 }
 
 function getVolumesMap(): Record<string, number> {

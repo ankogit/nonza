@@ -6,6 +6,19 @@
     <div v-if="!embedded" class="collab-whiteboard__header">
       <h3 class="collab-whiteboard__title">Совместная доска</h3>
       <div class="collab-whiteboard__actions">
+        <div
+          v-if="showPersistUi"
+          class="collab-whiteboard__save-status"
+          role="status"
+          :aria-label="persistAriaLabel"
+          :class="{
+            'collab-whiteboard__save-status--saving': showSaveSpinner,
+            'collab-whiteboard__save-status--error': persistStatus === 'error',
+          }"
+        >
+          <PixelIcon v-if="showSaveSpinner" name="loading" variant="small" />
+          <span v-if="persistStatus === 'error'">{{ persistErrorLabel }}</span>
+        </div>
         <Button
           type="icon"
           size="small"
@@ -257,6 +270,10 @@ const props = defineProps<{
   roomId?: string | null;
 }>();
 
+const emit = defineEmits<{
+  draftActive: [active: boolean];
+}>();
+
 const WB_ROOM_BRUSH_COLOR_PREFIX = "nonza_meet_wb_brush_color_";
 
 function readStoredBrushColor(roomId: string): string | null {
@@ -340,6 +357,7 @@ const connectionStatus = computed(() => {
   if (!collab) return "disconnected" as const;
   return collab.connectionStatus.value;
 });
+const persistStatus = computed(() => collab?.persistStatus.value ?? "idle");
 
 const WB_PERSIST_DEBOUNCE_MS = 1800;
 let persistRoomTimer: ReturnType<typeof setTimeout> | null = null;
@@ -386,8 +404,43 @@ function redoWhiteboard() {
 }
 
 const isDrawing = ref(false);
+watch(isDrawing, (v) => emit("draftActive", v), { immediate: true });
+
+const showSaveSpinner = computed(
+  () => persistStatus.value === "saving" || isDrawing.value,
+);
+const showPersistUi = computed(
+  () => showSaveSpinner.value || persistStatus.value === "error",
+);
+const persistErrorLabel = "Ошибка сохранения";
+const persistAriaLabel = computed(() => {
+  if (persistStatus.value === "error") return persistErrorLabel;
+  if (showSaveSpinner.value) {
+    return persistStatus.value === "saving"
+      ? "Сохранение на сервер"
+      : "Рисование, черновик";
+  }
+  return "";
+});
+
 let activeDrawingPointerId = -1;
 const localDraftPts: [number, number][] = [];
+
+const WB_MAX_DRAFT_POINTS = 28000;
+
+function thinDraftPointsIfNeeded() {
+  while (localDraftPts.length > WB_MAX_DRAFT_POINTS) {
+    const next: [number, number][] = [];
+    for (let i = 0; i < localDraftPts.length; i += 2) {
+      next.push(localDraftPts[i]);
+    }
+    localDraftPts.length = 0;
+    localDraftPts.push(...next);
+  }
+}
+
+let committedCanvas: HTMLCanvasElement | null = null;
+let committedLayerDirty = true;
 
 const usePointerRawUpdate =
   typeof window !== "undefined" &&
@@ -439,6 +492,10 @@ function isDotLikeStroke(pts: [number, number][]): boolean {
 
 let strokesSnapshotsCache: StrokeSnapshot[] = [];
 let strokesSnapshotsDirty = true;
+const strokePtsCacheById = new Map<
+  string,
+  { ptsJson: string; pts: [number, number][] }
+>();
 
 let surfaceW = 0;
 let surfaceH = 0;
@@ -519,6 +576,7 @@ function clearWhiteboardAwareness() {
 
 function snapshotStrokes(arr: Y.Array<Y.Map<unknown>>) {
   const out: StrokeSnapshot[] = [];
+  const nextIds = new Set<string>();
   for (let i = 0; i < arr.length; i++) {
     const m = arr.get(i);
     if (!(m instanceof Y.Map)) continue;
@@ -528,9 +586,21 @@ function snapshotStrokes(arr: Y.Array<Y.Map<unknown>>) {
     const width = m.get("width");
     const erase = m.get("erase");
     if (typeof id !== "string" || typeof ptsJson !== "string") continue;
+    nextIds.add(id);
+    const cached = strokePtsCacheById.get(id);
+    if (cached && cached.ptsJson === ptsJson && cached.pts.length > 0) {
+      out.push({
+        pts: cached.pts,
+        color: typeof color === "string" ? color : "#bab1a8",
+        width: typeof width === "number" ? width : 0.004,
+        erase: erase === true,
+      });
+      continue;
+    }
     try {
       const pts = JSON.parse(ptsJson) as [number, number][];
       if (!Array.isArray(pts) || pts.length < 1) continue;
+      strokePtsCacheById.set(id, { ptsJson, pts });
       out.push({
         pts,
         color: typeof color === "string" ? color : "#bab1a8",
@@ -541,7 +611,62 @@ function snapshotStrokes(arr: Y.Array<Y.Map<unknown>>) {
       /* skip */
     }
   }
+  for (const cachedId of strokePtsCacheById.keys()) {
+    if (!nextIds.has(cachedId)) {
+      strokePtsCacheById.delete(cachedId);
+    }
+  }
   return out;
+}
+
+function paintStrokesToCtx(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  snapshots: StrokeSnapshot[],
+) {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const minDim = Math.min(w, h);
+  for (const s of snapshots) {
+    ctx.lineWidth = Math.max(1, s.width * minDim);
+    if (isDotLikeStroke(s.pts)) {
+      const [fx, fy] = s.pts[0];
+      const px = fx * w;
+      const py = fy * h;
+      const r = Math.max(0.5, ctx.lineWidth / 2);
+      ctx.save();
+      if (s.erase) {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.fillStyle = "#000";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = s.color;
+      }
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      const [fx, fy] = s.pts[0];
+      ctx.moveTo(fx * w, fy * h);
+      for (let i = 1; i < s.pts.length; i++) {
+        const [nx, ny] = s.pts[i];
+        ctx.lineTo(nx * w, ny * h);
+      }
+      if (s.erase) {
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "#000";
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.strokeStyle = s.color;
+        ctx.stroke();
+      }
+    }
+  }
 }
 
 function paintCanvas() {
@@ -565,63 +690,56 @@ function paintCanvas() {
     canvas.height = targetH;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
+    committedLayerDirty = true;
   }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
 
   const arr = strokesArray.value;
-  if (arr) {
-    if (strokesSnapshotsDirty) {
-      strokesSnapshotsCache = snapshotStrokes(arr);
+  const needsCommittedRebuild =
+    committedLayerDirty ||
+    strokesSnapshotsDirty ||
+    !committedCanvas ||
+    committedCanvas.width !== targetW ||
+    committedCanvas.height !== targetH;
+
+  if (needsCommittedRebuild) {
+    let snapshots: StrokeSnapshot[] = [];
+    if (arr) {
+      if (strokesSnapshotsDirty) {
+        strokesSnapshotsCache = snapshotStrokes(arr);
+        strokesSnapshotsDirty = false;
+      }
+      snapshots = strokesSnapshotsCache;
+    } else {
+      strokesSnapshotsCache = [];
       strokesSnapshotsDirty = false;
     }
-    const snapshots = strokesSnapshotsCache;
-    const minDim = Math.min(w, h);
-    for (const s of snapshots) {
-      ctx.lineWidth = Math.max(1, s.width * minDim);
-      if (isDotLikeStroke(s.pts)) {
-        const [fx, fy] = s.pts[0];
-        const px = fx * w;
-        const py = fy * h;
-        const r = Math.max(0.5, ctx.lineWidth / 2);
-        ctx.save();
-        if (s.erase) {
-          ctx.globalCompositeOperation = "destination-out";
-          ctx.fillStyle = "#000";
-        } else {
-          ctx.globalCompositeOperation = "source-over";
-          ctx.fillStyle = s.color;
-        }
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      } else {
-        ctx.beginPath();
-        const [fx, fy] = s.pts[0];
-        ctx.moveTo(fx * w, fy * h);
-        for (let i = 1; i < s.pts.length; i++) {
-          const [nx, ny] = s.pts[i];
-          ctx.lineTo(nx * w, ny * h);
-        }
-        if (s.erase) {
-          ctx.save();
-          ctx.globalCompositeOperation = "destination-out";
-          ctx.strokeStyle = "#000";
-          ctx.stroke();
-          ctx.restore();
-        } else {
-          ctx.strokeStyle = s.color;
-          ctx.stroke();
-        }
-      }
+
+    if (!committedCanvas) {
+      committedCanvas = document.createElement("canvas");
     }
+    committedCanvas.width = targetW;
+    committedCanvas.height = targetH;
+    const cctx = committedCanvas.getContext("2d");
+    if (cctx) {
+      cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cctx.clearRect(0, 0, w, h);
+      paintStrokesToCtx(cctx, w, h, snapshots);
+    }
+    committedLayerDirty = false;
   }
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, targetW, targetH);
+  if (committedCanvas) {
+    ctx.drawImage(committedCanvas, 0, 0);
+  }
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
   if (localDraftPts.length >= 1) {
     const minDim = Math.min(w, h);
@@ -676,13 +794,14 @@ function requestPaint() {
 
 function onStrokesChanged() {
   strokesSnapshotsDirty = true;
+  committedLayerDirty = true;
   requestPaint();
 }
 
 function bindStrokes(doc: Y.Doc | null) {
   const prev = strokesArray.value;
   if (prev) {
-    prev.unobserve(onStrokesChanged);
+    prev.unobserveDeep(onStrokesChanged);
   }
   if (whiteboardUndoManager) {
     whiteboardUndoManager.destroy();
@@ -691,14 +810,17 @@ function bindStrokes(doc: Y.Doc | null) {
   syncWhiteboardUndoUi();
   strokesArray.value = null;
   strokesSnapshotsCache = [];
+  strokePtsCacheById.clear();
   strokesSnapshotsDirty = true;
+  committedLayerDirty = true;
+  committedCanvas = null;
   if (!doc) {
     requestPaint();
     return;
   }
   const arr = doc.getArray<Y.Map<unknown>>(WHITEBOARD_YARRAY_KEY);
   strokesArray.value = arr;
-  arr.observe(onStrokesChanged);
+  arr.observeDeep(onStrokesChanged);
   whiteboardUndoManager = new Y.UndoManager(arr);
   for (const ev of [
     "stack-item-added",
@@ -767,6 +889,7 @@ function pushDistinctDraftPoint(ev: PointerEvent): { nx: number; ny: number } {
   const last = localDraftPts[localDraftPts.length - 1];
   if (!last || last[0] !== nx || last[1] !== ny) {
     localDraftPts.push([nx, ny]);
+    thinDraftPointsIfNeeded();
   }
   return { nx, ny };
 }
@@ -909,6 +1032,7 @@ function onPointerUp(ev: PointerEvent) {
       color: brushColor.value,
     });
     requestPaint();
+    collab?.persistRoomDocumentInBackground?.();
   }
 }
 
@@ -926,11 +1050,12 @@ function performClearAll() {
   if (!doc || !arr) return;
   whiteboardUndoManager?.stopCapturing();
   doc.transact(() => {
-    while (arr.length > 0) {
-      arr.delete(0, 1);
+    if (arr.length > 0) {
+      arr.delete(0, arr.length);
     }
   });
   whiteboardUndoManager?.stopCapturing();
+  committedLayerDirty = true;
   flushPersistRoomNow();
 }
 
@@ -990,10 +1115,19 @@ watch(
   { immediate: true },
 );
 
+function onDocVisibilityChange() {
+  if (document.visibilityState === "hidden") {
+    flushPersistRoomNow();
+  }
+}
+
 onMounted(() => {
   refreshSurfaceMetrics();
+  document.addEventListener("visibilitychange", onDocVisibilityChange);
   const surface = surfaceRef.value;
-  if (!surface || typeof ResizeObserver === "undefined") return;
+  if (!surface || typeof ResizeObserver === "undefined") {
+    return;
+  }
   ro = new ResizeObserver(() => {
     refreshSurfaceMetrics();
     requestPaint();
@@ -1004,11 +1138,13 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onDocVisibilityChange);
   if (persistRoomTimer !== null) {
     window.clearTimeout(persistRoomTimer);
     persistRoomTimer = null;
   }
   flushPersistRoomNow();
+  committedCanvas = null;
   ro?.disconnect();
   ro = null;
   if (rafAwareness) {
@@ -1021,7 +1157,7 @@ onBeforeUnmount(() => {
   }
   const arr = strokesArray.value;
   if (arr) {
-    arr.unobserve(onStrokesChanged);
+    arr.unobserveDeep(onStrokesChanged);
   }
   if (whiteboardUndoManager) {
     whiteboardUndoManager.destroy();
@@ -1123,6 +1259,22 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.collab-whiteboard__save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.collab-whiteboard__save-status--saving {
+  color: #ffc866;
+}
+
+.collab-whiteboard__save-status--error {
+  color: #e2534b;
 }
 
 .collab-whiteboard__status {

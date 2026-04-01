@@ -51,7 +51,7 @@
                 v-for="member in members"
                 :key="member.user_id"
                 class="org-settings-screen__member"
-                :class="{ 'org-settings-screen__member--contextable': canManageMembers && canRemoveMember(member) }"
+                :class="{ 'org-settings-screen__member--contextable': memberRowContextable(member) }"
                 @contextmenu.prevent="onMemberContextMenu($event, member)"
               >
                 <div class="org-settings-screen__member-info">
@@ -245,7 +245,12 @@ import {
   ORG_PERMISSION_MANAGE_MEMBERS,
 } from "@shared/entities/organization/model/org-roles";
 import type { OrgRole } from "@shared/entities/organization/model/org-roles";
-import { getAuthState, DEFAULT_PARTICIPANT_COLOR } from "@shared/lib";
+import {
+  getAuthState,
+  DEFAULT_PARTICIPANT_COLOR,
+  isReplicaTtsMutedIdentity,
+  toggleReplicaTtsMutedIdentity,
+} from "@shared/lib";
 import {
   ScreenLayout,
   Button,
@@ -292,9 +297,25 @@ interface ContextMenuState {
 }
 const contextMenu = ref<ContextMenuState | null>(null);
 
-const contextMenuItems: ContextMenuItem[] = [
-  { id: "remove", label: "Удалить", danger: true },
-];
+const contextMenuItems = computed<ContextMenuItem[]>(() => {
+  const state = contextMenu.value;
+  if (!state) return [];
+  const member = state.member;
+  const items: ContextMenuItem[] = [];
+  if (!isCurrentUser(member)) {
+    const muted = isReplicaTtsMutedIdentity(member.user_id);
+    items.push({
+      id: "toggle-replica-tts",
+      label: muted
+        ? "Включить озвучку реплик"
+        : "Выключить озвучку реплик",
+    });
+  }
+  if (canRemoveMember(member)) {
+    items.push({ id: "remove", label: "Удалить", danger: true });
+  }
+  return items;
+});
 
 const currentMember = computed(() => {
   const id = getAuthState()?.user?.id?.toLowerCase();
@@ -457,18 +478,26 @@ function canRemoveMember(member: OrganizationMember): boolean {
   return (member.role?.toLowerCase() ?? "") !== ORG_ROLE_OWNER;
 }
 
+function memberRowContextable(member: OrganizationMember): boolean {
+  if (!isCurrentUser(member)) return true;
+  return canRemoveMember(member);
+}
+
 function openRemoveMemberConfirm(member: OrganizationMember) {
   memberToRemove.value = member;
 }
 
 function onMemberContextMenu(e: MouseEvent, member: OrganizationMember) {
-  if (!canRemoveMember(member)) return;
+  if (!memberRowContextable(member)) return;
   contextMenu.value = { x: e.clientX, y: e.clientY, member };
 }
 
 function onContextMenuSelect(item: ContextMenuItem) {
-  if (item.id === "remove" && contextMenu.value) {
-    openRemoveMemberConfirm(contextMenu.value.member);
+  const state = contextMenu.value;
+  if (item.id === "toggle-replica-tts" && state) {
+    toggleReplicaTtsMutedIdentity(state.member.user_id);
+  } else if (item.id === "remove" && state) {
+    openRemoveMemberConfirm(state.member);
   }
   contextMenu.value = null;
 }

@@ -48,6 +48,8 @@ export interface YjsWebSocketProviderOptions {
   awareness?: any; // Y.js awareness object
 }
 
+export type YjsPersistStatus = "idle" | "saving" | "saved" | "error";
+
 /**
  * Custom Y.js WebSocket provider that works with the existing Go WebSocket server.
  * Sends Y.js updates as binary messages wrapped in JSON for compatibility.
@@ -79,6 +81,25 @@ export class YjsWebSocketProvider {
   private readonly UPDATE_DEBOUNCE_MS = 600;
   private readonly AWARENESS_DEBOUNCE_MS = 100; // Smaller debounce for awareness (cursors should be more responsive)
   private persistBackgroundGeneration = 0;
+  private persistStatusHandler: ((status: YjsPersistStatus) => void) | null =
+    null;
+  private persistStatus: YjsPersistStatus = "idle";
+  private persistQueuedOnReconnect = false;
+
+  /**
+   * After reconnect, block yjs_full_state until server snapshot is likely merged (or room empty).
+   * Otherwise Redis can be overwritten with a doc that never received the persisted snapshot
+   * if a live peer update arrives before the Redis payload on the wire.
+   */
+  private documentRemoteHydrated = false;
+  private pendingFullStateAfterHydrate = false;
+  private deferredPersistFlush = false;
+  private serverHadPersistedDoc: boolean | null = null;
+  private remoteDocApplyCountSinceOpen = 0;
+  private hydrationFallbackTimer: number | null = null;
+  private hydrateDebounceTimer: number | null = null;
+  private readonly HYDRATION_FALLBACK_MS = 15000;
+  private readonly HYDRATE_AFTER_REMOTE_APPLY_DEBOUNCE_MS = 180;
 
   constructor(options: YjsWebSocketProviderOptions) {
     this.url = options.url;
@@ -94,18 +115,13 @@ export class YjsWebSocketProvider {
         return;
       }
 
-      // Don't send updates that came from the Collaboration extension (it handles its own sync)
-      // Only send updates from Y.js document changes
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        // Add update to pending queue
-        this.pendingUpdates.push(update);
+      this.pendingUpdates.push(update);
 
-        // Clear existing debounce timeout
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         if (this.updateDebounceTimeout !== null) {
           window.clearTimeout(this.updateDebounceTimeout);
         }
 
-        // Set new debounce timeout
         this.updateDebounceTimeout = window.setTimeout(() => {
           this.flushPendingUpdates();
         }, this.UPDATE_DEBOUNCE_MS);
@@ -191,6 +207,142 @@ export class YjsWebSocketProvider {
     this.connect();
   }
 
+  private clearHydrationFallbackTimer(): void {
+    if (this.hydrationFallbackTimer !== null) {
+      window.clearTimeout(this.hydrationFallbackTimer);
+      this.hydrationFallbackTimer = null;
+    }
+  }
+
+  private scheduleHydrationFallback(): void {
+    this.clearHydrationFallbackTimer();
+    this.hydrationFallbackTimer = window.setTimeout(() => {
+      this.hydrationFallbackTimer = null;
+      if (!this.documentRemoteHydrated) {
+        console.warn(
+          "[YjsWebSocketProvider] Document hydration timeout; allowing outbound full state.",
+        );
+        this.markDocumentRemoteHydrated();
+      }
+    }, this.HYDRATION_FALLBACK_MS);
+  }
+
+  private resetHydrationState(): void {
+    this.documentRemoteHydrated = false;
+    this.pendingFullStateAfterHydrate = false;
+    this.deferredPersistFlush = false;
+    this.serverHadPersistedDoc = null;
+    this.remoteDocApplyCountSinceOpen = 0;
+    this.clearHydrationFallbackTimer();
+    if (this.hydrateDebounceTimer !== null) {
+      window.clearTimeout(this.hydrateDebounceTimer);
+      this.hydrateDebounceTimer = null;
+    }
+  }
+
+  private flushDeferredAfterHydration(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const needSend =
+      this.pendingFullStateAfterHydrate || this.deferredPersistFlush;
+    if (!needSend) {
+      return;
+    }
+    const persistAfter = this.deferredPersistFlush;
+    this.pendingFullStateAfterHydrate = false;
+    this.deferredPersistFlush = false;
+    try {
+      this.sendFullStateNow();
+      if (persistAfter) {
+        this.emitPersistStatus("saved");
+      }
+    } catch {
+      if (persistAfter) {
+        this.emitPersistStatus("error");
+      }
+    }
+  }
+
+  private markDocumentRemoteHydrated(): void {
+    if (this.documentRemoteHydrated) {
+      this.flushDeferredAfterHydration();
+      return;
+    }
+    this.documentRemoteHydrated = true;
+    this.clearHydrationFallbackTimer();
+    if (this.hydrateDebounceTimer !== null) {
+      window.clearTimeout(this.hydrateDebounceTimer);
+      this.hydrateDebounceTimer = null;
+    }
+    this.flushDeferredAfterHydration();
+  }
+
+  private scheduleHydrationAfterRemoteApplies(): void {
+    if (this.documentRemoteHydrated) return;
+    if (this.hydrateDebounceTimer !== null) {
+      window.clearTimeout(this.hydrateDebounceTimer);
+    }
+    this.hydrateDebounceTimer = window.setTimeout(() => {
+      this.hydrateDebounceTimer = null;
+      this.markDocumentRemoteHydrated();
+    }, this.HYDRATE_AFTER_REMOTE_APPLY_DEBOUNCE_MS);
+  }
+
+  private noteRemoteDocUpdateMerged(): void {
+    this.remoteDocApplyCountSinceOpen += 1;
+    if (this.serverHadPersistedDoc === true) {
+      this.scheduleHydrationAfterRemoteApplies();
+    }
+  }
+
+  private sendFullStateWhenHydrated(fromPersist: boolean): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (fromPersist) {
+        this.persistQueuedOnReconnect = true;
+      }
+      return;
+    }
+    if (!this.documentRemoteHydrated) {
+      if (fromPersist) {
+        this.deferredPersistFlush = true;
+      } else {
+        this.pendingFullStateAfterHydrate = true;
+      }
+      return;
+    }
+    try {
+      this.sendFullStateNow();
+      if (fromPersist) {
+        this.emitPersistStatus("saved");
+      }
+    } catch {
+      if (fromPersist) {
+        this.emitPersistStatus("error");
+      }
+    }
+  }
+
+  private async waitUntilDocumentRemoteHydrated(
+    expectedGen: number,
+    maxMs: number,
+  ): Promise<void> {
+    const t0 = Date.now();
+    while (!this.documentRemoteHydrated) {
+      if (expectedGen !== this.persistBackgroundGeneration) {
+        return;
+      }
+      if (Date.now() - t0 > maxMs) {
+        console.warn(
+          "[YjsWebSocketProvider] Persist: document hydration wait exceeded; flushing full state.",
+        );
+        this.markDocumentRemoteHydrated();
+        return;
+      }
+      await yieldMacrotask();
+    }
+  }
+
   private connect(): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       return;
@@ -213,8 +365,20 @@ export class YjsWebSocketProvider {
         this.reconnectAttempts = 0;
         this.emitStatus("connected");
 
+        this.resetHydrationState();
+        this.scheduleHydrationFallback();
+
         // Send initial sync message
         this.sendSync();
+        window.setTimeout(() => {
+          this.flushPendingUpdates();
+        }, 0);
+        if (this.persistQueuedOnReconnect) {
+          this.persistQueuedOnReconnect = false;
+          window.setTimeout(() => {
+            this.persistRoomDocumentInBackground();
+          }, 250);
+        }
       };
 
       this.ws.onmessage = (event: MessageEvent) => {
@@ -279,6 +443,7 @@ export class YjsWebSocketProvider {
 
       try {
         Y.applyUpdate(this.doc, update, this);
+        this.noteRemoteDocUpdateMerged();
         if (!this.synced) {
           this.synced = true;
           this.emitSynced();
@@ -352,10 +517,16 @@ export class YjsWebSocketProvider {
 
   private processJsonMessage(message: Record<string, unknown>): void {
     if (message.type === "yjs_update") {
-      // Decode base64 update
-      if (message.update && typeof message.update === "string") {
+      const rawPayload = message.payload as Record<string, unknown> | undefined;
+      const updateField =
+        typeof message.update === "string"
+          ? message.update
+          : rawPayload && typeof rawPayload.update === "string"
+            ? rawPayload.update
+            : undefined;
+      if (updateField) {
         try {
-          const binaryString = atob(message.update);
+          const binaryString = atob(updateField);
           const update = new Uint8Array(binaryString.length);
           for (let i = 0; i < binaryString.length; i++) {
             update[i] = binaryString.charCodeAt(i);
@@ -363,6 +534,7 @@ export class YjsWebSocketProvider {
 
           // Apply update to document (with origin to prevent echo)
           Y.applyUpdate(this.doc, update, this);
+          this.noteRemoteDocUpdateMerged();
           if (!this.synced) {
             this.synced = true;
             this.emitSynced();
@@ -383,13 +555,24 @@ export class YjsWebSocketProvider {
     } else if (message.type === "connected") {
       this.sendSync();
     } else if (message.type === "yjs_sync_ack") {
-      // If server had no state (first participant), push our full state so server has it for new joiners
       const payload = message.payload as { synced?: boolean } | undefined;
       if (payload?.synced === false) {
-        window.setTimeout(() => this.sendFullState(), 500);
+        this.serverHadPersistedDoc = false;
+        this.markDocumentRemoteHydrated();
+        window.setTimeout(() => this.sendFullStateWhenHydrated(false), 500);
+      } else if (payload?.synced === true) {
+        this.serverHadPersistedDoc = true;
+        if (this.remoteDocApplyCountSinceOpen > 0) {
+          this.scheduleHydrationAfterRemoteApplies();
+        }
+      } else {
+        this.serverHadPersistedDoc = true;
+        if (this.remoteDocApplyCountSinceOpen > 0) {
+          this.scheduleHydrationAfterRemoteApplies();
+        }
       }
     } else if (message.type === "user_joined") {
-      this.sendFullState();
+      this.sendFullStateWhenHydrated(false);
     }
   }
 
@@ -400,23 +583,24 @@ export class YjsWebSocketProvider {
     }
 
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(
-        "[YjsWebSocketProvider] Cannot flush updates: WebSocket not open",
-      );
-      this.pendingUpdates = [];
       this.updateDebounceTimeout = null;
       return;
     }
 
-    try {
-      // Merge multiple updates into one using Y.js mergeUpdates
-      // This reduces the number of messages sent to the server
-      const updatesToMerge = [...this.pendingUpdates];
-      const mergedUpdate = Y.mergeUpdates(updatesToMerge);
-      this.pendingUpdates = [];
-      this.updateDebounceTimeout = null;
+    const updatesToMerge = [...this.pendingUpdates];
+    this.pendingUpdates = [];
+    this.updateDebounceTimeout = null;
 
-      // Send merged update
+    let mergedUpdate: Uint8Array;
+    try {
+      mergedUpdate = Y.mergeUpdates(updatesToMerge);
+    } catch (error) {
+      console.error("[YjsWebSocketProvider] Error merging updates:", error);
+      this.pendingUpdates = [...updatesToMerge, ...this.pendingUpdates];
+      return;
+    }
+
+    try {
       const base64 = uint8ArrayToBase64(mergedUpdate);
       const message = {
         type: "yjs_update",
@@ -428,19 +612,16 @@ export class YjsWebSocketProvider {
       const jsonMessage = JSON.stringify(message);
       this.ws.send(jsonMessage);
 
-      // If update is very small (likely document was cleared), also send full state
-      // This ensures empty document state is properly synchronized
       if (mergedUpdate.length < 50) {
         setTimeout(() => {
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.sendFullState();
+            this.sendFullStateWhenHydrated(false);
           }
         }, 200);
       }
     } catch (error) {
       console.error("[YjsWebSocketProvider] Error flushing updates:", error);
-      this.pendingUpdates = [];
-      this.updateDebounceTimeout = null;
+      this.pendingUpdates = [mergedUpdate, ...this.pendingUpdates];
     }
   }
 
@@ -523,10 +704,17 @@ export class YjsWebSocketProvider {
       this.updateDebounceTimeout = null;
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.persistQueuedOnReconnect = true;
       return;
     }
-    this.flushPendingUpdates();
-    this.sendFullState();
+    this.emitPersistStatus("saving");
+    try {
+      this.flushPendingUpdates();
+      this.sendFullStateWhenHydrated(true);
+    } catch {
+      this.deferredPersistFlush = false;
+      this.emitPersistStatus("error");
+    }
   }
 
   persistRoomDocumentInBackground(): void {
@@ -538,8 +726,10 @@ export class YjsWebSocketProvider {
           this.updateDebounceTimeout = null;
         }
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          this.persistQueuedOnReconnect = true;
           return;
         }
+        this.emitPersistStatus("saving");
         await yieldMacrotask();
         if (gen !== this.persistBackgroundGeneration) return;
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -547,30 +737,37 @@ export class YjsWebSocketProvider {
         await yieldMacrotask();
         if (gen !== this.persistBackgroundGeneration) return;
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        await this.waitUntilDocumentRemoteHydrated(
+          gen,
+          this.HYDRATION_FALLBACK_MS,
+        );
+        if (gen !== this.persistBackgroundGeneration) return;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
         await this.sendFullStateAsync(gen);
+        if (gen === this.persistBackgroundGeneration) {
+          this.emitPersistStatus("saved");
+        }
       } catch {
-        /* ignore */
+        if (gen === this.persistBackgroundGeneration) {
+          this.emitPersistStatus("error");
+        }
       }
     })();
   }
 
   /** Sends full document state (Y.encodeStateAsUpdate) so server can store it for new joiners. */
-  private sendFullState(): void {
+  private sendFullStateNow(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return;
     }
-    try {
-      const stateUpdate = Y.encodeStateAsUpdate(this.doc);
-      const base64 = uint8ArrayToBase64(stateUpdate);
-      const message = {
-        type: "yjs_full_state",
-        room_id: this.roomId,
-        payload: { update: base64 },
-      };
-      this.ws.send(JSON.stringify(message));
-    } catch (error) {
-      console.error("[YjsWebSocketProvider] Error sending full state:", error);
-    }
+    const stateUpdate = Y.encodeStateAsUpdate(this.doc);
+    const base64 = uint8ArrayToBase64(stateUpdate);
+    const message = {
+      type: "yjs_full_state",
+      room_id: this.roomId,
+      payload: { update: base64 },
+    };
+    this.ws.send(JSON.stringify(message));
   }
 
   private async sendFullStateAsync(
@@ -644,6 +841,11 @@ export class YjsWebSocketProvider {
     }
   }
 
+  onPersistStatus(handler: (status: YjsPersistStatus) => void): void {
+    this.persistStatusHandler = handler;
+    handler(this.persistStatus);
+  }
+
   off(
     event: "status" | "synced" | "awarenessUpdate" | "awarenessChange",
     handler: any,
@@ -662,6 +864,13 @@ export class YjsWebSocketProvider {
   private emitSynced(): void {
     if (this.syncedHandler && this.synced) {
       this.syncedHandler();
+    }
+  }
+
+  private emitPersistStatus(status: YjsPersistStatus): void {
+    this.persistStatus = status;
+    if (this.persistStatusHandler) {
+      this.persistStatusHandler(status);
     }
   }
 

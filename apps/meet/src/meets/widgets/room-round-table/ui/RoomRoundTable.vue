@@ -153,7 +153,7 @@
             variant="large"
           />
         </Button>
-        <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
       </template>
       <template #right>
         <Button
@@ -184,6 +184,7 @@
           <PixelIcon name="edit" variant="large" />
         </Button>
         <SoundBar
+          v-if="showOrganizationSoundBar"
           :org-id="props.room?.organization_id ?? null"
           :livekit-room="props.livekitRoom"
           :preview-mode="previewMode"
@@ -270,7 +271,7 @@
                   variant="large"
                 />
               </Button>
-              <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+              <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
             </template>
             <template #right>
               <Button
@@ -303,6 +304,7 @@
                 <PixelIcon name="edit" variant="large" />
               </Button>
               <SoundBar
+                v-if="showOrganizationSoundBar"
                 :org-id="props.room?.organization_id ?? null"
                 :livekit-room="props.livekitRoom"
                 :preview-mode="previewMode"
@@ -513,7 +515,7 @@
                   variant="large"
                 />
               </Button>
-              <ReplicaInput v-if="!previewMode" @submit="sendReplica" />
+              <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
             </template>
             <template #right>
               <Button
@@ -719,6 +721,8 @@ import type {
   LocalParticipant,
 } from "livekit-client";
 
+const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
+
 const props = defineProps<{
   room: RoomEntity | null;
   livekitRoom: LiveKitRoom | null;
@@ -801,6 +805,13 @@ const { replicaByParticipant, sendReplica } = useParticipantReplica(
     },
   },
 );
+
+function handleReplicaSubmit(payload: {
+  text: string;
+  accept: () => void;
+}): void {
+  if (sendReplica(payload.text)) payload.accept();
+}
 
 const isDocumentOpen = ref(false);
 function toggleDocument() {

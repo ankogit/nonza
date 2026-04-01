@@ -5,7 +5,7 @@
       type="text"
       class="replica-input__field"
       placeholder="Реплика..."
-      :maxlength="props.maxLength ?? 100"
+      :maxlength="props.maxLength ?? REPLICA_TEXT_MAX_LENGTH"
       @keydown.enter="submit"
     />
     <Button
@@ -22,20 +22,25 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Button, PixelIcon } from "@shared/ui";
+import { REPLICA_TEXT_MAX_LENGTH } from "../lib/replica-limits";
 
 const props = defineProps<{
   maxLength?: number;
 }>();
 
 const emit = defineEmits<{
-  submit: [text: string];
+  submit: [payload: { text: string; accept: () => void }];
 }>();
 
 const inputText = ref("");
 
 function submit() {
-  emit("submit", inputText.value);
-  inputText.value = "";
+  emit("submit", {
+    text: inputText.value,
+    accept: () => {
+      inputText.value = "";
+    },
+  });
 }
 </script>
 

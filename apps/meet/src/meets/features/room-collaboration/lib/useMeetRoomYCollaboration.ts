@@ -33,6 +33,7 @@ export function useMeetRoomYCollaboration(options: {
   const connectionStatus = ref<
     "connecting" | "connected" | "disconnected"
   >("disconnected");
+  const persistStatus = ref<"idle" | "saving" | "saved" | "error">("idle");
 
   function handleVisibilityOrUnload() {
     persistRoomDocument();
@@ -107,6 +108,7 @@ export function useMeetRoomYCollaboration(options: {
       ydoc.value = null;
     }
     connectionStatus.value = "disconnected";
+    persistStatus.value = "idle";
   }
 
   function setup() {
@@ -134,6 +136,9 @@ export function useMeetRoomYCollaboration(options: {
 
     prov.onStatus((status) => {
       connectionStatus.value = status;
+    });
+    prov.onPersistStatus((status) => {
+      persistStatus.value = status;
     });
 
     ydoc.value = doc;
@@ -181,6 +186,7 @@ export function useMeetRoomYCollaboration(options: {
     awareness,
     provider,
     connectionStatus,
+    persistStatus,
     persistRoomDocument,
     persistRoomDocumentInBackground,
   };

@@ -58,8 +58,8 @@ func (h *Handler) HandleWebSocket(c *gin.Context) {
 	client := &Client{
 		hub:        h.hub,
 		conn:       conn,
-		send:       make(chan []byte, 256),
-		sendBinary: make(chan []byte, 256),
+		send:       make(chan []byte, 1024),
+		sendBinary: make(chan []byte, 1024),
 		roomID:     roomID,
 		userID:     userID,
 	}
@@ -116,8 +116,8 @@ func (h *Handler) HandleOrgParticipantsWS(c *gin.Context) {
 	client := &Client{
 		hub:        h.hub,
 		conn:       conn,
-		send:       make(chan []byte, 256),
-		sendBinary: make(chan []byte, 256),
+		send:       make(chan []byte, 1024),
+		sendBinary: make(chan []byte, 1024),
 		roomID:     roomID,
 		userID:     userID,
 	}

@@ -192,24 +192,22 @@ func (h *Hub) broadcastToRoomExcluding(roomID string, message interface{}, exclu
 		h.mu.RUnlock()
 		return err
 	}
+	msg := make([]byte, len(data))
+	copy(msg, data)
 	for client := range roomClients {
 		if client == excludeClient {
 			continue
 		}
-		// Use goroutine with recover to safely send to potentially closed channel
-		go func(cli *Client) {
+		cli := client
+		payload := msg
+		go func() {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Printf("Panic recovered while sending to client %s: %v", cli.userID, r)
 				}
 			}()
-			select {
-			case cli.send <- data:
-			default:
-				// Channel is full or closed, skip this client
-				log.Printf("Send channel full or closed for client %s", cli.userID)
-			}
-		}(client)
+			cli.send <- payload
+		}()
 	}
 	h.mu.RUnlock()
 	return nil
@@ -248,18 +246,23 @@ func (h *Hub) loadDocumentForClient(client *Client) {
 		return
 	}
 	
-	// Send document state even if empty (empty document is valid state)
 	if docState != nil {
-		select {
-		case client.sendBinary <- docState:
-			if len(docState) == 0 {
-				log.Printf("Sent empty document state to client %s in room %s (document is empty)", client.userID, client.roomID)
+		payload := make([]byte, len(docState))
+		copy(payload, docState)
+		cli := client
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Panic recovered while sending initial document to client %s: %v", cli.userID, r)
+				}
+			}()
+			cli.sendBinary <- payload
+			if len(payload) == 0 {
+				log.Printf("Sent empty document state to client %s in room %s (document is empty)", cli.userID, cli.roomID)
 			} else {
-				log.Printf("Sent document state to client %s in room %s (size: %d bytes)", client.userID, client.roomID, len(docState))
+				log.Printf("Sent document state to client %s in room %s (size: %d bytes)", cli.userID, cli.roomID, len(payload))
 			}
-		default:
-			log.Printf("Failed to send document state to client %s: channel full", client.userID)
-		}
+		}()
 	}
 }
 
@@ -338,28 +341,20 @@ func (h *Hub) BroadcastBinaryToRoom(roomID string, data []byte, excludeClient *C
 
 	log.Printf("Broadcasting Y.js update to %d clients in room %s", len(clientsToNotify), roomID)
 
-	// Send updates to clients (outside of lock to avoid blocking)
 	for _, client := range clientsToNotify {
-		// Create a copy of the data for each client to avoid race conditions
 		dataCopy := make([]byte, len(data))
 		copy(dataCopy, data)
-
-		// Use a goroutine with recover to safely send to potentially closed channel
-		go func(cli *Client, data []byte) {
+		cli := client
+		payload := dataCopy
+		go func() {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Printf("Panic recovered while sending binary to client %s: %v", cli.userID, r)
 				}
 			}()
-			
-			select {
-			case cli.sendBinary <- data:
-				log.Printf("Sent Y.js update to client %s", cli.userID)
-			default:
-				// Channel is full, skip this client
-				log.Printf("Binary send channel full for client %s", cli.userID)
-			}
-		}(client, dataCopy)
+			cli.sendBinary <- payload
+			log.Printf("Sent Y.js update to client %s", cli.userID)
+		}()
 	}
 
 	return nil

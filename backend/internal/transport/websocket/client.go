@@ -391,12 +391,10 @@ func (c *Client) handleYjsSync(_ Message) {
 
 	hasState := len(docState) > 0
 	if hasState {
-		select {
-		case c.sendBinary <- docState:
-			log.Printf("Sent document state to client %s (size: %d bytes)", c.userID, len(docState))
-		default:
-			log.Printf("Failed to send document state to client %s: channel full", c.userID)
-		}
+		payload := make([]byte, len(docState))
+		copy(payload, docState)
+		c.sendBinary <- payload
+		log.Printf("Queued document state for client %s (size: %d bytes)", c.userID, len(payload))
 	}
 
 	c.sendSyncAck(hasState)

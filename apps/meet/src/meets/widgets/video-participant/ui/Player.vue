@@ -8,6 +8,7 @@
     ]"
     :style="pip === true ? pipStyle : undefined"
     @pointerdown="pip === true ? onPipPointerDown : undefined"
+    @contextmenu="onPlayerContextMenu"
   >
     <template v-if="mode === 'grid'">
       <div
@@ -112,7 +113,7 @@
           >
             <PixelIcon name="hand" variant="small" />
           </Indicator>
-          <slot v-if="mode === 'list'" name="actions" />
+          <slot name="actions" />
           <MicIndicator
             v-if="!(mode === 'list' && previewMode)"
             ref="micIndicatorRef"
@@ -150,6 +151,13 @@
         <PixelIcon name="close" variant="small" />
       </Button>
     </template>
+    <ContextMenu
+      :model-value="contextMenuOpen"
+      :position="contextMenuPos ?? undefined"
+      :items="contextMenuItems"
+      @update:model-value="contextMenuOpen = $event"
+      @select="onContextMenuSelect"
+    />
   </div>
 </template>
 
@@ -160,7 +168,17 @@ import type {
   LocalParticipant,
   RemoteAudioTrack,
 } from "livekit-client";
-import { Button, PixelIcon, Indicator } from "@shared/ui";
+import {
+  Button,
+  PixelIcon,
+  Indicator,
+  ContextMenu,
+  type ContextMenuItem,
+} from "@shared/ui";
+import {
+  isReplicaTtsMutedIdentity,
+  toggleReplicaTtsMutedIdentity,
+} from "@shared/lib";
 import FullscreenIcon from "./FullscreenIcon.vue";
 import MicIndicator from "./MicIndicator.vue";
 import ReplicaBlock from "./ReplicaBlock.vue";
@@ -206,12 +224,28 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ "full-size": [] }>();
+const contextMenuOpen = ref(false);
+const contextMenuPos = ref<{ x: number; y: number } | null>(null);
+const replicaTtsMenuTick = ref(0);
 
 function onPipPointerDown(e: PointerEvent) {
   if ((e.target as HTMLElement).closest("button")) return;
   if ((e.target as HTMLElement).closest("[data-pip-resize-handle]")) return;
   e.preventDefault();
   props.onPipDrag?.(e);
+}
+
+function onPlayerContextMenu(e: MouseEvent) {
+  if (!canToggleReplicaTtsForParticipant.value) return;
+  e.preventDefault();
+  contextMenuPos.value = { x: e.clientX, y: e.clientY };
+  contextMenuOpen.value = true;
+}
+
+function onContextMenuSelect(item: ContextMenuItem) {
+  if (item.id !== "toggle-replica-tts" || !props.participant) return;
+  toggleReplicaTtsMutedIdentity(props.participant.identity);
+  replicaTtsMenuTick.value++;
 }
 
 const nameReplica = ref({
@@ -325,6 +359,24 @@ const {
   isLocalParticipant,
   isAudioEnabled: tracksAudioEnabled,
 } = tracks;
+
+const canToggleReplicaTtsForParticipant = computed(
+  () => !!props.participant && !isLocalParticipant.value && !props.previewMode,
+);
+
+const contextMenuItems = computed<ContextMenuItem[]>(() => {
+  if (!canToggleReplicaTtsForParticipant.value || !props.participant) return [];
+  void replicaTtsMenuTick.value;
+  const muted = isReplicaTtsMutedIdentity(props.participant.identity);
+  return [
+    {
+      id: "toggle-replica-tts",
+      label: muted
+        ? "Включить озвучку реплик"
+        : "Выключить озвучку реплик",
+    },
+  ];
+});
 
 const isAudioEnabled = computed(() =>
   props.mode === "list" && props.isAudioEnabled !== undefined
