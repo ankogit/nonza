@@ -36,10 +36,12 @@ const containerClass = computed(() => ({
 .screen-layout__container {
   max-width: 900px;
   margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .screen-layout--narrow .screen-layout__container {
-  max-width: 500px;
+  max-width: min(500px, 100%);
 }
 
 .screen-layout--centered .screen-layout__container {

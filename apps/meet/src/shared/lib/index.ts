@@ -33,4 +33,5 @@ export * from "./soundBarPlayback";
 export * from "./soundBarEmojiParticles";
 export * from "./renderSoundBarClipForUpload";
 export * from "./useAppOst";
+export * from "./callWidgetRoomOpenStorage";
 

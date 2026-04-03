@@ -26,6 +26,10 @@
     </header>
 
     <div class="table-circle__content">
+      <div
+        class="table-circle__main-row"
+        :class="{ 'table-circle__main-row--with-collab': sideCollabVisible }"
+      >
       <div class="table-circle__board">
         <div class="table-circle__center bg-dark-20" :style="centerStyle">
           <div class="table-circle__center-body">
@@ -74,6 +78,19 @@
                 Ожидание лидера...
               </div>
             </div>
+          </div>
+
+          <div
+            v-if="isSoundBarPanelOpen"
+            class="table-circle__sound-panel"
+            aria-label="Звуки организации"
+          >
+            <SoundBar
+              layout="panel"
+              :org-id="props.room?.organization_id ?? null"
+              :livekit-room="props.livekitRoom"
+              :preview-mode="previewMode"
+            />
           </div>
 
           <div class="table-circle__center-mode">
@@ -186,9 +203,43 @@
         </template>
         </div>
       </div>
+
+      <div
+        v-if="sideCollabVisible"
+        class="table-circle__collab-column"
+        aria-label="Совместная работа"
+      >
+        <div
+          v-if="collaborationEnabled && isDocumentOpen"
+          class="table-circle__collab-block table-circle__collab-block--document"
+        >
+          <CollaborativeDocument
+            :room="props.room"
+            :participant-name="props.participantName"
+            :participant-color="participantColorForDocument"
+          />
+        </div>
+        <div
+          v-if="collaborationEnabled && isWhiteboardOpen && !whiteboardFullscreen"
+          class="table-circle__collab-block table-circle__collab-block--whiteboard"
+        >
+          <CollaborativeWhiteboardShell
+            :participant-color="participantColorForDocument"
+            :room-id="props.room?.id ?? null"
+          />
+        </div>
+      </div>
+      </div>
     </div>
 
-    <CallMenu @disconnect="handleDisconnect">
+    <CallMenu
+      display-room-type="table_circle"
+      :room-id="props.room?.id ?? null"
+      :enabled-widget-ids="enabledTableCircleCallWidgets"
+      :active-call-widget-ids="activeCallWidgetIds"
+      @disconnect="handleDisconnect"
+      @activate-call-widget="activateCallWidgetFromMenu"
+    >
       <template #left>
         <Button
           :class="{ active: mediaState.isAudioEnabled, default: !mediaState.isAudioEnabled }"
@@ -245,12 +296,78 @@
             <PixelIcon name="right" variant="small" />
           </Button>
         </div>
-        <SoundBar
-          v-if="showOrganizationSoundBar"
-          :org-id="props.room?.organization_id ?? null"
-          :livekit-room="props.livekitRoom"
-          :preview-mode="previewMode"
-        />
+      </template>
+      <template #widget-table_chat>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: centerContent === 'chat' }"
+          title="Чат стола"
+          @click="centerContent = 'chat'"
+        >
+          <PixelIcon name="message" variant="small" />
+        </Button>
+      </template>
+      <template #widget-table_dice>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: centerContent === 'dice' }"
+          title="Кости"
+          @click="centerContent = 'dice'"
+        >
+          <PixelIcon name="dice" variant="small" />
+        </Button>
+      </template>
+      <template #widget-table_stream>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: centerContent === 'stream' }"
+          title="Стрим ведущего"
+          @click="centerContent = 'stream'"
+        >
+          <PixelIcon name="screen-on" variant="small" />
+        </Button>
+      </template>
+      <template #widget-document>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: isDocumentOpen }"
+          :title="isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'"
+          @click="toggleDocument"
+        >
+          <PixelIcon name="document" variant="small" />
+        </Button>
+      </template>
+      <template #widget-whiteboard>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: isWhiteboardOpen }"
+          :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="edit" variant="small" />
+        </Button>
+      </template>
+      <template #widget-soundbar>
+        <Button
+          variant="default"
+          size="small"
+          :class="{ active: isSoundBarPanelOpen }"
+          :title="
+            isSoundBarPanelOpen
+              ? 'Скрыть звуки организации'
+              : 'Звуки организации'
+          "
+          @click="isSoundBarPanelOpen = !isSoundBarPanelOpen"
+        >
+          <PixelIcon name="notes" variant="small" />
+        </Button>
+      </template>
+      <template #widget-settings>
         <Button
           v-if="settingsInCallMenu"
           variant="default"
@@ -269,11 +386,37 @@
       </div>
     </Modal>
 
+    <Teleport to="body">
+      <div
+        v-if="collaborationEnabled && isWhiteboardOpen && whiteboardFullscreen"
+        class="room-fullscreen"
+        role="dialog"
+        aria-label="Совместная доска"
+      >
+        <Button
+          variant="default"
+          size="small"
+          class="room-fullscreen__close"
+          title="Закрыть доску"
+          aria-label="Закрыть доску"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+        <div class="room-fullscreen__editor">
+          <CollaborativeWhiteboardShell
+            :participant-color="participantColorForDocument"
+            :room-id="props.room?.id ?? null"
+          />
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, provide, toRef } from "vue";
 import { RoomEvent } from "livekit-client";
 import type { Room as LiveKitRoom, RemoteParticipant, LocalParticipant } from "livekit-client";
 import type { Room as RoomEntity } from "@shared/entities";
@@ -285,19 +428,27 @@ import {
 import { useConferenceHall } from "@features/conference-hall";
 import { useTableCircle } from "@features/table-circle";
 import { SoundBar } from "@features/sound-bar";
+import {
+  MEET_ROOM_COLLABORATION_KEY,
+  useMeetRoomYCollaboration,
+} from "@features/room-collaboration";
+import { CollaborativeDocument } from "@widgets/collaborative-document";
+import { CollaborativeWhiteboardShell } from "@widgets/collaborative-whiteboard";
 import { Button, Modal, AudioSettings, PixelIcon } from "@shared/ui";
 import { VideoParticipant } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";
+import type { CallWidgetId } from "@features/call-widgets";
 import TableCirclePublicTable from "./TableCirclePublicTable.vue";
 import TableCirclePublicChat from "./TableCirclePublicChat.vue";
 import {
   DEFAULT_PARTICIPANT_COLOR,
   parseParticipantColorFromMetadata,
+  getAuthState,
+  readTableCircleCenterForRoom,
+  writeTableCircleCenterForRoom,
 } from "@shared/lib";
 
 import type { RoomApi } from "@shared/entities";
-
-const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
 
 const props = defineProps<{
   room: RoomEntity | null;
@@ -308,6 +459,7 @@ const props = defineProps<{
   participantName: string;
   apiBaseURL: string;
   roomApi?: RoomApi | null;
+  showDocument?: boolean;
   previewMode?: boolean;
   settingsInCallMenu?: boolean;
   settingsInUpperMenu?: boolean;
@@ -318,6 +470,19 @@ const emit = defineEmits<{
   disconnect: [];
   "update:participantName": [name: string];
 }>();
+
+const enabledTableCircleCallWidgets = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [
+    "document",
+    "whiteboard",
+    "table_chat",
+    "table_dice",
+    "table_stream",
+    "soundbar",
+  ];
+  if (props.settingsInCallMenu) ids.push("settings");
+  return ids;
+});
 
 const previewMode = computed(() => props.previewMode ?? false);
 const settingsInCallMenu = computed(() => props.settingsInCallMenu ?? false);
@@ -340,6 +505,97 @@ const remoteParticipants = computed<RemoteParticipant[]>(() => {
   if (!props.livekitRoom) return [];
   return Array.from(props.livekitRoom.remoteParticipants.values());
 });
+
+const isSoundBarPanelOpen = ref(false);
+
+const participantColorForDocument = computed(() => {
+  const c = getAuthState()?.user?.color;
+  if (c && c.trim() !== "") return c;
+  return DEFAULT_PARTICIPANT_COLOR;
+});
+
+const collaborationEnabled = computed(() =>
+  Boolean(props.room?.id && props.apiBaseURL),
+);
+
+const meetCollab = useMeetRoomYCollaboration({
+  room: toRef(props, "room"),
+  apiBaseURL: toRef(props, "apiBaseURL"),
+  userId: toRef(props, "participantName"),
+  userName: toRef(props, "participantName"),
+  userColor: participantColorForDocument,
+  enabled: collaborationEnabled,
+});
+
+provide(MEET_ROOM_COLLABORATION_KEY, meetCollab);
+
+const WB_ROOM_OPEN_PREFIX = "nonza_meet_wb_open_";
+
+function readStoredWhiteboardOpen(roomId: string | undefined): boolean {
+  if (!roomId) return false;
+  try {
+    return localStorage.getItem(WB_ROOM_OPEN_PREFIX + roomId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredWhiteboardOpen(roomId: string | undefined, open: boolean) {
+  if (!roomId) return;
+  try {
+    localStorage.setItem(WB_ROOM_OPEN_PREFIX + roomId, open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+const isDocumentOpen = ref(false);
+function toggleDocument() {
+  isDocumentOpen.value = !isDocumentOpen.value;
+}
+
+const isWhiteboardOpen = ref(false);
+
+watch(
+  () => [props.room?.id, collaborationEnabled.value] as const,
+  ([id, collab]) => {
+    if (!id || !collab) return;
+    isWhiteboardOpen.value = readStoredWhiteboardOpen(id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isWhiteboardOpen.value] as const,
+  () => {
+    writeStoredWhiteboardOpen(props.room?.id, isWhiteboardOpen.value);
+  },
+);
+
+function toggleWhiteboard() {
+  isWhiteboardOpen.value = !isWhiteboardOpen.value;
+}
+
+const WB_FULLSCREEN_KEY = "nonza_settings_wb_fullscreen";
+
+function readWbFullscreen(): boolean {
+  try {
+    const v = localStorage.getItem(WB_FULLSCREEN_KEY);
+    if (v === null) return false;
+    return v === "1";
+  } catch {
+    return false;
+  }
+}
+
+const whiteboardFullscreen = ref(readWbFullscreen());
+
+const sideCollabVisible = computed(
+  () =>
+    collaborationEnabled.value &&
+    (isDocumentOpen.value ||
+      (isWhiteboardOpen.value && !whiteboardFullscreen.value)),
+);
 
 const participantsKey = ref(0);
 const allParticipants = computed(() => {
@@ -595,6 +851,25 @@ const settingsOpen = ref(false);
 const audioSettingsRef = ref<InstanceType<typeof AudioSettings> | null>(null);
 const centerContent = ref<"dice" | "stream" | "chat">("chat");
 
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      centerContent.value = "chat";
+      return;
+    }
+    centerContent.value = readTableCircleCenterForRoom(id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, centerContent.value] as const,
+  () => {
+    writeTableCircleCenterForRoom(props.room?.id, centerContent.value);
+  },
+);
+
 const leaderParticipant = computed(() => {
   const id = leaderIdentity.value;
   if (!id) return null;
@@ -612,9 +887,46 @@ function handleSettings() {
   settingsOpen.value = true;
 }
 
-const handleDisconnect = () => emit("disconnect");
+const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [];
+  if (isDocumentOpen.value) ids.push("document");
+  if (isWhiteboardOpen.value) ids.push("whiteboard");
+  if (isSoundBarPanelOpen.value) ids.push("soundbar");
+  if (centerContent.value === "chat") ids.push("table_chat");
+  if (centerContent.value === "dice") ids.push("table_dice");
+  if (centerContent.value === "stream") ids.push("table_stream");
+  return ids;
+});
 
-void DEFAULT_PARTICIPANT_COLOR;
+function activateCallWidgetFromMenu(id: CallWidgetId): void {
+  switch (id) {
+    case "document":
+      toggleDocument();
+      break;
+    case "whiteboard":
+      toggleWhiteboard();
+      break;
+    case "table_chat":
+      centerContent.value = "chat";
+      break;
+    case "table_dice":
+      centerContent.value = "dice";
+      break;
+    case "table_stream":
+      centerContent.value = "stream";
+      break;
+    case "soundbar":
+      isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      break;
+    case "settings":
+      handleSettings();
+      break;
+    default:
+      break;
+  }
+}
+
+const handleDisconnect = () => emit("disconnect");
 </script>
 
 <style scoped>
@@ -632,6 +944,46 @@ void DEFAULT_PARTICIPANT_COLOR;
   align-items: stretch;
   justify-content: center;
   padding: 12px 12px 120px;
+}
+
+.table-circle__main-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1440px;
+  gap: 12px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.table-circle__main-row--with-collab .table-circle__board {
+  max-width: min(720px, 52vw);
+}
+
+.table-circle__collab-column {
+  flex: 0 0 min(380px, 42vw);
+  min-width: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.table-circle__collab-block {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.table-circle__collab-block--document {
+  min-height: 260px;
+}
+
+.table-circle__collab-block--whiteboard {
+  min-height: 220px;
 }
 
 .table-circle__board {
@@ -659,6 +1011,21 @@ void DEFAULT_PARTICIPANT_COLOR;
   justify-content: center;
   min-height: 0;
   z-index: 3;
+}
+
+.table-circle__sound-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  min-height: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: #101010f0;
+  border: 2px solid #444;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-circle__center-body {
@@ -828,8 +1195,33 @@ void DEFAULT_PARTICIPANT_COLOR;
   max-width: calc(100vw - 24px);
 }
 
+@media (max-width: 639px) {
+  .table-circle__center-mode {
+    display: none;
+  }
+}
+
 .table-circle__settings {
   padding: 12px;
+}
+
+@media (max-width: 900px) {
+  .table-circle__main-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-circle__main-row--with-collab .table-circle__board {
+    max-width: 980px;
+    width: 100%;
+  }
+
+  .table-circle__collab-column {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    max-height: min(48vh, 420px);
+  }
 }
 </style>
 

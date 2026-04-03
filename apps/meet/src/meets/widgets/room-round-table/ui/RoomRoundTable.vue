@@ -75,14 +75,17 @@
 
       <div
         v-if="
-          props.showDocument &&
-          (isDocumentOpen || (isWhiteboardOpen && !whiteboardFullscreen))
+          (collaborationEnabled &&
+            (isDocumentOpen || (isWhiteboardOpen && !whiteboardFullscreen))) ||
+          isTableChatOpen ||
+          isTableDiceOpen ||
+          isSoundBarOpen
         "
         class="round-table-collab"
         aria-label="Совместная работа"
       >
         <div
-          v-if="isDocumentOpen"
+          v-if="collaborationEnabled && isDocumentOpen"
           class="round-table-document"
           aria-label="Совместный документ"
         >
@@ -93,7 +96,7 @@
           />
         </div>
         <div
-          v-if="isWhiteboardOpen && !whiteboardFullscreen"
+          v-if="collaborationEnabled && isWhiteboardOpen && !whiteboardFullscreen"
           class="round-table-whiteboard"
           aria-label="Совместная доска"
         >
@@ -102,10 +105,61 @@
             :room-id="props.room?.id ?? null"
           />
         </div>
+        <div
+          v-if="isTableChatOpen"
+          class="round-table-table-chat"
+          aria-label="Чат стола"
+        >
+          <MeetCollabPanel title="Чат стола">
+            <TableCirclePublicChat
+              :local-participant="localParticipant"
+              :remote-participants="remoteParticipants"
+              :participant-name="props.participantName"
+              :get-display-name="props.getDisplayName"
+              :livekit-room="props.livekitRoom"
+            />
+          </MeetCollabPanel>
+        </div>
+        <div
+          v-if="isTableDiceOpen"
+          class="round-table-table-dice"
+          aria-label="Кости"
+        >
+          <MeetCollabPanel title="Кости">
+            <TableCirclePublicTable
+              :local-participant="localParticipant"
+              :remote-participants="remoteParticipants"
+              :participant-name="props.participantName"
+              :get-display-name="props.getDisplayName"
+              :livekit-room="props.livekitRoom"
+            />
+          </MeetCollabPanel>
+        </div>
+        <div
+          v-if="isSoundBarOpen"
+          class="round-table-soundbar"
+          aria-label="Звуки организации"
+        >
+          <MeetCollabPanel title="Саунд бар">
+            <SoundBar
+              layout="panel"
+              :org-id="props.room?.organization_id ?? null"
+              :livekit-room="props.livekitRoom"
+              :preview-mode="previewMode"
+            />
+          </MeetCollabPanel>
+        </div>
       </div>
     </div>
 
-    <CallMenu @disconnect="handleDisconnect">
+    <CallMenu
+      display-room-type="round_table"
+      :room-id="props.room?.id ?? null"
+      :enabled-widget-ids="enabledRoundTableCallWidgets"
+      :active-call-widget-ids="activeCallWidgetIds"
+      @disconnect="handleDisconnect"
+      @activate-call-widget="activateCallWidgetFromMenu"
+    >
       <template #left>
         <Button
           :class="{
@@ -165,8 +219,9 @@
         >
           <PixelIcon name="settings" variant="large" />
         </Button>
+      </template>
+      <template #widget-document>
         <Button
-          v-if="props.showDocument"
           variant="default"
           :class="{ active: isDocumentOpen }"
           :title="isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'"
@@ -174,8 +229,9 @@
         >
           <PixelIcon name="document" variant="large" />
         </Button>
+      </template>
+      <template #widget-whiteboard>
         <Button
-          v-if="props.showDocument"
           variant="default"
           :class="{ active: isWhiteboardOpen }"
           :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
@@ -183,18 +239,44 @@
         >
           <PixelIcon name="edit" variant="large" />
         </Button>
-        <SoundBar
-          v-if="showOrganizationSoundBar"
-          :org-id="props.room?.organization_id ?? null"
-          :livekit-room="props.livekitRoom"
-          :preview-mode="previewMode"
-        />
+      </template>
+      <template #widget-table_chat>
+        <Button
+          variant="default"
+          :class="{ active: isTableChatOpen }"
+          :title="isTableChatOpen ? 'Скрыть чат стола' : 'Чат стола'"
+          @click="toggleTableChat"
+        >
+          <PixelIcon name="message" variant="large" />
+        </Button>
+      </template>
+      <template #widget-table_dice>
+        <Button
+          variant="default"
+          :class="{ active: isTableDiceOpen }"
+          :title="isTableDiceOpen ? 'Скрыть кости' : 'Кости'"
+          @click="toggleTableDice"
+        >
+          <PixelIcon name="dice" variant="large" />
+        </Button>
+      </template>
+      <template #widget-soundbar>
+        <Button
+          variant="default"
+          :class="{ active: isSoundBarOpen }"
+          :title="
+            isSoundBarOpen ? 'Скрыть звуки организации' : 'Звуки организации'
+          "
+          @click="toggleSoundBar"
+        >
+          <PixelIcon name="notes" variant="large" />
+        </Button>
       </template>
     </CallMenu>
 
     <Teleport to="body">
       <div
-        v-if="isWhiteboardOpen && props.showDocument && whiteboardFullscreen"
+        v-if="collaborationEnabled && isWhiteboardOpen && whiteboardFullscreen"
         class="room-fullscreen"
         role="dialog"
         aria-label="Совместная доска"
@@ -217,8 +299,14 @@
         </div>
         <div class="room-fullscreen__menu-wrapper">
           <CallMenu
+            display-room-type="round_table"
+            :room-id="props.room?.id ?? null"
+            :enabled-widget-ids="enabledRoundTableCallWidgets"
+            :active-call-widget-ids="activeCallWidgetIds"
+            storage-suffix="fullscreen-wb"
             menu-class="room-fullscreen__menu"
             @disconnect="handleDisconnect"
+            @activate-call-widget="activateCallWidgetFromMenu"
           >
             <template #left>
               <Button
@@ -283,8 +371,9 @@
               >
                 <PixelIcon name="settings" variant="large" />
               </Button>
+            </template>
+            <template #widget-document>
               <Button
-                v-if="props.showDocument"
                 variant="default"
                 :class="{ active: isDocumentOpen }"
                 :title="
@@ -294,8 +383,9 @@
               >
                 <PixelIcon name="document" variant="large" />
               </Button>
+            </template>
+            <template #widget-whiteboard>
               <Button
-                v-if="props.showDocument"
                 variant="default"
                 :class="{ active: isWhiteboardOpen }"
                 :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
@@ -303,8 +393,29 @@
               >
                 <PixelIcon name="edit" variant="large" />
               </Button>
+            </template>
+            <template #widget-table_chat>
+              <Button
+                variant="default"
+                :class="{ active: isTableChatOpen }"
+                :title="isTableChatOpen ? 'Скрыть чат стола' : 'Чат стола'"
+                @click="toggleTableChat"
+              >
+                <PixelIcon name="message" variant="large" />
+              </Button>
+            </template>
+            <template #widget-table_dice>
+              <Button
+                variant="default"
+                :class="{ active: isTableDiceOpen }"
+                :title="isTableDiceOpen ? 'Скрыть кости' : 'Кости'"
+                @click="toggleTableDice"
+              >
+                <PixelIcon name="dice" variant="large" />
+              </Button>
+            </template>
+            <template #widget-soundbar>
               <SoundBar
-                v-if="showOrganizationSoundBar"
                 :org-id="props.room?.organization_id ?? null"
                 :livekit-room="props.livekitRoom"
                 :preview-mode="previewMode"
@@ -461,8 +572,14 @@
         </Button>
         <div ref="fullscreenMenuRef" class="room-fullscreen__menu-wrapper">
           <CallMenu
+            display-room-type="round_table"
+            :room-id="props.room?.id ?? null"
+            :enabled-widget-ids="enabledFullscreenVideoCallWidgets"
+            :active-call-widget-ids="activeCallWidgetIds"
+            storage-suffix="fullscreen-video"
             menu-class="room-fullscreen__menu"
             @disconnect="handleDisconnect"
+            @activate-call-widget="activateCallWidgetFromMenu"
           >
             <template #left>
               <Button
@@ -517,9 +634,8 @@
               </Button>
               <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
             </template>
-            <template #right>
+            <template #widget-document>
               <Button
-                v-if="props.showDocument"
                 variant="default"
                 :class="{ active: isDocumentOpen }"
                 :title="
@@ -529,8 +645,9 @@
               >
                 <PixelIcon name="document" variant="large" />
               </Button>
+            </template>
+            <template #widget-whiteboard>
               <Button
-                v-if="props.showDocument"
                 variant="default"
                 :class="{ active: isWhiteboardOpen }"
                 :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
@@ -538,6 +655,33 @@
               >
                 <PixelIcon name="edit" variant="large" />
               </Button>
+            </template>
+            <template #widget-table_chat>
+              <Button
+                variant="default"
+                :class="{ active: isTableChatOpen }"
+                :title="isTableChatOpen ? 'Скрыть чат стола' : 'Чат стола'"
+                @click="toggleTableChat"
+              >
+                <PixelIcon name="message" variant="large" />
+              </Button>
+            </template>
+            <template #widget-table_dice>
+              <Button
+                variant="default"
+                :class="{ active: isTableDiceOpen }"
+                :title="isTableDiceOpen ? 'Скрыть кости' : 'Кости'"
+                @click="toggleTableDice"
+              >
+                <PixelIcon name="dice" variant="large" />
+              </Button>
+            </template>
+            <template #widget-soundbar>
+              <SoundBar
+                :org-id="props.room?.organization_id ?? null"
+                :livekit-room="props.livekitRoom"
+                :preview-mode="previewMode"
+              />
             </template>
           </CallMenu>
         </div>
@@ -679,15 +823,19 @@ import {
   PixelSelect,
   Switch,
   Indicator,
+  MeetCollabPanel,
 } from "@shared/ui";
 import { VideoParticipant, Player } from "@widgets/video-participant";
 import { CallMenu } from "@widgets/call-menu";
+import type { CallWidgetId } from "@features/call-widgets";
 import {
   MEET_ROOM_COLLABORATION_KEY,
   useMeetRoomYCollaboration,
 } from "@features/room-collaboration";
 import { CollaborativeDocument } from "@widgets/collaborative-document";
 import { CollaborativeWhiteboardShell } from "@widgets/collaborative-whiteboard";
+import TableCirclePublicChat from "@widgets/room-table-circle/ui/TableCirclePublicChat.vue";
+import TableCirclePublicTable from "@widgets/room-table-circle/ui/TableCirclePublicTable.vue";
 import {
   setParticipantName,
   getStoredAudioInputDevice,
@@ -711,6 +859,10 @@ import {
   setStoredDefaultVideoQuality,
   type VideoQualityLevel,
   toggleOutputMuted,
+  readTableChatOpenForRoom,
+  writeTableChatOpenForRoom,
+  readTableDiceOpenForRoom,
+  writeTableDiceOpenForRoom,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@shared/entities";
@@ -720,8 +872,6 @@ import type {
   RemoteParticipant,
   LocalParticipant,
 } from "livekit-client";
-
-const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
 
 const props = defineProps<{
   room: RoomEntity | null;
@@ -738,6 +888,22 @@ const props = defineProps<{
   updateParticipantName?: (name: string) => void;
 }>();
 
+const enabledRoundTableCallWidgets = computed<CallWidgetId[]>(() => [
+  "document",
+  "whiteboard",
+  "table_chat",
+  "table_dice",
+  "soundbar",
+]);
+
+const enabledFullscreenVideoCallWidgets = computed<CallWidgetId[]>(() => [
+  "document",
+  "whiteboard",
+  "table_chat",
+  "table_dice",
+  "soundbar",
+]);
+
 const emit = defineEmits<{
   disconnect: [];
   "update:participantName": [name: string];
@@ -750,7 +916,7 @@ const participantColorForDocument = computed(() => {
 });
 
 const collaborationEnabled = computed(() =>
-  Boolean(props.showDocument && props.room?.id && props.apiBaseURL),
+  Boolean(props.room?.id && props.apiBaseURL),
 );
 
 const meetCollab = useMeetRoomYCollaboration({
@@ -841,9 +1007,9 @@ function writeStoredWhiteboardOpen(roomId: string | undefined, open: boolean) {
 const isWhiteboardOpen = ref(false);
 
 watch(
-  () => [props.room?.id, props.showDocument] as const,
-  ([id, showDoc]) => {
-    if (!id || !showDoc) return;
+  () => [props.room?.id, collaborationEnabled.value] as const,
+  ([id, collab]) => {
+    if (!id || !collab) return;
     isWhiteboardOpen.value = readStoredWhiteboardOpen(id);
   },
   { immediate: true },
@@ -858,6 +1024,81 @@ watch(
 
 function toggleWhiteboard() {
   isWhiteboardOpen.value = !isWhiteboardOpen.value;
+}
+
+const isTableChatOpen = ref(false);
+function toggleTableChat() {
+  isTableChatOpen.value = !isTableChatOpen.value;
+}
+
+const isTableDiceOpen = ref(false);
+function toggleTableDice() {
+  isTableDiceOpen.value = !isTableDiceOpen.value;
+}
+
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      isTableChatOpen.value = false;
+      isTableDiceOpen.value = false;
+      return;
+    }
+    isTableChatOpen.value = readTableChatOpenForRoom(id);
+    isTableDiceOpen.value = readTableDiceOpenForRoom(id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isTableChatOpen.value] as const,
+  () => {
+    writeTableChatOpenForRoom(props.room?.id, isTableChatOpen.value);
+  },
+);
+
+watch(
+  () => [props.room?.id, isTableDiceOpen.value] as const,
+  () => {
+    writeTableDiceOpenForRoom(props.room?.id, isTableDiceOpen.value);
+  },
+);
+
+const isSoundBarOpen = ref(false);
+function toggleSoundBar() {
+  isSoundBarOpen.value = !isSoundBarOpen.value;
+}
+
+const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [];
+  if (isDocumentOpen.value) ids.push("document");
+  if (isWhiteboardOpen.value) ids.push("whiteboard");
+  if (isTableChatOpen.value) ids.push("table_chat");
+  if (isTableDiceOpen.value) ids.push("table_dice");
+  if (isSoundBarOpen.value) ids.push("soundbar");
+  return ids;
+});
+
+function activateCallWidgetFromMenu(id: CallWidgetId): void {
+  switch (id) {
+    case "document":
+      toggleDocument();
+      break;
+    case "whiteboard":
+      toggleWhiteboard();
+      break;
+    case "table_chat":
+      toggleTableChat();
+      break;
+    case "table_dice":
+      toggleTableDice();
+      break;
+    case "soundbar":
+      toggleSoundBar();
+      break;
+    default:
+      break;
+  }
 }
 
 const localParticipant = computed<LocalParticipant | null>(() => {
@@ -1411,10 +1652,48 @@ function handleModalClose() {
   border-top: none;
 }
 
+.round-table-table-chat,
+.round-table-table-dice {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  max-height: min(45vh, 420px);
+  padding: 10px 20px 0 0;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.round-table-table-chat:first-child,
+.round-table-table-dice:first-child {
+  padding-top: 20px;
+  border-top: none;
+}
+
+.round-table-soundbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 20px 0 0;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.round-table-soundbar:first-child {
+  padding-top: 20px;
+  border-top: none;
+}
+
+.round-table-soundbar :deep(.sound-bar__surface--panel) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 @media (min-width: 768px) {
   .round-table-collab {
     width: 400px;
-    max-height: calc(100% - 90px);
   }
 
   .round-table-document {
@@ -1440,7 +1719,9 @@ function handleModalClose() {
 @media (max-width: 767px) {
   .round-table-content {
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
   }
 
   .round-table-content > .call-grid {
@@ -1449,24 +1730,42 @@ function handleModalClose() {
     max-height: none;
     overflow: visible;
     overflow-y: visible;
-    padding-bottom: 20px;
+    padding-bottom: 12px;
+    padding-top: 12px;
+    gap: 12px;
   }
 
   .round-table-collab {
     padding-bottom: 0;
     max-height: none;
     overflow-y: visible;
+    gap: 8px;
   }
 
   .round-table-document {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
     padding-top: 10px;
   }
 
   .round-table-whiteboard {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-top: 10px;
+  }
+
+  .round-table-table-chat,
+  .round-table-table-dice {
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-top: 10px;
+    max-height: none;
+    min-height: 220px;
+  }
+
+  .round-table-soundbar {
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
     padding-top: 10px;
   }
 }

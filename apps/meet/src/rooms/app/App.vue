@@ -57,13 +57,19 @@
       </Button>
       -->
     </div>
-    <div v-else-if="appStore.page === 'login'" class="rooms-app__content">
+    <div
+      v-else-if="appStore.page === 'login'"
+      class="rooms-app__content rooms-app__content--auth-form"
+    >
       <LoginScreen
         @success="handleAuthSuccess"
         @go-register="appStore.setPage('register')"
       />
     </div>
-    <div v-else-if="appStore.page === 'register'" class="rooms-app__content">
+    <div
+      v-else-if="appStore.page === 'register'"
+      class="rooms-app__content rooms-app__content--auth-form"
+    >
       <RegisterScreen
         @success="handleAuthSuccess"
         @go-login="appStore.setPage('login')"
@@ -221,18 +227,6 @@
         <PixelIcon :name="ostIconName" variant="small" />
       </Button>
     </Teleport>
-    <Button
-      v-if="isTauriDesktop()"
-      type="icon"
-      size="small"
-      variant="default"
-      class="rooms-app__refresh"
-      title="Обновить страницу"
-      aria-label="Обновить страницу"
-      @click="handleRefresh"
-    >
-      <PixelIcon name="reload" variant="small" />
-    </Button>
   </div>
 </template>
 
@@ -604,10 +598,6 @@ function handleReconnect() {
   }
 }
 
-function handleRefresh() {
-  window.location.reload();
-}
-
 function syncAppMenu() {
   if (!isTauriDesktop()) return;
   const shortcuts = getStoredShortcuts();
@@ -726,12 +716,30 @@ onUnmounted(() => {
 .rooms-app--scroll-root {
   height: 100dvh;
   height: 100vh;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .rooms-app--scroll-root .rooms-app__content {
   flex: none;
   overflow: visible;
+}
+
+.rooms-app__content--auth-form {
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  min-height: min-content;
+}
+
+.rooms-app__content--auth-form > * {
+  width: 100%;
 }
 
 .rooms-app__main {
@@ -805,40 +813,6 @@ onUnmounted(() => {
 }
 
 .rooms-app__ost-mute :deep(.pi) {
-  --pi-size: 16px;
-  width: 16px;
-  height: 16px;
-}
-
-.rooms-app__refresh {
-  position: fixed;
-  top: 35px;
-  right: 0px;
-  z-index: 100;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0;
-  background: transparent !important;
-  border: none;
-  box-shadow: none;
-  filter: none;
-  opacity: 0.4;
-  color: var(--color-text-secondary, #888);
-}
-
-.rooms-app__refresh:hover {
-  opacity: 1;
-  color: var(--color-text, #fff);
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.rooms-app__refresh:hover:not(.button--disabled) {
-  scale: 1;
-}
-
-.rooms-app__refresh :deep(.pi) {
   --pi-size: 16px;
   width: 16px;
   height: 16px;

@@ -175,7 +175,7 @@
         :get-display-name="getDisplayName"
         :participant-name="displayParticipantName"
         :api-base-u-r-l="props.apiBaseURL"
-        :show-document="displayRoomType === 'round_table'"
+        :show-document="displayRoomType != null"
         :hide-sidebar="hideSidebar"
         :update-participant-name="updateParticipantName"
         @disconnect="handleDisconnect"
@@ -793,6 +793,8 @@ onMounted(() => {
   padding: 8px;
   border: 2px solid #444;
   border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
   background: #1a1a1a;
   color: white;
   font-size: 16px;

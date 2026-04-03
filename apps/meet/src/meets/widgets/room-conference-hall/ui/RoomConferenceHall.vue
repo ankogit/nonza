@@ -314,7 +314,122 @@
       </aside>
     </div>
 
-    <CallMenu @disconnect="handleDisconnect">
+    <div
+      v-if="extrasCollabVisible"
+      class="conference-hall__extras"
+      aria-label="Дополнительно"
+    >
+      <div
+        v-if="collaborationEnabled && isDocumentOpen"
+        class="conference-hall__extra conference-hall__extra--document"
+        aria-label="Совместный документ"
+      >
+        <CollaborativeDocument
+          :room="props.room"
+          :participant-name="props.participantName"
+          :participant-color="participantColorForDocument"
+        />
+      </div>
+      <div
+        v-if="collaborationEnabled && isWhiteboardOpen && !whiteboardFullscreen"
+        class="conference-hall__extra conference-hall__extra--whiteboard"
+        aria-label="Совместная доска"
+      >
+        <CollaborativeWhiteboardShell
+          :participant-color="participantColorForDocument"
+          :room-id="props.room?.id ?? null"
+        />
+      </div>
+      <div
+        v-if="isTableChatOpen"
+        class="conference-hall__extra conference-hall__extra--chat"
+        aria-label="Чат стола"
+      >
+        <TableCirclePublicChat
+          :local-participant="localParticipant"
+          :remote-participants="remoteParticipants"
+          :participant-name="props.participantName"
+          :get-display-name="props.getDisplayName"
+          :livekit-room="props.livekitRoom"
+        />
+      </div>
+      <div
+        v-if="isTableDiceOpen"
+        class="conference-hall__extra conference-hall__extra--dice"
+        aria-label="Кости"
+      >
+        <TableCirclePublicTable
+          :local-participant="localParticipant"
+          :remote-participants="remoteParticipants"
+          :participant-name="props.participantName"
+          :get-display-name="props.getDisplayName"
+          :livekit-room="props.livekitRoom"
+        />
+      </div>
+      <div
+        v-if="isTableStreamOpen"
+        class="conference-hall__extra conference-hall__extra--stream"
+        aria-label="Стрим ведущего"
+      >
+        <div
+          v-if="leaderParticipant"
+          class="conference-hall__stream-video"
+        >
+          <VideoParticipant
+            :participant="resolveParticipant(leaderParticipant)"
+            :participant-name="
+              isLocal(leaderParticipant)
+                ? props.participantName
+                : (props.getDisplayName?.(leaderParticipant) ??
+                  leaderParticipant.name ??
+                  leaderParticipant.identity)
+            "
+            :participant-color="leaderParticipantColor"
+            :is-speaking="
+              leaderParticipant
+                ? speakingIdentitySet.has(leaderParticipant.identity)
+                : false
+            "
+            :is-leader="true"
+            :show-full-size="true"
+            preferred-video-source="screen-share"
+            :replica-text="
+              leaderParticipant
+                ? replicaByParticipant[leaderParticipant.identity]?.text
+                : undefined
+            "
+          />
+        </div>
+        <div
+          v-else
+          class="conference-hall__stream-placeholder color-white-60 font-bebas"
+        >
+          Ожидание лидера…
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="isSoundBarPanelOpen"
+      class="conference-hall__sound-collab"
+      aria-label="Звуки организации"
+    >
+      <SoundBar
+        layout="panel"
+        :org-id="props.room?.organization_id ?? null"
+        :livekit-room="props.livekitRoom"
+        :preview-mode="previewMode"
+      />
+    </div>
+
+    <CallMenu
+      display-room-type="conference_hall"
+      :room-id="props.room?.id ?? null"
+      :enabled-widget-ids="enabledConferenceCallWidgets"
+      :active-call-widget-ids="activeCallWidgetIds"
+      @disconnect="handleDisconnect"
+      @activate-call-widget="activateCallWidgetFromMenu"
+    >
       <template #left>
         <Button
           v-if="!previewMode && !conferenceHall.isLeader.value"
@@ -383,12 +498,74 @@
           :raised-count="raisedHandsSet.size"
           @toggle="showParticipantsPanel = !showParticipantsPanel"
         />
-        <SoundBar
-          v-if="showOrganizationSoundBar"
-          :org-id="props.room?.organization_id ?? null"
-          :livekit-room="props.livekitRoom"
-          :preview-mode="previewMode"
-        />
+      </template>
+      <template #widget-document>
+        <Button
+          variant="default"
+          :class="{ active: isDocumentOpen }"
+          :title="isDocumentOpen ? 'Скрыть документ' : 'Совместный документ'"
+          @click="toggleDocument"
+        >
+          <PixelIcon name="document" variant="large" />
+        </Button>
+      </template>
+      <template #widget-whiteboard>
+        <Button
+          variant="default"
+          :class="{ active: isWhiteboardOpen }"
+          :title="isWhiteboardOpen ? 'Скрыть доску' : 'Совместная доска'"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="edit" variant="large" />
+        </Button>
+      </template>
+      <template #widget-table_chat>
+        <Button
+          variant="default"
+          :class="{ active: isTableChatOpen }"
+          :title="isTableChatOpen ? 'Скрыть чат стола' : 'Чат стола'"
+          @click="toggleTableChat"
+        >
+          <PixelIcon name="message" variant="large" />
+        </Button>
+      </template>
+      <template #widget-table_dice>
+        <Button
+          variant="default"
+          :class="{ active: isTableDiceOpen }"
+          :title="isTableDiceOpen ? 'Скрыть кости' : 'Кости'"
+          @click="toggleTableDice"
+        >
+          <PixelIcon name="dice" variant="large" />
+        </Button>
+      </template>
+      <template #widget-table_stream>
+        <Button
+          variant="default"
+          :class="{ active: isTableStreamOpen }"
+          :title="
+            isTableStreamOpen ? 'Скрыть стрим ведущего' : 'Стрим ведущего'
+          "
+          @click="toggleTableStream"
+        >
+          <PixelIcon name="screen-on" variant="large" />
+        </Button>
+      </template>
+      <template #widget-soundbar>
+        <Button
+          variant="default"
+          :class="{ active: isSoundBarPanelOpen }"
+          :title="
+            isSoundBarPanelOpen
+              ? 'Скрыть звуки организации'
+              : 'Звуки организации'
+          "
+          @click="isSoundBarPanelOpen = !isSoundBarPanelOpen"
+        >
+          <PixelIcon name="notes" variant="large" />
+        </Button>
+      </template>
+      <template #widget-settings>
         <Button
           v-if="settingsInCallMenu"
           variant="default"
@@ -400,6 +577,32 @@
         </Button>
       </template>
     </CallMenu>
+
+    <Teleport to="body">
+      <div
+        v-if="collaborationEnabled && isWhiteboardOpen && whiteboardFullscreen"
+        class="room-fullscreen"
+        role="dialog"
+        aria-label="Совместная доска"
+      >
+        <Button
+          variant="default"
+          size="small"
+          class="room-fullscreen__close"
+          title="Закрыть доску"
+          aria-label="Закрыть доску"
+          @click="toggleWhiteboard"
+        >
+          <PixelIcon name="close" variant="large" />
+        </Button>
+        <div class="room-fullscreen__editor">
+          <CollaborativeWhiteboardShell
+            :participant-color="participantColorForDocument"
+            :room-id="props.room?.id ?? null"
+          />
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div
@@ -493,6 +696,10 @@
           />
         </div>
         <CallMenu
+          display-room-type="conference_hall"
+          :room-id="props.room?.id ?? null"
+          :enabled-widget-ids="[]"
+          storage-suffix="fullscreen"
           menu-class="room-fullscreen__menu"
           @disconnect="handleDisconnect"
         >
@@ -675,12 +882,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, toRef } from "vue";
+import { ref, computed, watch, nextTick, toRef, provide } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
 import { SoundBar } from "@features/sound-bar";
+import {
+  MEET_ROOM_COLLABORATION_KEY,
+  useMeetRoomYCollaboration,
+} from "@features/room-collaboration";
+import { CollaborativeDocument } from "@widgets/collaborative-document";
+import { CollaborativeWhiteboardShell } from "@widgets/collaborative-whiteboard";
+import TableCirclePublicChat from "@widgets/room-table-circle/ui/TableCirclePublicChat.vue";
+import TableCirclePublicTable from "@widgets/room-table-circle/ui/TableCirclePublicTable.vue";
 import {
   useParticipantReplica,
   ReplicaInput,
@@ -698,6 +913,7 @@ import { VideoParticipant } from "@widgets/video-participant";
 import { RoomParticipantsList } from "@widgets/room-participants-list";
 import type { RoomParticipantListItem } from "@widgets/room-participants-list";
 import { CallMenu } from "@widgets/call-menu";
+import type { CallWidgetId } from "@features/call-widgets";
 import ParticipantsTrigger from "./ParticipantsTrigger.vue";
 import {
   getAuthState,
@@ -713,6 +929,7 @@ import {
   setReplicaTtsEnabled,
   speakReplicaTextWithVoice,
   parseParticipantColorFromMetadata,
+  DEFAULT_PARTICIPANT_COLOR,
   getStoredDefaultVideoQuality,
   setStoredDefaultVideoQuality,
   type VideoQualityLevel,
@@ -722,6 +939,10 @@ import {
   resetFullscreenPipGateLog,
   logFullscreenPip,
   toggleOutputMuted,
+  readTableChatOpenForRoom,
+  writeTableChatOpenForRoom,
+  readTableDiceOpenForRoom,
+  writeTableDiceOpenForRoom,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity, RoomApi } from "@shared/entities";
@@ -731,8 +952,6 @@ import type {
   RemoteParticipant,
   LocalParticipant,
 } from "livekit-client";
-
-const showOrganizationSoundBar = import.meta.env.VITE_APP === "rooms";
 
 const props = defineProps<{
   room: RoomEntity | null;
@@ -756,6 +975,19 @@ const emit = defineEmits<{
   "update:participantName": [name: string];
   "update:participants": [RoomParticipantListItem[]];
 }>();
+
+const enabledConferenceCallWidgets = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [
+    "document",
+    "whiteboard",
+    "table_chat",
+    "table_dice",
+    "table_stream",
+    "soundbar",
+  ];
+  if (props.settingsInCallMenu) ids.push("settings");
+  return ids;
+});
 
 defineExpose({
   openCallSettings: handleSettings,
@@ -911,23 +1143,139 @@ watch(
   { immediate: true },
 );
 
-// Обработка изменения метаданных участников (включая имя)
+const participantColorForDocument = computed(() => {
+  const c = getAuthState()?.user?.color;
+  if (c && c.trim() !== "") return c;
+  return DEFAULT_PARTICIPANT_COLOR;
+});
+
+const collaborationEnabled = computed(() =>
+  Boolean(props.room?.id && props.apiBaseURL),
+);
+
+const meetCollab = useMeetRoomYCollaboration({
+  room: toRef(props, "room"),
+  apiBaseURL: toRef(props, "apiBaseURL"),
+  userId: toRef(props, "participantName"),
+  userName: toRef(props, "participantName"),
+  userColor: participantColorForDocument,
+  enabled: collaborationEnabled,
+});
+
+provide(MEET_ROOM_COLLABORATION_KEY, meetCollab);
+
+const WB_ROOM_OPEN_PREFIX = "nonza_meet_wb_open_";
+
+function readStoredWhiteboardOpen(roomId: string | undefined): boolean {
+  if (!roomId) return false;
+  try {
+    return localStorage.getItem(WB_ROOM_OPEN_PREFIX + roomId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredWhiteboardOpen(roomId: string | undefined, open: boolean) {
+  if (!roomId) return;
+  try {
+    localStorage.setItem(WB_ROOM_OPEN_PREFIX + roomId, open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+const isDocumentOpen = ref(false);
+function toggleDocument() {
+  isDocumentOpen.value = !isDocumentOpen.value;
+}
+
+const isWhiteboardOpen = ref(false);
+
 watch(
-  () => props.livekitRoom,
-  (room) => {
-    if (!room) return;
-
-    const handleMetadataChanged = () => {
-      conferenceHall.updateParticipants();
-    };
-
-    room.on(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
-
-    return () => {
-      room.off(RoomEvent.ParticipantMetadataChanged, handleMetadataChanged);
-    };
+  () => [props.room?.id, collaborationEnabled.value] as const,
+  ([id, collab]) => {
+    if (!id || !collab) return;
+    isWhiteboardOpen.value = readStoredWhiteboardOpen(id);
   },
   { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isWhiteboardOpen.value] as const,
+  () => {
+    writeStoredWhiteboardOpen(props.room?.id, isWhiteboardOpen.value);
+  },
+);
+
+function toggleWhiteboard() {
+  isWhiteboardOpen.value = !isWhiteboardOpen.value;
+}
+
+const WB_FULLSCREEN_KEY = "nonza_settings_wb_fullscreen";
+
+function readWbFullscreen(): boolean {
+  try {
+    const v = localStorage.getItem(WB_FULLSCREEN_KEY);
+    if (v === null) return false;
+    return v === "1";
+  } catch {
+    return false;
+  }
+}
+
+const whiteboardFullscreen = ref(readWbFullscreen());
+
+const isTableChatOpen = ref(false);
+function toggleTableChat() {
+  isTableChatOpen.value = !isTableChatOpen.value;
+}
+
+const isTableDiceOpen = ref(false);
+function toggleTableDice() {
+  isTableDiceOpen.value = !isTableDiceOpen.value;
+}
+
+const isTableStreamOpen = ref(false);
+function toggleTableStream() {
+  isTableStreamOpen.value = !isTableStreamOpen.value;
+}
+
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      isTableChatOpen.value = false;
+      isTableDiceOpen.value = false;
+      return;
+    }
+    isTableChatOpen.value = readTableChatOpenForRoom(id);
+    isTableDiceOpen.value = readTableDiceOpenForRoom(id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isTableChatOpen.value] as const,
+  () => {
+    writeTableChatOpenForRoom(props.room?.id, isTableChatOpen.value);
+  },
+);
+
+watch(
+  () => [props.room?.id, isTableDiceOpen.value] as const,
+  () => {
+    writeTableDiceOpenForRoom(props.room?.id, isTableDiceOpen.value);
+  },
+);
+
+const extrasCollabVisible = computed(
+  () =>
+    (collaborationEnabled.value &&
+      (isDocumentOpen.value ||
+        (isWhiteboardOpen.value && !whiteboardFullscreen.value))) ||
+    isTableChatOpen.value ||
+    isTableDiceOpen.value ||
+    isTableStreamOpen.value,
 );
 
 const leaderParticipant = computed(() => {
@@ -1267,6 +1615,7 @@ const handleTransferLeadership = (participantIdentity: string) => {
 
 const isSettingsOpen = ref(false);
 const showParticipantsPanel = ref(false);
+const isSoundBarPanelOpen = ref(false);
 const audioSettingsRef = ref<ComponentPublicInstance | null>(null);
 const initialParticipantName = ref(props.participantName);
 const settingsParticipantName = ref(props.participantName);
@@ -1323,6 +1672,45 @@ function handleSettings() {
     (audioSettingsRef.value as any).resetSettings();
   }
   isSettingsOpen.value = true;
+}
+
+const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [];
+  if (isDocumentOpen.value) ids.push("document");
+  if (isWhiteboardOpen.value) ids.push("whiteboard");
+  if (isTableChatOpen.value) ids.push("table_chat");
+  if (isTableDiceOpen.value) ids.push("table_dice");
+  if (isTableStreamOpen.value) ids.push("table_stream");
+  if (isSoundBarPanelOpen.value) ids.push("soundbar");
+  return ids;
+});
+
+function activateCallWidgetFromMenu(id: CallWidgetId): void {
+  switch (id) {
+    case "document":
+      toggleDocument();
+      break;
+    case "whiteboard":
+      toggleWhiteboard();
+      break;
+    case "table_chat":
+      toggleTableChat();
+      break;
+    case "table_dice":
+      toggleTableDice();
+      break;
+    case "table_stream":
+      toggleTableStream();
+      break;
+    case "soundbar":
+      isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      break;
+    case "settings":
+      handleSettings();
+      break;
+    default:
+      break;
+  }
 }
 
 async function handleSaveSettings() {
@@ -1441,6 +1829,62 @@ function handleModalClose() {
   font-size: 1.5rem;
   font-weight: 400;
   letter-spacing: 0.02em;
+}
+
+.conference-hall__sound-collab {
+  flex-shrink: 0;
+  max-height: min(42vh, 400px);
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.conference-hall__extras {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(52vh, 520px);
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.conference-hall__extra {
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.conference-hall__extra--document {
+  min-height: 280px;
+}
+
+.conference-hall__extra--whiteboard {
+  min-height: 240px;
+}
+
+.conference-hall__extra--chat,
+.conference-hall__extra--dice {
+  min-height: 260px;
+}
+
+.conference-hall__extra--stream {
+  min-height: 200px;
+}
+
+.conference-hall__stream-video {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+}
+
+.conference-hall__stream-placeholder {
+  padding: 20px;
+  text-align: center;
+  font-size: 14px;
 }
 
 .conference-hall__content {

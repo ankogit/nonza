@@ -133,6 +133,18 @@ const emit = defineEmits<{
   background-color: #222222;
 }
 
+.button.default.active {
+  background: #2980b9;
+}
+
+.button.default.active:hover:not(.button--disabled) {
+  background-color: #3a91c9;
+}
+
+.button.default.active:active:not(.button--disabled) {
+  background-color: #1f6fa0;
+}
+
 .button.active {
   background: #2980b9;
 }

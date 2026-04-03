@@ -1,5 +1,5 @@
 <template>
-  <div class="public-table">
+  <div class="public-table meet-scroll">
     <div class="public-table__controls">
       <div class="public-table__roll-row">
         <input

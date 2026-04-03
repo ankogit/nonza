@@ -1,6 +1,6 @@
 <template>
   <div class="public-chat">
-    <div ref="listEl" class="public-chat__list">
+    <div ref="listEl" class="public-chat__list meet-scroll">
       <div
         v-if="messages.length === 0"
         class="public-chat__empty color-white-60"

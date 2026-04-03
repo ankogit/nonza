@@ -30,3 +30,4 @@ export * from "./Toast";
 export * from "./DiceRoller";
 export * from "./Knob";
 export * from "./ParticipantColorPalette";
+export * from "./MeetCollabPanel";

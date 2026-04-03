@@ -114,6 +114,10 @@ async function submit() {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .login-screen__logo-circle {
@@ -131,6 +135,9 @@ async function submit() {
 
 .login-screen__card {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: #2a2a2a;
   border: 2px solid #444;
   padding: 24px;
@@ -141,13 +148,42 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
 }
 
 .login-screen__actions {
   display: flex;
+  flex-flow: row wrap;
   gap: 12px;
   justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
   padding-top: 16px;
   border-top: 2px solid #444;
+}
+
+.login-screen__actions :deep(.button--text) {
+  max-width: 100%;
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 480px) {
+  .login-screen__card {
+    padding: 16px;
+  }
+
+  .login-screen__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .login-screen__actions :deep(.button--text) {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>
