@@ -410,7 +410,7 @@
     </div>
 
     <div
-      v-if="isSoundBarPanelOpen"
+      v-show="isSoundBarPanelOpen"
       class="conference-hall__sound-collab"
       aria-label="Звуки организации"
     >
@@ -943,6 +943,8 @@ import {
   writeTableChatOpenForRoom,
   readTableDiceOpenForRoom,
   writeTableDiceOpenForRoom,
+  readSoundBarPanelOpenForRoom,
+  writeSoundBarPanelOpenForRoom,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity, RoomApi } from "@shared/entities";
@@ -1616,6 +1618,34 @@ const handleTransferLeadership = (participantIdentity: string) => {
 const isSettingsOpen = ref(false);
 const showParticipantsPanel = ref(false);
 const isSoundBarPanelOpen = ref(false);
+
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      isSoundBarPanelOpen.value = false;
+      return;
+    }
+    isSoundBarPanelOpen.value = readSoundBarPanelOpenForRoom(
+      "conference_hall",
+      id,
+    );
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isSoundBarPanelOpen.value] as const,
+  ([id]) => {
+    if (!id) return;
+    writeSoundBarPanelOpenForRoom(
+      "conference_hall",
+      id,
+      isSoundBarPanelOpen.value,
+    );
+  },
+);
+
 const audioSettingsRef = ref<ComponentPublicInstance | null>(null);
 const initialParticipantName = ref(props.participantName);
 const settingsParticipantName = ref(props.participantName);

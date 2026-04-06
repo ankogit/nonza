@@ -136,7 +136,7 @@
           </MeetCollabPanel>
         </div>
         <div
-          v-if="isSoundBarOpen"
+          v-show="isSoundBarOpen"
           class="round-table-soundbar"
           aria-label="Звуки организации"
         >
@@ -863,6 +863,8 @@ import {
   writeTableChatOpenForRoom,
   readTableDiceOpenForRoom,
   writeTableDiceOpenForRoom,
+  readSoundBarPanelOpenForRoom,
+  writeSoundBarPanelOpenForRoom,
 } from "@shared/lib";
 import type { ComponentPublicInstance } from "vue";
 import type { Room as RoomEntity } from "@shared/entities";
@@ -1065,6 +1067,27 @@ watch(
 );
 
 const isSoundBarOpen = ref(false);
+
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      isSoundBarOpen.value = false;
+      return;
+    }
+    isSoundBarOpen.value = readSoundBarPanelOpenForRoom("round_table", id);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isSoundBarOpen.value] as const,
+  ([id]) => {
+    if (!id) return;
+    writeSoundBarPanelOpenForRoom("round_table", id, isSoundBarOpen.value);
+  },
+);
+
 function toggleSoundBar() {
   isSoundBarOpen.value = !isSoundBarOpen.value;
 }

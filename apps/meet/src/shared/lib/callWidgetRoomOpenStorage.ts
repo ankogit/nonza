@@ -1,8 +1,40 @@
+import type { DisplayRoomType } from "./room-type";
+
+const SOUNDBAR_PANEL_PREFIX = "nonza_meet_soundbar_panel_";
 const TABLE_CHAT_OPEN_PREFIX = "nonza_meet_table_chat_open_";
 const TABLE_DICE_OPEN_PREFIX = "nonza_meet_table_dice_open_";
 const TABLE_CIRCLE_CENTER_PREFIX = "nonza_meet_table_circle_center_";
 
 export type TableCircleCenterMode = "chat" | "dice" | "stream";
+
+function soundBarPanelKey(roomType: DisplayRoomType, roomId: string): string {
+  return `${SOUNDBAR_PANEL_PREFIX}${roomType}_${roomId}`;
+}
+
+export function readSoundBarPanelOpenForRoom(
+  roomType: DisplayRoomType,
+  roomId: string | undefined | null,
+): boolean {
+  if (!roomId) return false;
+  try {
+    return localStorage.getItem(soundBarPanelKey(roomType, roomId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeSoundBarPanelOpenForRoom(
+  roomType: DisplayRoomType,
+  roomId: string | undefined | null,
+  open: boolean,
+): void {
+  if (!roomId) return;
+  try {
+    localStorage.setItem(soundBarPanelKey(roomType, roomId), open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 export function readTableChatOpenForRoom(
   roomId: string | undefined | null,

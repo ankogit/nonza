@@ -81,7 +81,7 @@
           </div>
 
           <div
-            v-if="isSoundBarPanelOpen"
+            v-show="isSoundBarPanelOpen"
             class="table-circle__sound-panel"
             aria-label="Звуки организации"
           >
@@ -446,6 +446,8 @@ import {
   getAuthState,
   readTableCircleCenterForRoom,
   writeTableCircleCenterForRoom,
+  readSoundBarPanelOpenForRoom,
+  writeSoundBarPanelOpenForRoom,
 } from "@shared/lib";
 
 import type { RoomApi } from "@shared/entities";
@@ -507,6 +509,33 @@ const remoteParticipants = computed<RemoteParticipant[]>(() => {
 });
 
 const isSoundBarPanelOpen = ref(false);
+
+watch(
+  () => props.room?.id,
+  (id) => {
+    if (!id) {
+      isSoundBarPanelOpen.value = false;
+      return;
+    }
+    isSoundBarPanelOpen.value = readSoundBarPanelOpenForRoom(
+      "table_circle",
+      id,
+    );
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.room?.id, isSoundBarPanelOpen.value] as const,
+  ([id]) => {
+    if (!id) return;
+    writeSoundBarPanelOpenForRoom(
+      "table_circle",
+      id,
+      isSoundBarPanelOpen.value,
+    );
+  },
+);
 
 const participantColorForDocument = computed(() => {
   const c = getAuthState()?.user?.color;
