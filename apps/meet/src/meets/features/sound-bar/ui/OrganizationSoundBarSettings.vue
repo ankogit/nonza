@@ -178,6 +178,11 @@ function onListPointerDown(s: OrganizationSound, ev: PointerEvent) {
     sessionId,
     audioUrl: s.audioUrl,
     loopEnabled: s.loopEnabled,
+    gateEnabled: s.gateEnabled,
+    sessionVolume: Math.max(0, Math.min(1, Number(s.volume) / 100)),
+    playbackSpeed: Math.max(0.25, Math.min(4, Number(s.speed) / 100)),
+    reverse: false,
+    pendulum: false,
   });
 }
 
@@ -210,6 +215,11 @@ function onListClick(s: OrganizationSound) {
       sessionId,
       audioUrl: s.audioUrl,
       loopEnabled: true,
+      gateEnabled: false,
+      sessionVolume: Math.max(0, Math.min(1, Number(s.volume) / 100)),
+      playbackSpeed: Math.max(0.25, Math.min(4, Number(s.speed) / 100)),
+      reverse: false,
+      pendulum: false,
     });
     return;
   }
@@ -217,6 +227,11 @@ function onListClick(s: OrganizationSound) {
     sessionId: createSessionId(),
     audioUrl: s.audioUrl,
     loopEnabled: false,
+    gateEnabled: false,
+    sessionVolume: Math.max(0, Math.min(1, Number(s.volume) / 100)),
+    playbackSpeed: Math.max(0.25, Math.min(4, Number(s.speed) / 100)),
+    reverse: false,
+    pendulum: false,
   });
 }
 </script>

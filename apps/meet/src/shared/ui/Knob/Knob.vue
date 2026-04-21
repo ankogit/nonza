@@ -1,12 +1,12 @@
 <template>
-  <div class="knob-control">
+  <div class="knob-control" :class="{ 'knob-control--compact': compact }">
     <div
       class="knob-control__wrap"
       :class="[
         `knob-control__wrap--${color}`,
         { 'knob-control__wrap--active': dragging },
       ]"
-      :style="{ width: `${size}px`, height: `${size}px` }"
+      :style="{ width: `${displaySize}px`, height: `${displaySize}px` }"
       @pointerdown="startDrag"
     >
       <div class="knob-control__body" :style="{ transform: `rotate(${rotationDeg}deg)` }">
@@ -46,6 +46,8 @@ const props = withDefaults(
     label?: string;
     formatValue?: (value: number) => string;
     color?: "blue" | "orange" | "red";
+    /** Smaller diameter, thinner rim and handle */
+    compact?: boolean;
   }>(),
   {
     step: 1,
@@ -54,7 +56,16 @@ const props = withDefaults(
     label: "",
     formatValue: undefined,
     color: "blue",
+    compact: false,
   },
+);
+
+const displaySize = computed(() =>
+  props.compact ? Math.min(props.size, 32) : props.size,
+);
+
+const sweepDeg = computed(() =>
+  props.compact ? Math.min(props.bufferSize, 260) : props.bufferSize,
 );
 
 const emit = defineEmits<{
@@ -77,7 +88,7 @@ const normalized = computed(() => {
 });
 
 const rotationDeg = computed(
-  () => normalized.value * props.bufferSize - props.bufferSize / 2,
+  () => normalized.value * sweepDeg.value - sweepDeg.value / 2,
 );
 
 const displayValue = computed(() => {
@@ -172,6 +183,22 @@ function startDrag(e: PointerEvent) {
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.knob-control--compact .knob-control__wrap {
+  border-width: 2px;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.knob-control--compact .knob-control__handle {
+  width: 4px;
+  height: 11px;
+  top: -2px;
+}
+
+.knob-control--compact .knob-control__label,
+.knob-control--compact .knob-control__value {
+  font-size: 10px;
 }
 
 .knob-control__wrap {

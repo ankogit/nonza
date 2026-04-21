@@ -14,7 +14,10 @@ import {
   triggerSoundBarEmojiLoopIntro,
   triggerSoundBarEmojiLoopPulse,
 } from "@shared/lib";
-import type { SoundBarActionMessage } from "../model/types";
+import type {
+  SoundBarActionMessage,
+  SoundBarActionStartPayload,
+} from "../model/types";
 
 const DATA_TOPIC = "sound_bar";
 
@@ -46,36 +49,65 @@ function removeSessionBySessionId(sessionId: string) {
   if (changed) sharedSessionByEmoji.value = next;
 }
 
+function clampSessionVolume(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.max(0, Math.min(1, n));
+}
+
+function clampPlaybackSpeed(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.max(0.25, Math.min(4, n));
+}
+
 async function handleAction(
   payload: SoundBarActionMessage["payload"],
   opts?: { onPlaybackEnded?: () => void },
 ) {
   if (payload.action === "start") {
-    const { emoji, sessionId, gateEnabled, loopEnabled } = payload;
-    let clipDurationSec = 2.5;
+    const {
+      emoji,
+      sessionId,
+      gateEnabled,
+      loopEnabled,
+      audioUrl,
+      sessionVolume,
+      playbackSpeed,
+      reverse,
+      pendulum,
+    } = payload;
+    let clipLapSec = 2.5;
 
     await startSoundBarSession({
       sessionId,
-      audioUrl: payload.audioUrl,
+      audioUrl,
       loopEnabled,
+      gateEnabled,
+      sessionVolume,
+      playbackSpeed,
+      reverse,
+      pendulum,
       onEnded: opts?.onPlaybackEnded,
       onGateNonLoopClipEnded:
-        gateEnabled && !loopEnabled
+        gateEnabled && !loopEnabled && !pendulum
           ? () => stopSoundBarEmojiGate(sessionId)
           : undefined,
-      onPlaybackReady: ({ durationSec }) => {
-        clipDurationSec = durationSec;
+      onPlaybackReady: ({ heardLapSec, heardTotalOnceSec }) => {
+        clipLapSec = heardLapSec;
         if (gateEnabled) {
-          startSoundBarEmojiGate(sessionId, emoji, durationSec);
+          startSoundBarEmojiGate(
+            sessionId,
+            emoji,
+            loopEnabled ? heardLapSec : heardTotalOnceSec,
+          );
         } else if (loopEnabled) {
-          triggerSoundBarEmojiLoopIntro(emoji, durationSec);
+          triggerSoundBarEmojiLoopIntro(emoji, heardLapSec);
         } else {
-          triggerSoundBarEmojiBurst(emoji, durationSec);
+          triggerSoundBarEmojiBurst(emoji, heardTotalOnceSec);
         }
       },
       onLoopTick:
         loopEnabled && !gateEnabled
-          ? () => triggerSoundBarEmojiLoopPulse(emoji, clipDurationSec)
+          ? () => triggerSoundBarEmojiLoopPulse(emoji, clipLapSec)
           : undefined,
     });
     return;
@@ -110,9 +142,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
       return;
     }
 
-    const p = parsed.payload as
-      | Partial<SoundBarActionMessage["payload"]>
-      | undefined;
+    const p = parsed.payload as Record<string, unknown> | undefined;
 
     if (!p?.action || (p.action !== "start" && p.action !== "stop")) return;
     if (!p?.sessionId || typeof p.sessionId !== "string") return;
@@ -131,6 +161,16 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
     const emoji = p.emoji as string;
     const sessionId = p.sessionId;
 
+    const loopEnabled = Boolean(p.loopEnabled);
+    const gateEnabled = Boolean(p.gateEnabled);
+    const sessionVolume = clampSessionVolume(p.sessionVolume);
+    const playbackSpeed = clampPlaybackSpeed(p.playbackSpeed);
+    const pendulum = typeof p.pendulum === "boolean" ? p.pendulum : false;
+    let reverse = typeof p.reverse === "boolean" ? p.reverse : false;
+    if (pendulum) {
+      reverse = false;
+    }
+
     if (p.action === "start") {
       sharedSessionByEmoji.value = {
         ...sharedSessionByEmoji.value,
@@ -138,17 +178,37 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
       };
     }
 
+    const startPayload: SoundBarActionStartPayload | null =
+      p.action === "start"
+        ? {
+            action: "start",
+            sessionId,
+            senderIdentity: p.senderIdentity as string,
+            emoji,
+            audioUrl,
+            loopEnabled,
+            gateEnabled,
+            sessionVolume,
+            playbackSpeed,
+            reverse,
+            pendulum,
+            ts: p.ts as number,
+          }
+        : null;
+
     void handleAction(
-      {
-        action: p.action,
-        sessionId,
-        senderIdentity: p.senderIdentity,
-        emoji,
-        audioUrl,
-        loopEnabled: p.loopEnabled,
-        gateEnabled: p.gateEnabled,
-        ts: p.ts,
-      },
+      p.action === "start" && startPayload
+        ? startPayload
+        : {
+            action: "stop",
+            sessionId,
+            senderIdentity: p.senderIdentity as string,
+            emoji: "",
+            audioUrl: "",
+            loopEnabled: false,
+            gateEnabled: false,
+            ts: p.ts as number,
+          },
       p.action === "start"
         ? {
             onPlaybackEnded: () => {
@@ -190,6 +250,19 @@ function acquireSoundBarRoomListener(room: LiveKitRoom): () => void {
     }
   };
 }
+
+export type SoundBarStartBroadcastParams = {
+  sessionId: string;
+  emoji: string;
+  audioUrl: string;
+  loopEnabled: boolean;
+  gateEnabled: boolean;
+  sessionVolume: number;
+  playbackSpeed: number;
+  reverse: boolean;
+  pendulum: boolean;
+  onLocalPlaybackEnded?: () => void;
+};
 
 export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
   let releaseListener: (() => void) | null = null;
@@ -233,26 +306,26 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
     releaseListener = null;
   });
 
-  async function startAndBroadcast(params: {
-    sessionId: string;
-    emoji: string;
-    audioUrl: string;
-    loopEnabled: boolean;
-    gateEnabled: boolean;
-    onLocalPlaybackEnded?: () => void;
-  }) {
+  async function startAndBroadcast(params: SoundBarStartBroadcastParams) {
     const room = livekitRoom();
     const local = room?.localParticipant;
     if (!room || !local) return;
 
-    const payload: SoundBarActionMessage["payload"] = {
+    const loopEnabled = params.loopEnabled;
+    const pendulum = params.pendulum;
+
+    const payload: SoundBarActionStartPayload = {
       action: "start",
       sessionId: params.sessionId,
       senderIdentity: local.identity,
       emoji: params.emoji,
       audioUrl: params.audioUrl,
-      loopEnabled: params.loopEnabled,
+      loopEnabled,
       gateEnabled: params.gateEnabled,
+      sessionVolume: params.sessionVolume,
+      playbackSpeed: params.playbackSpeed,
+      reverse: params.reverse,
+      pendulum,
       ts: Date.now(),
     };
 

@@ -1106,6 +1106,8 @@ const roomGroupApi = new RoomGroupApi(apiClient);
 const organizationApi = new OrganizationApi(apiClient);
 const inviteApi = new InviteApi(apiClient);
 
+let orgScreenAlive = false;
+
 const org = ref<Organization | null>(null);
 const orgLoadError = ref<"not_found" | "forbidden" | null>(null);
 const rooms = ref<RoomWithParticipants[]>([]);
@@ -1974,9 +1976,13 @@ function handleCallSettingsModalClose() {
 
 async function loadOrg() {
   orgLoadError.value = null;
+  const orgIdSnapshot = props.orgId;
   try {
-    org.value = await organizationApi.getById(props.orgId);
+    const loaded = await organizationApi.getById(orgIdSnapshot);
+    if (!orgScreenAlive || props.orgId !== orgIdSnapshot) return;
+    org.value = loaded;
   } catch (e) {
+    if (!orgScreenAlive || props.orgId !== orgIdSnapshot) return;
     console.error("Failed to load org:", e);
     const msg = e instanceof Error ? e.message : String(e);
     orgLoadError.value = /403|forbidden|доступ/i.test(msg)
@@ -1988,13 +1994,15 @@ async function loadOrg() {
 async function loadRooms() {
   loading.value = true;
   loadCollapsedState();
+  const orgIdSnapshot = props.orgId;
   try {
     const [roomsList, groupsList] = await Promise.all([
-      roomApi.listByOrganizationId(props.orgId, {
+      roomApi.listByOrganizationId(orgIdSnapshot, {
         include: "participants",
       }),
-      roomGroupApi.listByOrganizationId(props.orgId),
+      roomGroupApi.listByOrganizationId(orgIdSnapshot),
     ]);
+    if (!orgScreenAlive || props.orgId !== orgIdSnapshot) return;
     rooms.value = roomsList;
     roomGroups.value = groupsList;
   } catch (e) {
@@ -2034,12 +2042,15 @@ function displayMemberId(userId: string): string {
 }
 
 function refreshRoomsParticipants() {
+  const orgIdSnapshot = props.orgId;
+  if (!orgIdSnapshot) return;
   roomApi
-    .listByOrganizationId(props.orgId, {
+    .listByOrganizationId(orgIdSnapshot, {
       include: "participants",
       skipNetworkErrorHook: true,
     })
     .then((list) => {
+      if (!orgScreenAlive || props.orgId !== orgIdSnapshot) return;
       rooms.value = list.map((r) => ({
         ...r,
         participants: r.participants ? [...r.participants] : [],
@@ -2083,7 +2094,7 @@ let orgWs: WebSocket | null = null;
 let orgWsSubscribedOrgId: string | null = null;
 
 function connectOrgWs() {
-  if (!props.orgId) return;
+  if (!orgScreenAlive || !props.orgId) return;
   orgWsSubscribedOrgId = props.orgId;
   const url = `${getOrgWsUrl()}?org_id=${encodeURIComponent(props.orgId)}&user_id=${encodeURIComponent(getPresenceUserId())}`;
   console.log("[org-ws] connect", url);
@@ -2093,6 +2104,7 @@ function connectOrgWs() {
     orgWsOpen.value = true;
   };
   orgWs.onmessage = (event) => {
+    if (!orgScreenAlive) return;
     const raw = typeof event.data === "string" ? event.data : "";
     const lines = raw
       .split("\n")
@@ -2110,6 +2122,7 @@ function connectOrgWs() {
           loadMembers();
         } else if (msg?.type === "organization_changed") {
           loadOrg().then(() => {
+            if (!orgScreenAlive) return;
             if (org.value) orgStore.updateOrganization(org.value);
           });
         } else if (
@@ -2160,7 +2173,11 @@ function connectOrgWs() {
     if (orgWsSubscribedOrgId) {
       const orgId = orgWsSubscribedOrgId;
       setTimeout(() => {
-        if (orgWsSubscribedOrgId === orgId && !orgWs) {
+        if (
+          orgScreenAlive &&
+          orgWsSubscribedOrgId === orgId &&
+          !orgWs
+        ) {
           console.log("[org-ws] reconnecting…");
           connectOrgWs();
         }
@@ -2436,6 +2453,7 @@ let mobileQuery: MediaQueryList | null = null;
 let mobileQueryHandler: ((e: MediaQueryListEvent) => void) | null = null;
 
 onMounted(async () => {
+  orgScreenAlive = true;
   mobileQuery = window.matchMedia("(max-width: 1000px)");
   isMobile.value = mobileQuery.matches;
   mobileQueryHandler = (e: MediaQueryListEvent) => {
@@ -2462,6 +2480,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  orgScreenAlive = false;
   if (mobileQuery && mobileQueryHandler) {
     mobileQuery.removeEventListener("change", mobileQueryHandler);
   }
