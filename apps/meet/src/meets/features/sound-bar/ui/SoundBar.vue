@@ -222,12 +222,6 @@ const panelReverse = ref(false);
 const panelPendulum = ref(false);
 const clipSpeedPct = ref(100);
 
-const selectedSoundEmoji = computed(() => {
-  const id = selectedSoundId.value;
-  if (!id) return "";
-  return sounds.value.find((s) => s.id === id)?.emoji ?? "";
-});
-
 function formatClipSpeed(v: number): string {
   return `${Math.round(v)}%`;
 }
