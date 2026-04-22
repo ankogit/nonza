@@ -3,6 +3,7 @@ import {
   getStoredAudioOutputDevice,
 } from "./audio-devices";
 import { getOutputMuted } from "./output-mute";
+import { stopSoundBarEmojiGate } from "./soundBarEmojiParticles";
 import { subscribeSoundBarVolume } from "./soundBarVolume";
 
 type SessionId = string;
@@ -106,6 +107,7 @@ function removeSessionHandle(sessionId: SessionId): void {
 }
 
 function cleanupSession(sessionId: SessionId): void {
+  stopSoundBarEmojiGate(sessionId);
   gatePendReleaseBySessionId.delete(sessionId);
   clearPlaybackReadyFallback(sessionId);
 
@@ -445,6 +447,82 @@ async function startWebAudioSoundBarSession(
 
   fireReady(sessionId, baseSec, speed, pendulum && !gateEnabled, onPlaybackReady);
 
+  if (gateEnabled && pendulum && reverse && reverseBuf) {
+    let reverseExhausted = false;
+    let userReleased = false;
+    const t0 = ctx.currentTime;
+
+    let tailStarted = false;
+
+    /** After reverse hold: play **forward** from stop position to end (not more reverse buffer). */
+    function playForwardTailAfterReverseHold(playedRevSec: number): void {
+      if (stopped || tailStarted) return;
+      tailStarted = true;
+      const played = Math.min(D, Math.max(0, playedRevSec));
+      if (played < 0.02) {
+        cleanupSession(sessionId);
+        return;
+      }
+      const offFwd = D - played;
+      const durFwd = played;
+      if (durFwd < 0.02) {
+        cleanupSession(sessionId);
+        return;
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = forward;
+      applyPlaybackRate(src, speed);
+      src.connect(gainNode);
+      currentSource = src;
+      src.onended = () => {
+        if (currentSource === src) currentSource = null;
+        if (!stopped) cleanupSession(sessionId);
+      };
+      try {
+        src.start(0, offFwd, durFwd);
+      } catch {
+        cleanupSession(sessionId);
+      }
+    }
+
+    gatePendReleaseBySessionId.set(sessionId, () => {
+      if (stopped) return;
+      if (userReleased) {
+        cleanupSession(sessionId);
+        return;
+      }
+      userReleased = true;
+      try {
+        currentSource?.stop(0);
+      } catch {
+        /* ignore */
+      }
+      currentSource = null;
+      const playedWall = ctx.currentTime - t0;
+      const playedRev = reverseExhausted
+        ? D
+        : Math.min(D, Math.max(0, playedWall * speed));
+      playForwardTailAfterReverseHold(playedRev);
+    });
+
+    const rev = ctx.createBufferSource();
+    rev.buffer = reverseBuf;
+    applyPlaybackRate(rev, speed);
+    rev.connect(gainNode);
+    currentSource = rev;
+    rev.onended = () => {
+      if (currentSource === rev) currentSource = null;
+      reverseExhausted = true;
+    };
+    try {
+      rev.start(0);
+    } catch {
+      gatePendReleaseBySessionId.delete(sessionId);
+      cleanupSession(sessionId);
+    }
+    return;
+  }
+
   if (gateEnabled && pendulum) {
     let forwardExhausted = false;
     let userReleased = false;
@@ -516,7 +594,7 @@ async function startWebAudioSoundBarSession(
     return;
   }
 
-  if (gateEnabled && reverse && reverseBuf) {
+  if (gateEnabled && reverse && reverseBuf && !pendulum) {
     playBufferOnce(reverseBuf, () => {}, true);
     return;
   }
@@ -566,7 +644,8 @@ export async function startSoundBarSession(
 
   if (activeBySessionId.has(sessionId)) cleanupSession(sessionId);
 
-  const reverseEff = Boolean(reverse) && !pendulum;
+  const gateEnabled = Boolean(params.gateEnabled);
+  const reverseEff = Boolean(reverse) && (!pendulum || gateEnabled);
   const merged: SoundBarPlaybackStartParams = {
     ...params,
     reverse: reverseEff,

@@ -74,7 +74,7 @@
               </Switch>
               <Switch
                 :model-value="panelReverse"
-                :disabled="panelPendulum"
+                :disabled="panelPendulum && !panelGate"
                 aria-label="Реверс"
                 @update:model-value="setPanelReverse"
               >
@@ -127,11 +127,13 @@
             >
               <span class="sound-bar__tile-emoji">{{ s.emoji }}</span>
               <div
-                v-if="s.loopEnabled || s.gateEnabled"
+                v-if="tilePlaybackFlags(s).any"
                 class="sound-bar__tile-badges"
               >
-                <span v-if="s.loopEnabled" class="sound-bar__badge">L</span>
-                <span v-if="s.gateEnabled" class="sound-bar__badge">G</span>
+                <span v-if="tilePlaybackFlags(s).loop" class="sound-bar__badge">L</span>
+                <span v-if="tilePlaybackFlags(s).gate" class="sound-bar__badge">D</span>
+                <span v-if="tilePlaybackFlags(s).reverse" class="sound-bar__badge">R</span>
+                <span v-if="tilePlaybackFlags(s).pendulum" class="sound-bar__badge">P</span>
               </div>
             </Button>
           </div>
@@ -232,7 +234,7 @@ function setPanelLoop(v: boolean) {
 
 function setPanelPendulum(v: boolean) {
   panelPendulum.value = v;
-  if (v) {
+  if (v && !panelGate.value) {
     panelReverse.value = false;
   }
 }
@@ -283,6 +285,23 @@ function effectivePlaybackForSound(sound: OrganizationSound): StoredPlayback {
   const row = storePerSound.value[sound.id];
   if (row) return row;
   return seedFromOrg(sound);
+}
+
+function tilePlaybackFlags(sound: OrganizationSound): {
+  any: boolean;
+  loop: boolean;
+  gate: boolean;
+  reverse: boolean;
+  pendulum: boolean;
+} {
+  const p = effectivePlaybackForSound(sound);
+  return {
+    any: p.loop || p.gate || p.reverse || p.pendulum,
+    loop: p.loop,
+    gate: p.gate,
+    reverse: p.reverse,
+    pendulum: p.pendulum,
+  };
 }
 
 function ensureDefaultSoundSelection(list: OrganizationSound[]): void {
@@ -438,7 +457,7 @@ function broadcastPlaybackForSound(sound: OrganizationSound) {
     gateEnabled: snap.gate,
     sessionVolume: Math.max(0, Math.min(1, volPct / 100)),
     playbackSpeed: Math.max(0.25, Math.min(4, snap.clipSpeed / 100)),
-    reverse: snap.reverse && !snap.pendulum,
+    reverse: snap.reverse && (!snap.pendulum || snap.gate),
     pendulum: snap.pendulum,
   };
 }
@@ -511,8 +530,13 @@ function tileTitle(s: OrganizationSound): string {
   const bits: string[] = [];
   if (s.title?.trim()) bits.push(s.title.trim());
   if (storePerSound.value[s.id]) bits.push("свои настройки");
-  if (s.loopEnabled) bits.push("L");
-  if (s.gateEnabled) bits.push("G");
+  const f = tilePlaybackFlags(s);
+  const letters: string[] = [];
+  if (f.loop) letters.push("L");
+  if (f.gate) letters.push("D");
+  if (f.reverse) letters.push("R");
+  if (f.pendulum) letters.push("P");
+  if (letters.length) bits.push(letters.join(""));
   bits.push("ЛКМ — выбор и звук · ПКМ — только выбор");
   return bits.join(" · ");
 }
@@ -872,6 +896,7 @@ function handleRowClick(sound: OrganizationSound) {
 }
 
 :deep(.sound-bar__tile.button) {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -913,14 +938,17 @@ function handleRowClick(sound: OrganizationSound) {
 }
 
 .sound-bar__tile-badges {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 1;
   display: flex;
-  flex-shrink: 0;
   flex-wrap: wrap;
-  gap: 2px;
-  align-items: center;
-  justify-content: center;
-  max-width: 100%;
+  justify-content: flex-end;
+  gap: 1px;
+  max-width: calc(100% - 4px);
   line-height: 1;
+  pointer-events: none;
 }
 
 .sound-bar__badge {

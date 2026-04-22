@@ -3,7 +3,7 @@
     :src="
       variant === 'withBackground'
         ? '/images/nonza-icon-512.png'
-        : '/images/nonza_logo_leon-512.png'
+        : '/images/nonza-icon-m.png'
     "
     alt="Nonza"
     class="app-logo"

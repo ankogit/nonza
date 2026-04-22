@@ -100,9 +100,9 @@ async function handleAction(
             loopEnabled ? heardLapSec : heardTotalOnceSec,
           );
         } else if (loopEnabled) {
-          triggerSoundBarEmojiLoopIntro(emoji, heardLapSec);
+          triggerSoundBarEmojiLoopIntro(emoji, heardLapSec, sessionId);
         } else {
-          triggerSoundBarEmojiBurst(emoji, heardTotalOnceSec);
+          triggerSoundBarEmojiBurst(emoji, heardTotalOnceSec, sessionId);
         }
       },
       onLoopTick:
@@ -167,7 +167,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
     const playbackSpeed = clampPlaybackSpeed(p.playbackSpeed);
     const pendulum = typeof p.pendulum === "boolean" ? p.pendulum : false;
     let reverse = typeof p.reverse === "boolean" ? p.reverse : false;
-    if (pendulum) {
+    if (pendulum && !gateEnabled) {
       reverse = false;
     }
 

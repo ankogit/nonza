@@ -21,6 +21,56 @@ type Particle = {
 
 const particles: Particle[] = [];
 const gateIntervalsBySessionId = new Map<string, ReturnType<typeof setInterval>>();
+const emitIntervalsBySessionId = new Map<
+  string,
+  Set<ReturnType<typeof setInterval>>
+>();
+
+function trackEmitInterval(
+  sessionId: string,
+  id: ReturnType<typeof setInterval>,
+): void {
+  let set = emitIntervalsBySessionId.get(sessionId);
+  if (!set) {
+    set = new Set();
+    emitIntervalsBySessionId.set(sessionId, set);
+  }
+  set.add(id);
+}
+
+function forgetEmitInterval(
+  sessionId: string,
+  id: ReturnType<typeof setInterval>,
+): void {
+  emitIntervalsBySessionId.get(sessionId)?.delete(id);
+}
+
+function clearEmitIntervalsForSession(sessionId: string): void {
+  const set = emitIntervalsBySessionId.get(sessionId);
+  if (!set) return;
+  for (const id of set) {
+    clearInterval(id);
+  }
+  emitIntervalsBySessionId.delete(sessionId);
+}
+
+export function stopAllSoundBarEmojiEffects(): void {
+  for (const set of emitIntervalsBySessionId.values()) {
+    for (const id of set) {
+      clearInterval(id);
+    }
+  }
+  emitIntervalsBySessionId.clear();
+  for (const id of gateIntervalsBySessionId.values()) {
+    clearInterval(id);
+  }
+  gateIntervalsBySessionId.clear();
+  particles.length = 0;
+  if (rafId != null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+}
 
 function cubicIn(t: number): number {
   return t * t * t;
@@ -121,6 +171,7 @@ function emitOverWindow(
   symbol: string,
   durationSec: number,
   densityFactor: number,
+  sessionId: string,
 ): void {
   ensureCanvas();
   if (!canvas) return;
@@ -153,8 +204,10 @@ function emitOverWindow(
   const id = window.setInterval(() => {
     if (!emitTick()) {
       clearInterval(id);
+      forgetEmitInterval(sessionId, id);
     }
   }, tickMs);
+  trackEmitInterval(sessionId, id);
 
   scheduleFrame();
 }
@@ -162,19 +215,21 @@ function emitOverWindow(
 export function triggerSoundBarEmojiBurst(
   symbol: string,
   durationSec: number = DEFAULT_CLIP_DURATION_SEC,
+  sessionId: string,
 ): void {
   if (!symbol.trim()) return;
   const d = clampClipDurationSec(durationSec);
-  emitOverWindow(symbol, d, 1);
+  emitOverWindow(symbol, d, 1, sessionId);
 }
 
 export function triggerSoundBarEmojiLoopIntro(
   symbol: string,
   durationSec: number = DEFAULT_CLIP_DURATION_SEC,
+  sessionId: string,
 ): void {
   if (!symbol.trim()) return;
   const d = clampClipDurationSec(durationSec);
-  emitOverWindow(symbol, d * 0.42, 0.55);
+  emitOverWindow(symbol, d * 0.42, 0.55, sessionId);
 }
 
 export function triggerSoundBarEmojiLoopPulse(
@@ -214,6 +269,7 @@ export function startSoundBarEmojiGate(
 }
 
 export function stopSoundBarEmojiGate(sessionId: string): void {
+  clearEmitIntervalsForSession(sessionId);
   const id = gateIntervalsBySessionId.get(sessionId);
   if (id != null) {
     clearInterval(id);

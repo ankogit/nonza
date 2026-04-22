@@ -337,11 +337,6 @@ onMounted(async () => {
   background: transparent;
 }
 
-.org-item--logo .org-item__icon :deep(.app-logo) {
-  max-width: 100%;
-  max-height: 100%;
-}
-
 .org-item__logo-img {
   width: 100%;
   height: 100%;

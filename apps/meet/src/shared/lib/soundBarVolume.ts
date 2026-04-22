@@ -1,5 +1,7 @@
 import { ref } from "vue";
 
+import { stopAllSoundBarEmojiEffects } from "./soundBarEmojiParticles";
+
 const STORAGE_KEY = "nonza_sound_bar_volume";
 const MUTED_STORAGE_KEY = "nonza_sound_bar_muted";
 const DEFAULT_VOLUME = 0.8;
@@ -70,6 +72,9 @@ export function setSoundBarVolume(value: number): void {
 export function setSoundBarMuted(value: boolean): void {
   soundBarMuted.value = value;
   saveMuted(value);
+  if (value) {
+    stopAllSoundBarEmojiEffects();
+  }
   const v = value ? 0 : soundBarVolume.value;
   for (const fn of subscribers) {
     try {
