@@ -803,6 +803,7 @@ async function startWebAudioSoundBarSession(
         : mergeGateHoldPlayedSec(wallPlayed, gateRevHoldShifter);
       gateRevHoldShifter = null;
       stopCurrentPlayback();
+      stopSoundBarEmojiGate(sessionId);
       playForwardTailAfterReverseHold(playedRev);
     });
 
@@ -864,6 +865,7 @@ async function startWebAudioSoundBarSession(
         : mergeGateHoldPlayedSec(wallPlayed, gateFwdHoldShifter);
       gateFwdHoldShifter = null;
       stopCurrentPlayback();
+      stopSoundBarEmojiGate(sessionId);
       playReverseFromPlayedSeconds(playedSec);
     });
 
