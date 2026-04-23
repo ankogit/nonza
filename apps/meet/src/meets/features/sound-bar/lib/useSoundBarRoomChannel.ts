@@ -51,10 +51,15 @@ function removeSessionBySessionId(sessionId: string) {
 
 function clampSessionVolume(n: unknown): number {
   if (typeof n !== "number" || !Number.isFinite(n)) return 1;
-  return Math.max(0, Math.min(1, n));
+  return Math.max(0, Math.min(5, n));
 }
 
 function clampPlaybackSpeed(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.max(0.25, Math.min(4, n));
+}
+
+function clampPlaybackPitch(n: unknown): number {
   if (typeof n !== "number" || !Number.isFinite(n)) return 1;
   return Math.max(0.25, Math.min(4, n));
 }
@@ -72,6 +77,7 @@ async function handleAction(
       audioUrl,
       sessionVolume,
       playbackSpeed,
+      playbackPitch,
       reverse,
       pendulum,
     } = payload;
@@ -84,6 +90,7 @@ async function handleAction(
       gateEnabled,
       sessionVolume,
       playbackSpeed,
+      playbackPitch,
       reverse,
       pendulum,
       onEnded: opts?.onPlaybackEnded,
@@ -165,6 +172,8 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
     const gateEnabled = Boolean(p.gateEnabled);
     const sessionVolume = clampSessionVolume(p.sessionVolume);
     const playbackSpeed = clampPlaybackSpeed(p.playbackSpeed);
+    const playbackPitch =
+      typeof p.playbackPitch === "number" ? clampPlaybackPitch(p.playbackPitch) : 1;
     const pendulum = typeof p.pendulum === "boolean" ? p.pendulum : false;
     let reverse = typeof p.reverse === "boolean" ? p.reverse : false;
     if (pendulum && !gateEnabled) {
@@ -190,6 +199,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
             gateEnabled,
             sessionVolume,
             playbackSpeed,
+            playbackPitch,
             reverse,
             pendulum,
             ts: p.ts as number,
@@ -223,9 +233,11 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
   };
 
   room.on(RoomEvent.DataReceived, handler);
+  room.on(RoomEvent.Disconnected, stopAllKnownSessions);
 
   return () => {
     room.off(RoomEvent.DataReceived, handler);
+    room.off(RoomEvent.Disconnected, stopAllKnownSessions);
   };
 }
 
@@ -259,10 +271,19 @@ export type SoundBarStartBroadcastParams = {
   gateEnabled: boolean;
   sessionVolume: number;
   playbackSpeed: number;
+  playbackPitch: number;
   reverse: boolean;
   pendulum: boolean;
   onLocalPlaybackEnded?: () => void;
 };
+
+function stopAllKnownSessions(): void {
+  for (const sessionId of Object.values(sharedSessionByEmoji.value)) {
+    stopSoundBarEmojiGate(sessionId);
+    stopSoundBarSession(sessionId);
+  }
+  sharedSessionByEmoji.value = {};
+}
 
 export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
   let releaseListener: (() => void) | null = null;
@@ -293,6 +314,7 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
       releaseListener?.();
       releaseListener = null;
       if (!room) {
+        stopAllKnownSessions();
         sharedSessionByEmoji.value = {};
         return;
       }
@@ -302,6 +324,7 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
   );
 
   onUnmounted(() => {
+    stopAllKnownSessions();
     releaseListener?.();
     releaseListener = null;
   });
@@ -324,6 +347,7 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
       gateEnabled: params.gateEnabled,
       sessionVolume: params.sessionVolume,
       playbackSpeed: params.playbackSpeed,
+      playbackPitch: params.playbackPitch,
       reverse: params.reverse,
       pendulum,
       ts: Date.now(),

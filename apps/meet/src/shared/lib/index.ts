@@ -29,6 +29,7 @@ export * from "./dice";
 export * from "./text-links";
 export * from "./playAudioUrl";
 export * from "./soundBarVolume";
+export * from "./soundBarLocalUserId";
 export * from "./soundBarPlayback";
 export * from "./soundBarEmojiParticles";
 export * from "./renderSoundBarClipForUpload";

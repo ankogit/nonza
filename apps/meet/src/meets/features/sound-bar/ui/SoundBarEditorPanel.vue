@@ -7,7 +7,7 @@
           label="Volume"
           color="orange"
           :min="0"
-          :max="100"
+          :max="500"
           :step="1"
           :size="64"
           :format-value="(v: number) => `${Math.round(v)}%`"
@@ -340,7 +340,15 @@ function applyWaveSpeed(speedPercent: number): void {
 }
 
 function clampVolume(v: number): number {
+  return Math.max(0, Math.min(500, Math.round(v)));
+}
+
+function clampPersistVolume(v: number): number {
   return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function previewVolumeGain(): number {
+  return Math.max(0, Math.min(5, volume.value / 100));
 }
 
 function clearPreviewEndListener(): void {
@@ -521,7 +529,7 @@ watch(
 
 watch(volume, () => {
   if (!wavesurfer.value) return;
-  wavesurfer.value.setVolume(Math.max(0, Math.min(volume.value / 100, 1)));
+  wavesurfer.value.setVolume(previewVolumeGain());
 });
 
 const startMsSource = computed(() => {
@@ -765,7 +773,7 @@ async function startSegmentPlayback(loopSegment: boolean) {
   stopPreview();
   previewLoopSegment.value = loopSegment;
   applyWaveSpeed(speed.value);
-  wavesurfer.value.setVolume(Math.max(0, Math.min(volume.value / 100, 1)));
+  wavesurfer.value.setVolume(previewVolumeGain());
   const start = Math.max(0, selectedRegion.value.start);
   const end = Math.max(start, selectedRegion.value.end);
   isPreviewPlaying.value = true;
@@ -853,7 +861,7 @@ async function handleSave() {
   form.append("clientProcessed", "1");
   form.append("loopEnabled", String(loopEnabled.value));
   form.append("gateEnabled", String(gateEnabled.value));
-  form.append("volume", String(clampVolume(volume.value)));
+  form.append("volume", String(clampPersistVolume(volume.value)));
   form.append("speed", String(Math.round(speed.value)));
 
   isSaving.value = true;

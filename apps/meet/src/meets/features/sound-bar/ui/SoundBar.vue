@@ -82,13 +82,24 @@
               </Switch>
               <Switch
                 :model-value="panelPendulum"
-                aria-label="Маятник"
+                aria-label="Ping-pong"
                 @update:model-value="setPanelPendulum"
               >
-                Маятник
+                Ping-pong
               </Switch>
             </div>
             <div class="sound-bar__knobs-row">
+              <Knob
+                :model-value="clipVolumePct"
+                :min="0"
+                :max="500"
+                :step="5"
+                compact
+                label="Громк."
+                color="blue"
+                :format-value="formatClipVolume"
+                @update:model-value="clipVolumePct = $event"
+              />
               <Knob
                 :model-value="clipSpeedPct"
                 :min="25"
@@ -99,6 +110,17 @@
                 color="orange"
                 :format-value="formatClipSpeed"
                 @update:model-value="clipSpeedPct = $event"
+              />
+              <Knob
+                :model-value="clipPitchPct"
+                :min="25"
+                :max="400"
+                :step="5"
+                compact
+                label="Питч"
+                color="red"
+                :format-value="formatClipPitch"
+                @update:model-value="clipPitchPct = $event"
               />
             </div>
           </div>
@@ -125,6 +147,19 @@
               @pointercancel="handlePointerUp(s)"
               @contextmenu.stop.prevent="onSoundContextMenu(s, $event)"
             >
+              <button
+                type="button"
+                class="sound-bar__keybind-mini"
+                :class="{
+                  'sound-bar__keybind-mini--bound': Boolean(hotkeysBySoundId[s.id]),
+                  'sound-bar__keybind-mini--capture': bindingCaptureSoundId === s.id,
+                }"
+                :title="tileKeybindTitle(s)"
+                tabindex="-1"
+                @click.stop="onKeybindMiniClick(s, $event)"
+              >
+                {{ hotkeyLabelForSound(s.id) || "·" }}
+              </button>
               <span class="sound-bar__tile-emoji">{{ s.emoji }}</span>
               <div
                 v-if="tilePlaybackFlags(s).any"
@@ -163,6 +198,7 @@ import {
   soundBarMuted,
   setSoundBarVolume,
   toggleSoundBarMuted,
+  getSoundBarLocalUserId,
 } from "@shared/lib";
 
 const soundBarVolumeRef = soundBarVolume;
@@ -196,14 +232,21 @@ const previewMode = computed(() => props.previewMode ?? false);
 const pressedEmoji = ref<string | null>(null);
 
 const PANEL_STORAGE_V1 = "nonza_soundbar_playback_panel_v1";
-const PANEL_STORAGE_KEY = "nonza_soundbar_playback_panel_v2";
+const LEGACY_PANEL_V2 = "nonza_soundbar_playback_panel_v2";
+
+function panelStorageKey(): string {
+  const oid = props.orgId?.trim() || "_";
+  return `nonza_soundbar_playback_panel_v3:${oid}:${getSoundBarLocalUserId()}`;
+}
 
 type StoredPlayback = {
   loop: boolean;
   gate: boolean;
   reverse: boolean;
   pendulum: boolean;
+  clipVolume: number;
   clipSpeed: number;
+  clipPitch: number;
 };
 
 const DEFAULT_PLAYBACK: StoredPlayback = {
@@ -211,20 +254,35 @@ const DEFAULT_PLAYBACK: StoredPlayback = {
   gate: false,
   reverse: false,
   pendulum: false,
+  clipVolume: 100,
   clipSpeed: 100,
+  clipPitch: 100,
 };
 
 const storePerSound = ref<Record<string, StoredPlayback>>({});
 const selectedSoundId = ref<string | null>(null);
 const legacyV1Panel = ref<StoredPlayback | null>(null);
+const hotkeysBySoundId = ref<Record<string, string>>({});
+const bindingCaptureSoundId = ref<string | null>(null);
+const gateKeydownFromKeyboard = new Set<string>();
 
 const panelLoop = ref(false);
 const panelGate = ref(false);
 const panelReverse = ref(false);
 const panelPendulum = ref(false);
+const clipVolumePct = ref(100);
 const clipSpeedPct = ref(100);
+const clipPitchPct = ref(100);
 
 function formatClipSpeed(v: number): string {
+  return `${Math.round(v)}%`;
+}
+
+function formatClipVolume(v: number): string {
+  return `${Math.round(v)}%`;
+}
+
+function formatClipPitch(v: number): string {
   return `${Math.round(v)}%`;
 }
 
@@ -264,10 +322,18 @@ function normalizePlaybackRow(raw: Record<string, unknown>): StoredPlayback {
     reverse:
       typeof raw.reverse === "boolean" ? raw.reverse : DEFAULT_PLAYBACK.reverse,
     pendulum,
+    clipVolume:
+      typeof raw.clipVolume === "number"
+        ? Math.max(0, Math.min(500, Math.round(raw.clipVolume)))
+        : DEFAULT_PLAYBACK.clipVolume,
     clipSpeed:
       typeof raw.clipSpeed === "number"
         ? clampSpeedPct(raw.clipSpeed)
         : DEFAULT_PLAYBACK.clipSpeed,
+    clipPitch:
+      typeof raw.clipPitch === "number"
+        ? clampSpeedPct(raw.clipPitch)
+        : DEFAULT_PLAYBACK.clipPitch,
   };
 }
 
@@ -277,7 +343,9 @@ function seedFromOrg(sound: OrganizationSound): StoredPlayback {
     gate: sound.gateEnabled,
     reverse: false,
     pendulum: false,
+    clipVolume: 100,
     clipSpeed: sound.speed,
+    clipPitch: 100,
   });
 }
 
@@ -330,7 +398,9 @@ function refsFromStored(s: StoredPlayback) {
   panelGate.value = s.gate;
   panelReverse.value = s.reverse;
   panelPendulum.value = s.pendulum;
+  clipVolumePct.value = s.clipVolume;
   clipSpeedPct.value = s.clipSpeed;
+  clipPitchPct.value = s.clipPitch;
 }
 
 function storedFromRefs(): StoredPlayback {
@@ -339,7 +409,9 @@ function storedFromRefs(): StoredPlayback {
     gate: panelGate.value,
     reverse: panelReverse.value,
     pendulum: panelPendulum.value,
+    clipVolume: clipVolumePct.value,
     clipSpeed: clipSpeedPct.value,
+    clipPitch: clipPitchPct.value,
   });
 }
 
@@ -349,17 +421,20 @@ function playbackRowEquals(a: StoredPlayback, b: StoredPlayback): boolean {
     a.gate === b.gate &&
     a.reverse === b.reverse &&
     a.pendulum === b.pendulum &&
-    a.clipSpeed === b.clipSpeed
+    a.clipVolume === b.clipVolume &&
+    a.clipSpeed === b.clipSpeed &&
+    a.clipPitch === b.clipPitch
   );
 }
 
 function persistAll(): void {
   try {
     localStorage.setItem(
-      PANEL_STORAGE_KEY,
+      panelStorageKey(),
       JSON.stringify({
         perSound: storePerSound.value,
         selectedId: selectedSoundId.value,
+        hotkeys: hotkeysBySoundId.value,
       }),
     );
   } catch {
@@ -367,29 +442,40 @@ function persistAll(): void {
   }
 }
 
-function loadPersisted(): void {
-  try {
-    const raw2 = localStorage.getItem(PANEL_STORAGE_KEY);
-    if (raw2) {
-      const j = JSON.parse(raw2) as {
-        perSound?: Record<string, Record<string, unknown>>;
-        selectedId?: string | null;
-      };
-      if (j.perSound && typeof j.perSound === "object") {
-        const next: Record<string, StoredPlayback> = {};
-        for (const [k, row] of Object.entries(j.perSound)) {
-          if (row && typeof row === "object") {
-            next[k] = normalizePlaybackRow(row);
-          }
-        }
-        storePerSound.value = next;
+type StoredPanelJson = {
+  perSound?: Record<string, Record<string, unknown>>;
+  selectedId?: string | null;
+  hotkeys?: Record<string, unknown>;
+};
+
+function applyStoredPayload(j: StoredPanelJson): void {
+  if (j.perSound && typeof j.perSound === "object") {
+    const next: Record<string, StoredPlayback> = {};
+    for (const [k, row] of Object.entries(j.perSound)) {
+      if (row && typeof row === "object") {
+        next[k] = normalizePlaybackRow(row);
       }
-      selectedSoundId.value =
-        typeof j.selectedId === "string" && j.selectedId.length > 0
-          ? j.selectedId
-          : null;
-      return;
     }
+    storePerSound.value = next;
+  }
+  selectedSoundId.value =
+    typeof j.selectedId === "string" && j.selectedId.length > 0 ? j.selectedId : null;
+
+  if (j.hotkeys && typeof j.hotkeys === "object" && !Array.isArray(j.hotkeys)) {
+    const nh: Record<string, string> = {};
+    for (const [sid, code] of Object.entries(j.hotkeys)) {
+      if (typeof code === "string" && code.length >= 2 && code.length < 32) {
+        nh[sid] = code;
+      }
+    }
+    hotkeysBySoundId.value = nh;
+  } else {
+    hotkeysBySoundId.value = {};
+  }
+}
+
+function loadLegacyV1IfNeeded(): void {
+  try {
     const raw1 = localStorage.getItem(PANEL_STORAGE_V1);
     if (raw1) {
       const j = JSON.parse(raw1) as Record<string, unknown>;
@@ -400,21 +486,42 @@ function loadPersisted(): void {
   }
 }
 
+function loadPersisted(): void {
+  try {
+    const primary = localStorage.getItem(panelStorageKey());
+    if (primary) {
+      applyStoredPayload(JSON.parse(primary) as StoredPanelJson);
+      loadLegacyV1IfNeeded();
+      return;
+    }
+    const legacyV2 = localStorage.getItem(LEGACY_PANEL_V2);
+    if (legacyV2) {
+      applyStoredPayload(JSON.parse(legacyV2) as StoredPanelJson);
+      persistAll();
+      loadLegacyV1IfNeeded();
+      return;
+    }
+    hotkeysBySoundId.value = {};
+    loadLegacyV1IfNeeded();
+  } catch {
+    /* ignore */
+  }
+}
+
 function commitActiveSnapshot(): void {
   const id = selectedSoundId.value;
   if (id === null) return;
-  const snap = storedFromRefs();
   const sound = sounds.value.find((s) => s.id === id);
-  if (sound) {
-    const seed = seedFromOrg(sound);
-    if (playbackRowEquals(snap, seed)) {
-      if (storePerSound.value[id]) {
-        const { [id]: _drop, ...rest } = storePerSound.value;
-        storePerSound.value = rest;
-      }
-      persistAll();
-      return;
+  if (!sound) return;
+  const snap = storedFromRefs();
+  const seed = seedFromOrg(sound);
+  if (playbackRowEquals(snap, seed)) {
+    if (storePerSound.value[id]) {
+      const { [id]: _drop, ...rest } = storePerSound.value;
+      storePerSound.value = rest;
     }
+    persistAll();
+    return;
   }
   storePerSound.value = { ...storePerSound.value, [id]: snap };
   persistAll();
@@ -452,43 +559,103 @@ function onSoundContextMenu(sound: OrganizationSound, ev: MouseEvent): void {
 function broadcastPlaybackForSound(sound: OrganizationSound) {
   const snap = effectivePlaybackForSound(sound);
   const volPct = Number.isFinite(sound.volume) ? sound.volume : 100;
+  const baseVolume = Math.max(0, Math.min(5, volPct / 100));
+  const profileVolume = Math.max(0, Math.min(5, snap.clipVolume / 100));
   return {
     loopEnabled: snap.loop,
     gateEnabled: snap.gate,
-    sessionVolume: Math.max(0, Math.min(1, volPct / 100)),
+    sessionVolume: Math.max(0, Math.min(5, baseVolume * profileVolume)),
     playbackSpeed: Math.max(0.25, Math.min(4, snap.clipSpeed / 100)),
+    playbackPitch: Math.max(0.25, Math.min(4, snap.clipPitch / 100)),
     reverse: snap.reverse && (!snap.pendulum || snap.gate),
     pendulum: snap.pendulum,
   };
 }
 
 watch(sounds, (list) => {
+  const idSet = new Set(list.map((s) => s.id));
+  let hkDirty = false;
+  const nh = { ...hotkeysBySoundId.value };
+  for (const k of Object.keys(nh)) {
+    if (!idSet.has(k)) {
+      delete nh[k];
+      hkDirty = true;
+    }
+  }
+  if (hkDirty) {
+    hotkeysBySoundId.value = nh;
+    persistAll();
+  }
+
   if (list.length === 0) {
     popoverOpen.value = false;
-    commitActiveSnapshot();
     selectedSoundId.value = null;
+    persistAll();
     return;
   }
   ensureDefaultSoundSelection(list);
   hydrateRefsForSelection();
 });
+
+watch(
+  () => props.orgId,
+  () => {
+    loadPersisted();
+    const list = sounds.value;
+    if (list.length === 0) {
+      popoverOpen.value = false;
+      selectedSoundId.value = null;
+      persistAll();
+      return;
+    }
+    ensureDefaultSoundSelection(list);
+    hydrateRefsForSelection();
+  },
+);
+
+function attachWindowHotkeys(): void {
+  window.addEventListener("keydown", handleWindowKeydown, true);
+  window.addEventListener("keyup", handleWindowKeyup, true);
+}
+
+function detachWindowHotkeys(): void {
+  window.removeEventListener("keydown", handleWindowKeydown, true);
+  window.removeEventListener("keyup", handleWindowKeyup, true);
+}
 
 onMounted(() => {
   loadPersisted();
   const list = sounds.value;
   if (list.length === 0) {
     popoverOpen.value = false;
-    commitActiveSnapshot();
     selectedSoundId.value = null;
-    return;
+    persistAll();
+  } else {
+    ensureDefaultSoundSelection(list);
+    hydrateRefsForSelection();
   }
-  ensureDefaultSoundSelection(list);
-  hydrateRefsForSelection();
+  if (!previewMode.value) attachWindowHotkeys();
 });
 
-watch([panelLoop, panelGate, panelReverse, panelPendulum, clipSpeedPct], () => {
-  commitActiveSnapshot();
+watch(previewMode, (p) => {
+  if (p) detachWindowHotkeys();
+  else attachWindowHotkeys();
 });
+
+watch(
+  [
+    panelLoop,
+    panelGate,
+    panelReverse,
+    panelPendulum,
+    clipVolumePct,
+    clipSpeedPct,
+    clipPitchPct,
+  ],
+  () => {
+  commitActiveSnapshot();
+  },
+);
 
 let detachOutside: (() => void) | null = null;
 
@@ -512,6 +679,7 @@ watch(popoverOpen, (open) => {
 onUnmounted(() => {
   detachOutside?.();
   detachOutside = null;
+  detachWindowHotkeys();
 });
 
 function togglePopover() {
@@ -537,7 +705,7 @@ function tileTitle(s: OrganizationSound): string {
   if (f.reverse) letters.push("R");
   if (f.pendulum) letters.push("P");
   if (letters.length) bits.push(letters.join(""));
-  bits.push("ЛКМ — выбор и звук · ПКМ — только выбор");
+  bits.push("ЛКМ — выбор и звук · ПКМ — только выбор · метка «·» слева снизу — горячая клавиша");
   return bits.join(" · ");
 }
 
@@ -545,25 +713,26 @@ function tileVariant(s: OrganizationSound): "primary" | "default" {
   return isActive(s.emoji) ? "primary" : "default";
 }
 
-function handlePointerDown(sound: OrganizationSound, ev: PointerEvent) {
+function isKeyboardFormTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  const t = target.tagName.toLowerCase();
+  if (t === "input" || t === "textarea" || t === "select") return true;
+  return target.isContentEditable;
+}
+
+function gatePressStart(sound: OrganizationSound): void {
   if (previewMode.value) return;
   if (!sound.audioUrl) return;
   const cfg = broadcastPlaybackForSound(sound);
   if (!cfg.gateEnabled) return;
-  if (ev.button !== 0) return;
-
-  ev.preventDefault();
   selectProfile(sound);
-
   const existing = sessionByEmoji.value[sound.emoji];
   if (existing) {
     void stopAndBroadcast({ sessionId: existing });
   }
-
   const sessionId = createSessionId();
   sessionByEmoji.value = { ...sessionByEmoji.value, [sound.emoji]: sessionId };
   pressedEmoji.value = sound.emoji;
-
   void startAndBroadcast({
     sessionId,
     emoji: sound.emoji,
@@ -572,16 +741,146 @@ function handlePointerDown(sound: OrganizationSound, ev: PointerEvent) {
   });
 }
 
-function handlePointerUp(sound: OrganizationSound) {
+function gatePressEnd(sound: OrganizationSound): void {
   if (previewMode.value) return;
+  gateKeydownFromKeyboard.delete(sound.emoji);
   const cfg = broadcastPlaybackForSound(sound);
   if (!cfg.gateEnabled) return;
-
   const sessionId = sessionByEmoji.value[sound.emoji];
   if (!sessionId) return;
-
   void stopAndBroadcast({ sessionId });
   if (pressedEmoji.value === sound.emoji) pressedEmoji.value = null;
+}
+
+function codeToShortLabel(code: string): string {
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  if (code.startsWith("Numpad")) return code.slice(6);
+  if (code.startsWith("Arrow")) return code.slice(5);
+  return code;
+}
+
+function hotkeyLabelForSound(soundId: string): string {
+  const code = hotkeysBySoundId.value[soundId];
+  return code ? codeToShortLabel(code) : "";
+}
+
+function tileKeybindTitle(sound: OrganizationSound): string {
+  if (bindingCaptureSoundId.value === sound.id) {
+    return "Нажми клавишу. Esc — отмена. Alt+клик — сброс";
+  }
+  const h = hotkeysBySoundId.value[sound.id];
+  if (h) return `Клавиша: ${h}. Клик — сменить. Alt+клик — сброс`;
+  return "Клик — привязать клавишу";
+}
+
+function onKeybindMiniClick(sound: OrganizationSound, ev: MouseEvent): void {
+  if (previewMode.value) return;
+  if (!sound.audioUrl) return;
+  if (ev.altKey) {
+    const next = { ...hotkeysBySoundId.value };
+    delete next[sound.id];
+    hotkeysBySoundId.value = next;
+    persistAll();
+    return;
+  }
+  if (bindingCaptureSoundId.value === sound.id) {
+    bindingCaptureSoundId.value = null;
+    return;
+  }
+  bindingCaptureSoundId.value = sound.id;
+}
+
+function assignHotkey(soundId: string, code: string): void {
+  const next: Record<string, string> = { ...hotkeysBySoundId.value };
+  for (const [k, v] of Object.entries(next)) {
+    if (k !== soundId && v === code) {
+      delete next[k];
+    }
+  }
+  next[soundId] = code;
+  hotkeysBySoundId.value = next;
+  persistAll();
+}
+
+function handleWindowKeydown(e: KeyboardEvent): void {
+  if (previewMode.value) return;
+
+  if (bindingCaptureSoundId.value) {
+    if (isKeyboardFormTarget(e.target)) return;
+    if (e.code === "Escape") {
+      bindingCaptureSoundId.value = null;
+      e.preventDefault();
+      return;
+    }
+    const neuKeys = new Set([
+      "ControlLeft",
+      "ControlRight",
+      "ShiftLeft",
+      "ShiftRight",
+      "AltLeft",
+      "AltRight",
+      "MetaLeft",
+      "MetaRight",
+      "CapsLock",
+    ]);
+    if (neuKeys.has(e.code)) return;
+    const sid = bindingCaptureSoundId.value;
+    if (sid) {
+      assignHotkey(sid, e.code);
+      bindingCaptureSoundId.value = null;
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if (isKeyboardFormTarget(e.target)) return;
+
+  const hit = Object.entries(hotkeysBySoundId.value).find(([, c]) => c === e.code);
+  if (!hit) return;
+  const sound = sounds.value.find((s) => s.id === hit[0]);
+  if (!sound?.audioUrl) return;
+
+  const cfg = broadcastPlaybackForSound(sound);
+  if (cfg.gateEnabled) {
+    if (gateKeydownFromKeyboard.has(sound.emoji)) return;
+    gateKeydownFromKeyboard.add(sound.emoji);
+    e.preventDefault();
+    gatePressStart(sound);
+    return;
+  }
+  if (e.repeat) return;
+  e.preventDefault();
+  handleRowClick(sound);
+}
+
+function handleWindowKeyup(e: KeyboardEvent): void {
+  if (previewMode.value) return;
+  if (isKeyboardFormTarget(e.target)) return;
+  const hit = Object.entries(hotkeysBySoundId.value).find(([, c]) => c === e.code);
+  if (!hit) return;
+  const sound = sounds.value.find((s) => s.id === hit[0]);
+  if (!sound) return;
+  const cfg = broadcastPlaybackForSound(sound);
+  if (!cfg.gateEnabled) return;
+  if (!gateKeydownFromKeyboard.has(sound.emoji)) return;
+  gateKeydownFromKeyboard.delete(sound.emoji);
+  e.preventDefault();
+  gatePressEnd(sound);
+}
+
+function handlePointerDown(sound: OrganizationSound, ev: PointerEvent) {
+  if (previewMode.value) return;
+  if (!sound.audioUrl) return;
+  const cfg = broadcastPlaybackForSound(sound);
+  if (!cfg.gateEnabled) return;
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  gatePressStart(sound);
+}
+
+function handlePointerUp(sound: OrganizationSound) {
+  gatePressEnd(sound);
 }
 
 function handleRowClick(sound: OrganizationSound) {
@@ -803,9 +1102,20 @@ function handleRowClick(sound: OrganizationSound) {
   flex-shrink: 0;
   margin-left: auto;
   justify-content: center;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 6px;
   min-width: 72px;
+}
+
+.sound-bar__knobs-row :deep(.knob-control__label),
+.sound-bar__knobs-row :deep(.knob-control__value) {
+  min-height: 10px;
+  line-height: 1;
+}
+
+.sound-bar__knobs-row :deep(.knob-control--compact .knob-control__handle) {
+  top: -3px;
+  height: 12px;
 }
 
 .sound-bar__toggles {
@@ -961,5 +1271,48 @@ function handleRowClick(sound: OrganizationSound) {
   color: #9a928a;
   user-select: none;
   pointer-events: none;
+}
+
+.sound-bar__keybind-mini {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  z-index: 2;
+  box-sizing: border-box;
+  min-width: 12px;
+  height: 11px;
+  padding: 0 2px;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.38);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 7px;
+  font-weight: 600;
+  line-height: 10px;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: inherit;
+}
+
+.sound-bar__keybind-mini--bound {
+  color: rgba(186, 210, 255, 0.96);
+  border-color: rgba(110, 150, 210, 0.55);
+}
+
+.sound-bar__keybind-mini--capture {
+  animation: sound-bar-kb-pulse 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes sound-bar-kb-pulse {
+  from {
+    opacity: 0.45;
+    border-color: rgba(255, 200, 120, 0.45);
+  }
+  to {
+    opacity: 1;
+    border-color: rgba(255, 220, 140, 0.85);
+  }
 }
 </style>

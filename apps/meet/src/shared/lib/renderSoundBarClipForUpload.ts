@@ -70,7 +70,7 @@ export async function renderSoundBarClipForUpload(params: {
   speed: number;
 }): Promise<File> {
   const { file, startSec, endSec } = params;
-  const volume = Math.max(0, Math.min(100, params.volume)) / 100;
+  const volume = Math.max(0, Math.min(500, params.volume)) / 100;
   const rate = Math.max(0.25, Math.min(4, params.speed / 100));
 
   if (endSec <= startSec) {

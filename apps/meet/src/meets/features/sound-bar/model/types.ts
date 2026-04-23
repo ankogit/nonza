@@ -20,6 +20,7 @@ export type SoundBarActionStartPayload = {
   gateEnabled: boolean;
   sessionVolume: number;
   playbackSpeed: number;
+  playbackPitch: number;
   reverse: boolean;
   pendulum: boolean;
   ts: number;

@@ -96,22 +96,29 @@ const displayValue = computed(() => {
   return String(props.modelValue);
 });
 
+function snapLinePx(v: number): number {
+  // Keep 1px overlay lines sharp and aligned.
+  return Math.round(v) + 0.5;
+}
+
 const stemStyle = computed(() => {
   if (!overlayPos.value) return {};
   const p = overlayPos.value;
   return {
-    transform: `translateX(${p.cursor[0]}px) translateY(${p.top}px) scaleY(${BASE_HEIGHT * p.scale})`,
+    transform: `translateX(${snapLinePx(p.cursor[0])}px) translateY(${snapLinePx(p.top)}px) scaleY(${BASE_HEIGHT * p.scale})`,
   };
 });
 
 const beamStyle = computed(() => {
   if (!overlayPos.value) return {};
   const p = overlayPos.value;
-  const [x1, y1] = p.knobCenter;
-  const [x2, y2] = p.cursor;
+  const x1 = snapLinePx(p.knobCenter[0]);
+  const y1 = snapLinePx(p.knobCenter[1]);
+  const x2 = snapLinePx(p.cursor[0]);
+  const y2 = snapLinePx(p.cursor[1]);
   const dx = x2 - x1;
   const dy = y2 - y1;
-  const distance = Math.sqrt(dx * dx + dy * dy);
+  const distance = Math.max(0, Math.sqrt(dx * dx + dy * dy) - 1);
   const degrees = (Math.atan2(dy, dx) * 180) / Math.PI;
   return {
     transform: `translateX(${x1}px) translateY(${y1}px) rotate(${degrees}deg) scaleX(${distance})`,

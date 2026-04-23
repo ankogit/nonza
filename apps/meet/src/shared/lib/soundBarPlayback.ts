@@ -2,6 +2,7 @@ import {
   applyStoredOutputDevice,
   getStoredAudioOutputDevice,
 } from "./audio-devices";
+import { PitchShifter } from "soundtouchjs";
 import { getOutputMuted } from "./output-mute";
 import { stopSoundBarEmojiGate } from "./soundBarEmojiParticles";
 import { subscribeSoundBarVolume } from "./soundBarVolume";
@@ -14,11 +15,12 @@ type SessionHandle =
 
 const activeBySessionId = new Map<SessionId, SessionHandle>();
 
-/** gate+pendulum: pointer-up triggers tail before full cleanupSession */
+/** Гейт и ping-pong: pointer-up сначала запускает хвост, полный cleanup — позже. */
 const gatePendReleaseBySessionId = new Map<SessionId, () => void>();
 const unsubscribeMasterBySessionId = new Map<SessionId, () => void>();
 const onEndedBySessionId = new Map<SessionId, () => void>();
 const loopTickCleanupBySessionId = new Map<SessionId, () => void>();
+const cancelledSessionIds = new Set<SessionId>();
 const playbackReadyFallbackBySessionId = new Map<
   SessionId,
   ReturnType<typeof setTimeout>
@@ -110,6 +112,7 @@ function cleanupSession(sessionId: SessionId): void {
   stopSoundBarEmojiGate(sessionId);
   gatePendReleaseBySessionId.delete(sessionId);
   clearPlaybackReadyFallback(sessionId);
+  cancelledSessionIds.delete(sessionId);
 
   const unsubMaster = unsubscribeMasterBySessionId.get(sessionId);
   if (unsubMaster) {
@@ -153,7 +156,22 @@ async function applySinkToAudioContext(ctx: AudioContext): Promise<void> {
   }
 }
 
+/** Если в HTML duration так и не стал конечным — не блокируем UI бесконечно. */
 const FALLBACK_CLIP_DURATION_SEC = 2.5;
+/** После play() duration иногда приходит с задержкой; не ждём вечно. */
+const PLAYBACK_READY_FALLBACK_MS = 900;
+/**
+ * bufferSize PitchShifter в сэмплах для режима гейта.
+ * Слишком мало — слышны «пошёлки» по границам ScriptProcessor; 2048 — компромисс с метром.
+ */
+const GATE_PITCH_SHIFT_BLOCK_FRAMES = 2048;
+/**
+ * Линейное затухание на Gain перед disconnect PitchShifter.
+ * ScriptProcessor/SoundTouch при резком disconnect даёт щелчок; при смене сегмента — то же + стык амплитуд.
+ */
+const PITCH_TAIL_RELEASE_SEC = 0.006;
+/** Больше кадр ScriptProcessor — меньше артефактов на границах блока, чуть выше задержка. */
+const PITCH_SHIFT_DEFAULT_BUFFER_FRAMES = 8192;
 
 function clampClipDurationSec(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return FALLBACK_CLIP_DURATION_SEC;
@@ -162,12 +180,54 @@ function clampClipDurationSec(raw: number): number {
 
 function clampSessionVolume(v: number): number {
   if (!Number.isFinite(v)) return 1;
-  return Math.max(0, Math.min(1, v));
+  return Math.max(0, Math.min(5, v));
 }
 
 function clampPlaybackSpeed(v: number): number {
   if (!Number.isFinite(v)) return 1;
   return Math.max(0.25, Math.min(4, v));
+}
+
+function clampPlaybackPitch(v: number): number {
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(0.25, Math.min(4, v));
+}
+
+function clampRange(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+/**
+ * Хвост из нулей после сегмента: SoundTouch догоняет выход после конца входа;
+ * без запаса слышен обрыв, сильнее при низком pitch / медленном tempo.
+ */
+function soundTouchTailPaddingSec(
+  speed: number,
+  pitch: number,
+  isReverseSegment: boolean,
+): number {
+  const base = 0.2;
+  const whenSlowed = Math.max(0, 1 - speed) * 0.35;
+  const fromPitchOctaves = Math.abs(Math.log2(Math.max(0.25, pitch))) * 0.14;
+  const lowPitchExtra = pitch < 1 ? (1 / Math.max(0.25, pitch) - 1) * 0.22 : 0;
+  const reverseExtra = isReverseSegment ? 0.14 : 0;
+  return clampRange(
+    base + whenSlowed + fromPitchOctaves + lowPitchExtra + reverseExtra,
+    0.18,
+    1.05,
+  );
+}
+
+function markSessionCancelled(sessionId: SessionId): void {
+  cancelledSessionIds.add(sessionId);
+}
+
+function clearSessionCancelled(sessionId: SessionId): void {
+  cancelledSessionIds.delete(sessionId);
+}
+
+function isSessionCancelled(sessionId: SessionId): boolean {
+  return cancelledSessionIds.has(sessionId);
 }
 
 export type SoundBarPlaybackReadyInfo = {
@@ -178,10 +238,10 @@ export type SoundBarPlaybackReadyInfo = {
 
 function heardTiming(
   baseSec: number,
-  speed: number,
+  rate: number,
   pendulum: boolean,
 ): { heardLapSec: number; heardTotalOnceSec: number } {
-  const lap = baseSec / speed;
+  const lap = baseSec / rate;
   return {
     heardLapSec: lap,
     heardTotalOnceSec: pendulum ? lap * 2 : lap,
@@ -191,13 +251,13 @@ function heardTiming(
 function fireReady(
   sessionId: SessionId,
   baseSec: number,
-  speed: number,
+  effectiveRate: number,
   pendulum: boolean,
   onPlaybackReady?: (info: SoundBarPlaybackReadyInfo) => void,
 ): void {
   clearPlaybackReadyFallback(sessionId);
   const durationSec = clampClipDurationSec(baseSec);
-  const s = clampPlaybackSpeed(speed);
+  const s = clampPlaybackSpeed(effectiveRate);
   const { heardLapSec, heardTotalOnceSec } = heardTiming(durationSec, s, pendulum);
   onPlaybackReady?.({ durationSec, heardLapSec, heardTotalOnceSec });
 }
@@ -209,6 +269,7 @@ export type SoundBarPlaybackStartParams = {
   gateEnabled?: boolean;
   sessionVolume: number;
   playbackSpeed: number;
+  playbackPitch: number;
   reverse: boolean;
   pendulum: boolean;
   onEnded?: () => void;
@@ -234,16 +295,17 @@ async function startHtmlSoundBarSession(
   const trimmed = audioUrl.trim();
   const volMul = clampSessionVolume(sessionVolume);
   const speed = clampPlaybackSpeed(playbackSpeed);
+  const effectiveRate = speed;
 
   const audio = new Audio(trimmed);
   audio.preload = "auto";
   audio.loop = loopEnabled;
-  audio.playbackRate = speed;
+  audio.playbackRate = effectiveRate;
 
   unsubscribeMasterBySessionId.set(
     sessionId,
     subscribeSoundBarVolume((v) => {
-      audio.volume = v * volMul;
+      audio.volume = Math.max(0, Math.min(1, v * volMul));
     }),
   );
 
@@ -256,7 +318,7 @@ async function startHtmlSoundBarSession(
     if (!Number.isFinite(d) || d <= 0) return;
     playbackReadyFired = true;
     const base = clampClipDurationSec(d);
-    fireReady(sessionId, base, speed, params.pendulum, onPlaybackReady);
+    fireReady(sessionId, base, effectiveRate, params.pendulum, onPlaybackReady);
   }
 
   audio.addEventListener("loadedmetadata", firePlaybackReadyOnce);
@@ -269,11 +331,11 @@ async function startHtmlSoundBarSession(
     fireReady(
       sessionId,
       FALLBACK_CLIP_DURATION_SEC,
-      speed,
+      effectiveRate,
       params.pendulum,
       onPlaybackReady,
     );
-  }, 900);
+  }, PLAYBACK_READY_FALLBACK_MS);
   playbackReadyFallbackBySessionId.set(sessionId, fallbackTimer);
 
   void applySink(audio);
@@ -325,6 +387,7 @@ async function startWebAudioSoundBarSession(
   const {
     sessionVolume,
     playbackSpeed,
+    playbackPitch,
     reverse,
     onLoopTick,
     onPlaybackReady,
@@ -333,6 +396,8 @@ async function startWebAudioSoundBarSession(
 
   const volMul = clampSessionVolume(sessionVolume);
   const speed = clampPlaybackSpeed(playbackSpeed);
+  const pitch = clampPlaybackPitch(playbackPitch);
+  const effectiveRate = speed;
   const baseSec = clampClipDurationSec(forward.duration);
   const D = forward.duration;
 
@@ -342,19 +407,99 @@ async function startWebAudioSoundBarSession(
   } catch {
     ctx = new AudioContext();
   }
+  if (isSessionCancelled(sessionId)) {
+    try {
+      void ctx.close();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   await ctx.resume();
+  if (isSessionCancelled(sessionId)) {
+    try {
+      void ctx.close();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   await applySinkToAudioContext(ctx);
+  if (isSessionCancelled(sessionId)) {
+    try {
+      void ctx.close();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
 
   const gainNode = ctx.createGain();
   gainNode.connect(ctx.destination);
 
+  function gateHeardSourceSeconds(timePlayedSec: number): number {
+    return Math.max(0, timePlayedSec - GATE_PITCH_SHIFT_BLOCK_FRAMES / ctx.sampleRate);
+  }
+  /** Берём минимум из «стены» и метра SoundTouch — иначе хвост после гейта стартует слишком рано. */
+  function mergeGateHoldPlayedSec(wallPlayedSec: number, shifter: PitchShifter | null): number {
+    const wall = Math.min(D, Math.max(0, wallPlayedSec));
+    if (shifter == null) return wall;
+    const fromMeter = Math.min(D, gateHeardSourceSeconds(shifter.timePlayed));
+    return Math.min(wall, fromMeter);
+  }
+
   let stopped = false;
   let currentSource: AudioBufferSourceNode | null = null;
+  let pitchTailVoice: GainNode | null = null;
+  let pitchTailShifter: PitchShifter | null = null;
+  let currentDetachNode: ((releaseHard?: boolean) => void) | null = null;
+
+  function fadePitchTail(hard: boolean): void {
+    const v = pitchTailVoice;
+    const s = pitchTailShifter;
+    pitchTailVoice = null;
+    pitchTailShifter = null;
+    if (!v && !s) return;
+    if (hard || !v) {
+      try {
+        s?.disconnect();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    const now = ctx.currentTime;
+    try {
+      v.gain.cancelScheduledValues(now);
+      const c = Math.min(1, Math.max(0, v.gain.value));
+      v.gain.setValueAtTime(c, now);
+      v.gain.linearRampToValueAtTime(0, now + PITCH_TAIL_RELEASE_SEC);
+    } catch {
+      try {
+        s?.disconnect();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    window.setTimeout(() => {
+      try {
+        s?.disconnect();
+      } catch {
+        /* ignore */
+      }
+    }, Math.ceil(PITCH_TAIL_RELEASE_SEC * 1000) + 25);
+  }
 
   const setGainFromMaster = (master: number) => {
     if (stopped || gainNode.context.state === "closed") return;
     try {
-      gainNode.gain.setValueAtTime(master * volMul, ctx.currentTime);
+      const t = ctx.currentTime;
+      const g = Math.max(0, master * volMul);
+      gainNode.gain.cancelScheduledValues(t);
+      const cur = Math.min(1, Math.max(0, gainNode.gain.value));
+      gainNode.gain.setValueAtTime(cur, t);
+      gainNode.gain.linearRampToValueAtTime(g, t + 0.028);
     } catch {
       /* ignore */
     }
@@ -375,6 +520,13 @@ async function startWebAudioSoundBarSession(
     }
     currentSource = null;
     try {
+      currentDetachNode?.(true);
+    } catch {
+      /* ignore */
+    }
+    currentDetachNode = null;
+    fadePitchTail(true);
+    try {
       void ctx.close();
     } catch {
       /* ignore */
@@ -392,52 +544,204 @@ async function startWebAudioSoundBarSession(
     const id = window.setInterval(() => {
       if (stopped) return;
       const now = performance.now();
-      const lapMs = (buf.duration / speed) * 1000;
+      const lapMs = (buf.duration / effectiveRate) * 1000;
       if (lapMs > 0 && now - lastWall >= lapMs * 0.92) {
         onLoopTick();
         lastWall = now;
       }
-    }, Math.min(420, Math.max(90, (buf.duration / speed / 4) * 1000)));
+    }, Math.min(420, Math.max(90, (buf.duration / effectiveRate / 4) * 1000)));
     loopTickCleanupBySessionId.set(sessionId, () => clearInterval(id));
   }
 
-  function applyPlaybackRate(src: AudioBufferSourceNode, r: number): void {
-    const t = ctx.currentTime;
+  function stopCurrentPlayback(): void {
     try {
-      src.playbackRate.cancelScheduledValues(t);
-      src.playbackRate.setValueAtTime(r, t);
-    } catch {
-      src.playbackRate.value = r;
-    }
-    try {
-      src.detune.setValueAtTime(0, t);
+      currentSource?.stop(0);
     } catch {
       /* ignore */
     }
+    currentSource = null;
+    try {
+      currentDetachNode?.(false);
+    } catch {
+      /* ignore */
+    }
+    currentDetachNode = null;
+  }
+
+  function sliceBuffer(
+    buffer: AudioBuffer,
+    offsetSec: number,
+    durationSec?: number,
+  ): AudioBuffer {
+    const startSec = Math.max(0, Math.min(buffer.duration, offsetSec));
+    const remainingSec = Math.max(0, buffer.duration - startSec);
+    const wantedSec =
+      durationSec == null ? remainingSec : Math.max(0, Math.min(remainingSec, durationSec));
+    const startFrame = Math.floor(startSec * buffer.sampleRate);
+    /** +1 кадр: не обрезаем хвост сегмента из‑за ceil. */
+    const frameCount = Math.max(1, Math.ceil(wantedSec * buffer.sampleRate) + 1);
+    const out = ctx.createBuffer(
+      buffer.numberOfChannels,
+      frameCount,
+      buffer.sampleRate,
+    );
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const src = buffer.getChannelData(c);
+      const dst = out.getChannelData(c);
+      dst.set(src.subarray(startFrame, startFrame + frameCount));
+    }
+    return out;
+  }
+
+  function withTrailingSilence(buffer: AudioBuffer, tailSec: number): AudioBuffer {
+    const addFrames = Math.max(1, Math.ceil(Math.max(0, tailSec) * buffer.sampleRate));
+    const out = ctx.createBuffer(
+      buffer.numberOfChannels,
+      buffer.length + addFrames,
+      buffer.sampleRate,
+    );
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      out.getChannelData(c).set(buffer.getChannelData(c), 0);
+    }
+    return out;
+  }
+
+  function playWithPitchShifter(
+    buffer: AudioBuffer,
+    loopThis: boolean,
+    onDone: () => void,
+    onLoopLap?: () => void,
+    expectedOutSec?: number,
+    shifterOpts?: {
+      onShifterReady?: (s: PitchShifter) => void;
+      bufferSize?: number;
+    },
+  ): void {
+    if (stopped) return;
+    stopCurrentPlayback();
+    let shifter: PitchShifter | null = null;
+    let alive = true;
+    const startOne = () => {
+      if (stopped || !alive) return;
+      let endedHandled = false;
+      let doneHandled = false;
+      let doneTimer: ReturnType<typeof setTimeout> | null = null;
+      const finishDone = () => {
+        if (doneHandled || stopped || !alive) return;
+        doneHandled = true;
+        onDone();
+      };
+      const voiceGain = ctx.createGain();
+      voiceGain.connect(gainNode);
+      const t = ctx.currentTime;
+      try {
+        voiceGain.gain.cancelScheduledValues(t);
+        voiceGain.gain.setValueAtTime(0, t);
+        voiceGain.gain.linearRampToValueAtTime(1, t + PITCH_TAIL_RELEASE_SEC);
+      } catch {
+        voiceGain.gain.value = 1;
+      }
+      const shifterBufferSize = shifterOpts?.bufferSize ?? PITCH_SHIFT_DEFAULT_BUFFER_FRAMES;
+      shifter = new PitchShifter(ctx, buffer, shifterBufferSize, () => {
+        if (stopped || !alive || endedHandled) return;
+        endedHandled = true;
+        if (loopThis) {
+          fadePitchTail(false);
+          if (!alive) return;
+          onLoopLap?.();
+          startOne();
+          return;
+        }
+        if (doneTimer != null) {
+          clearTimeout(doneTimer);
+          doneTimer = null;
+        }
+        fadePitchTail(false);
+        const drainMs = Math.max(
+          24,
+          Math.ceil((shifterBufferSize / Math.max(1, ctx.sampleRate)) * 1000) + 24,
+        );
+        const tailMs = Math.ceil(PITCH_TAIL_RELEASE_SEC * 1000) + 30;
+        if (!doneHandled) {
+          doneTimer = window.setTimeout(() => finishDone(), drainMs + tailMs);
+        }
+      });
+      shifter.rate = 1;
+      shifter.tempo = speed;
+      shifter.pitch = pitch;
+      shifter.connect(voiceGain);
+      shifterOpts?.onShifterReady?.(shifter);
+      if (!loopThis) {
+        const outSec = Math.max(0, expectedOutSec ?? buffer.duration / Math.max(0.001, speed));
+        const safetyMs = 36;
+        doneTimer = window.setTimeout(
+          () => finishDone(),
+          Math.ceil(outSec * 1000) + safetyMs,
+        );
+      }
+      pitchTailVoice = voiceGain;
+      pitchTailShifter = shifter;
+      currentDetachNode = (releaseHard?: boolean) => {
+        alive = false;
+        if (doneTimer != null) {
+          clearTimeout(doneTimer);
+          doneTimer = null;
+        }
+        fadePitchTail(releaseHard === true);
+      };
+    };
+    startOne();
   }
 
   function playBufferOnce(
     buffer: AudioBuffer,
     onDone: () => void,
     loopThis: boolean,
+    options?: {
+      offsetSec?: number;
+      durationSec?: number;
+      onLoopLap?: () => void;
+      /** Без хвоста тишины — первый полупериод ping-pong, чтобы стык со вторым был без щели. */
+      noTailPadding?: boolean;
+      /** Сегмент сразу после предыдущего (без лишнего padding между половинами). */
+      chainNext?: boolean;
+      /** Меньше — ниже задержка ScriptProcessor (гейт / хвост), выше CPU. */
+      pitchBufferSize?: number;
+      /** Хвост тишины для SoundTouch даже при chainNext (хвост после гейта — не обрезать конец). */
+      appendSoundTouchDrain?: boolean;
+      onShifterReady?: (s: PitchShifter) => void;
+    },
   ): void {
     if (stopped) return;
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    applyPlaybackRate(src, speed);
-    src.loop = loopThis;
-    src.connect(gainNode);
-    currentSource = src;
-    src.onended = () => {
-      if (currentSource === src) currentSource = null;
-      if (!stopped) onDone();
-    };
-    try {
-      src.start(0);
-    } catch {
-      onGateNonLoopClipEnded?.();
-      cleanupSession(sessionId);
-    }
+    const offsetSec = options?.offsetSec ?? 0;
+    const durationSec = options?.durationSec;
+    const onLoopLap = options?.onLoopLap;
+    const rawSegment =
+      offsetSec > 0 || durationSec != null
+        ? sliceBuffer(buffer, offsetSec, durationSec)
+        : buffer;
+    const isReverseSegment = reverseBuf != null && buffer === reverseBuf;
+    const padTailSec = soundTouchTailPaddingSec(speed, pitch, isReverseSegment);
+    const chainNext = Boolean(options?.chainNext);
+    const noTailPadding = Boolean(options?.noTailPadding);
+    const appendSoundTouchDrain = Boolean(options?.appendSoundTouchDrain);
+    const shouldPad =
+      !loopThis &&
+      (appendSoundTouchDrain || (!noTailPadding && !chainNext));
+    const segment = loopThis || !shouldPad ? rawSegment : withTrailingSilence(rawSegment, padTailSec);
+    const expectedOutSec = segment.duration / Math.max(0.001, speed);
+    const expectedOutSecWithReverseSafety = expectedOutSec + (isReverseSegment ? 0.12 : 0);
+    playWithPitchShifter(
+      segment,
+      loopThis,
+      onDone,
+      onLoopLap,
+      expectedOutSecWithReverseSafety,
+      {
+        bufferSize: options?.pitchBufferSize,
+        onShifterReady: options?.onShifterReady,
+      },
+    );
   }
 
   function finishNatural(): void {
@@ -445,16 +749,23 @@ async function startWebAudioSoundBarSession(
     cleanupSession(sessionId);
   }
 
-  fireReady(sessionId, baseSec, speed, pendulum && !gateEnabled, onPlaybackReady);
+  fireReady(
+    sessionId,
+    baseSec,
+    effectiveRate,
+    pendulum && !gateEnabled,
+    onPlaybackReady,
+  );
 
   if (gateEnabled && pendulum && reverse && reverseBuf) {
     let reverseExhausted = false;
     let userReleased = false;
     const t0 = ctx.currentTime;
+    let gateRevHoldShifter: PitchShifter | null = null;
 
     let tailStarted = false;
 
-    /** After reverse hold: play **forward** from stop position to end (not more reverse buffer). */
+    /** После удержания на реверсе — добираем вперёд до конца файла (уже не reverse-буфер). */
     function playForwardTailAfterReverseHold(playedRevSec: number): void {
       if (stopped || tailStarted) return;
       tailStarted = true;
@@ -469,20 +780,13 @@ async function startWebAudioSoundBarSession(
         cleanupSession(sessionId);
         return;
       }
-      const src = ctx.createBufferSource();
-      src.buffer = forward;
-      applyPlaybackRate(src, speed);
-      src.connect(gainNode);
-      currentSource = src;
-      src.onended = () => {
-        if (currentSource === src) currentSource = null;
-        if (!stopped) cleanupSession(sessionId);
-      };
-      try {
-        src.start(0, offFwd, durFwd);
-      } catch {
-        cleanupSession(sessionId);
-      }
+      playBufferOnce(forward, () => cleanupSession(sessionId), false, {
+        offsetSec: offFwd,
+        durationSec: durFwd,
+        chainNext: true,
+        appendSoundTouchDrain: true,
+        pitchBufferSize: GATE_PITCH_SHIFT_BLOCK_FRAMES,
+      });
     }
 
     gatePendReleaseBySessionId.set(sessionId, () => {
@@ -492,34 +796,30 @@ async function startWebAudioSoundBarSession(
         return;
       }
       userReleased = true;
-      try {
-        currentSource?.stop(0);
-      } catch {
-        /* ignore */
-      }
-      currentSource = null;
       const playedWall = ctx.currentTime - t0;
+      const wallPlayed = Math.min(D, Math.max(0, playedWall * effectiveRate));
       const playedRev = reverseExhausted
         ? D
-        : Math.min(D, Math.max(0, playedWall * speed));
+        : mergeGateHoldPlayedSec(wallPlayed, gateRevHoldShifter);
+      gateRevHoldShifter = null;
+      stopCurrentPlayback();
       playForwardTailAfterReverseHold(playedRev);
     });
 
-    const rev = ctx.createBufferSource();
-    rev.buffer = reverseBuf;
-    applyPlaybackRate(rev, speed);
-    rev.connect(gainNode);
-    currentSource = rev;
-    rev.onended = () => {
-      if (currentSource === rev) currentSource = null;
-      reverseExhausted = true;
-    };
-    try {
-      rev.start(0);
-    } catch {
-      gatePendReleaseBySessionId.delete(sessionId);
-      cleanupSession(sessionId);
-    }
+    playBufferOnce(
+      reverseBuf,
+      () => {
+        reverseExhausted = true;
+        gateRevHoldShifter = null;
+      },
+      false,
+      {
+        pitchBufferSize: GATE_PITCH_SHIFT_BLOCK_FRAMES,
+        onShifterReady: (s) => {
+          gateRevHoldShifter = s;
+        },
+      },
+    );
     return;
   }
 
@@ -528,6 +828,7 @@ async function startWebAudioSoundBarSession(
     let userReleased = false;
     const t0 = ctx.currentTime;
     const revFull = reverseAudioBuffer(ctx, forward);
+    let gateFwdHoldShifter: PitchShifter | null = null;
 
     let tailStarted = false;
 
@@ -540,20 +841,13 @@ async function startWebAudioSoundBarSession(
         return;
       }
       const off = Math.max(0, D - played);
-      const src = ctx.createBufferSource();
-      src.buffer = revFull;
-      applyPlaybackRate(src, speed);
-      src.connect(gainNode);
-      currentSource = src;
-      src.onended = () => {
-        if (currentSource === src) currentSource = null;
-        if (!stopped) cleanupSession(sessionId);
-      };
-      try {
-        src.start(0, off, played);
-      } catch {
-        cleanupSession(sessionId);
-      }
+      playBufferOnce(revFull, () => cleanupSession(sessionId), false, {
+        offsetSec: off,
+        durationSec: played,
+        chainNext: true,
+        appendSoundTouchDrain: true,
+        pitchBufferSize: GATE_PITCH_SHIFT_BLOCK_FRAMES,
+      });
     }
 
     gatePendReleaseBySessionId.set(sessionId, () => {
@@ -563,74 +857,89 @@ async function startWebAudioSoundBarSession(
         return;
       }
       userReleased = true;
-      try {
-        currentSource?.stop(0);
-      } catch {
-        /* ignore */
-      }
-      currentSource = null;
       const playedWall = ctx.currentTime - t0;
+      const wallPlayed = Math.min(D, Math.max(0, playedWall * effectiveRate));
       const playedSec = forwardExhausted
         ? D
-        : Math.min(D, Math.max(0, playedWall * speed));
+        : mergeGateHoldPlayedSec(wallPlayed, gateFwdHoldShifter);
+      gateFwdHoldShifter = null;
+      stopCurrentPlayback();
       playReverseFromPlayedSeconds(playedSec);
     });
 
-    const fwd = ctx.createBufferSource();
-    fwd.buffer = forward;
-    applyPlaybackRate(fwd, speed);
-    fwd.connect(gainNode);
-    currentSource = fwd;
-    fwd.onended = () => {
-      if (currentSource === fwd) currentSource = null;
-      forwardExhausted = true;
-    };
-    try {
-      fwd.start(0);
-    } catch {
-      gatePendReleaseBySessionId.delete(sessionId);
-      cleanupSession(sessionId);
-    }
+    playBufferOnce(
+      forward,
+      () => {
+        forwardExhausted = true;
+        gateFwdHoldShifter = null;
+      },
+      false,
+      {
+        pitchBufferSize: GATE_PITCH_SHIFT_BLOCK_FRAMES,
+        onShifterReady: (s) => {
+          gateFwdHoldShifter = s;
+        },
+      },
+    );
     return;
   }
 
   if (gateEnabled && reverse && reverseBuf && !pendulum) {
-    playBufferOnce(reverseBuf, () => {}, true);
+    playBufferOnce(reverseBuf, () => finishNatural(), false);
     return;
   }
 
   if (loopEnabled && pendulum && !gateEnabled) {
     const revFull = reverseAudioBuffer(ctx, forward);
-    function playPingPongCycle(): void {
+    function playPingPongCycle(fromReverse: boolean): void {
       if (stopped) return;
-      playBufferOnce(forward, () => {
-        if (stopped) return;
-        playBufferOnce(revFull, () => {
+      playBufferOnce(
+        forward,
+        () => {
           if (stopped) return;
-          onLoopTick?.();
-          playPingPongCycle();
-        }, false);
-      }, false);
+          playBufferOnce(
+            revFull,
+            () => {
+              if (stopped) return;
+              onLoopTick?.();
+              playPingPongCycle(true);
+            },
+            false,
+            { chainNext: true },
+          );
+        },
+        false,
+        fromReverse ? { chainNext: true } : { noTailPadding: true },
+      );
     }
-    fireReady(sessionId, baseSec, speed, true, onPlaybackReady);
-    playPingPongCycle();
+    playPingPongCycle(false);
     return;
   }
 
   if (pendulum && !gateEnabled) {
-    playBufferOnce(forward, () => {
-      if (stopped) return;
-      const revB = reverseAudioBuffer(ctx, forward);
-      playBufferOnce(revB, () => {
-        cleanupSession(sessionId);
-      }, false);
-    }, false);
+    playBufferOnce(
+      forward,
+      () => {
+        if (stopped) return;
+        const revB = reverseAudioBuffer(ctx, forward);
+        playBufferOnce(
+          revB,
+          () => {
+            cleanupSession(sessionId);
+          },
+          false,
+          { chainNext: true },
+        );
+      },
+      false,
+      { noTailPadding: true },
+    );
     return;
   }
 
   if (loopEnabled) {
-    playBufferOnce(playBuf, () => {}, true);
-    scheduleLoopTickIfNeeded(playBuf);
+    playBufferOnce(playBuf, () => {}, true, { onLoopLap: onLoopTick });
+    if (pitch === 1) scheduleLoopTickIfNeeded(playBuf);
     return;
   }
 
@@ -640,24 +949,35 @@ async function startWebAudioSoundBarSession(
 export async function startSoundBarSession(
   params: SoundBarPlaybackStartParams,
 ): Promise<void> {
-  const { sessionId, audioUrl, pendulum, reverse, onEnded, onPlaybackReady } = params;
+  const {
+    sessionId,
+    audioUrl,
+    pendulum,
+    reverse,
+    onEnded,
+    onPlaybackReady,
+    playbackPitch,
+  } = params;
 
+  clearSessionCancelled(sessionId);
   if (activeBySessionId.has(sessionId)) cleanupSession(sessionId);
 
   const gateEnabled = Boolean(params.gateEnabled);
   const reverseEff = Boolean(reverse) && (!pendulum || gateEnabled);
   const merged: SoundBarPlaybackStartParams = {
     ...params,
+    playbackPitch: clampPlaybackPitch(playbackPitch),
     reverse: reverseEff,
   };
 
   const speed = clampPlaybackSpeed(params.playbackSpeed);
+  const effectiveRate = speed;
 
   if (getOutputMuted()) {
     fireReady(
       sessionId,
       FALLBACK_CLIP_DURATION_SEC,
-      speed,
+      effectiveRate,
       pendulum,
       onPlaybackReady,
     );
@@ -673,17 +993,30 @@ export async function startSoundBarSession(
 
   if (onEnded) onEndedBySessionId.set(sessionId, onEnded);
 
-  const useWebAudio = pendulum || reverseEff;
+  const useWebAudio =
+    pendulum || reverseEff || merged.sessionVolume > 1 || merged.playbackPitch !== 1;
 
   if (!useWebAudio) {
+    if (isSessionCancelled(sessionId)) {
+      cleanupSession(sessionId);
+      return;
+    }
     await startHtmlSoundBarSession(sessionId, merged);
     return;
   }
 
   try {
     const forward = await decodeSoundBarUrl(trimmed);
+    if (isSessionCancelled(sessionId)) {
+      cleanupSession(sessionId);
+      return;
+    }
     await startWebAudioSoundBarSession(sessionId, merged, forward);
   } catch {
+    if (isSessionCancelled(sessionId)) {
+      cleanupSession(sessionId);
+      return;
+    }
     await startHtmlSoundBarSession(sessionId, {
       ...merged,
       reverse: false,
@@ -693,6 +1026,7 @@ export async function startSoundBarSession(
 }
 
 export function stopSoundBarSession(sessionId: SessionId): void {
+  markSessionCancelled(sessionId);
   const release = gatePendReleaseBySessionId.get(sessionId);
   if (release) {
     release();
