@@ -36,7 +36,7 @@ function debugLog(event: string, payload?: unknown): void {
   console.debug(`[soundbar/channel] ${event}`, payload ?? "");
 }
 
-const sharedSessionByEmoji = ref<Record<string, string>>({});
+const sharedSessionByEmoji = ref<Record<string, string[]>>({});
 
 const roomListenerBuckets = new WeakMap<
   LiveKitRoom,
@@ -55,10 +55,13 @@ function safeParse(payload: Uint8Array): unknown {
 function removeSessionBySessionId(sessionId: string) {
   const next = { ...sharedSessionByEmoji.value };
   let changed = false;
-  for (const [emoji, id] of Object.entries(next)) {
-    if (id === sessionId) {
-      delete next[emoji];
+  for (const [emoji, ids] of Object.entries(next)) {
+    const list = Array.isArray(ids) ? ids : [];
+    const filtered = list.filter((id) => id !== sessionId);
+    if (filtered.length !== list.length) {
       changed = true;
+      if (filtered.length === 0) delete next[emoji];
+      else next[emoji] = filtered;
     }
   }
   if (changed) sharedSessionByEmoji.value = next;
@@ -258,9 +261,10 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
     }
 
     if (p.action === "start") {
+      const cur = sharedSessionByEmoji.value[emoji] ?? [];
       sharedSessionByEmoji.value = {
         ...sharedSessionByEmoji.value,
-        [emoji]: sessionId,
+        [emoji]: [...cur, sessionId],
       };
     }
 
@@ -306,9 +310,12 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
       p.action === "start"
         ? {
             onPlaybackEnded: () => {
-              if (sharedSessionByEmoji.value[emoji] !== sessionId) return;
+              const list = sharedSessionByEmoji.value[emoji] ?? [];
+              if (!list.includes(sessionId)) return;
+              const filtered = list.filter((id) => id !== sessionId);
               const next = { ...sharedSessionByEmoji.value };
-              delete next[emoji];
+              if (filtered.length === 0) delete next[emoji];
+              else next[emoji] = filtered;
               sharedSessionByEmoji.value = next;
             },
             syncOrigin: "remote",
@@ -366,7 +373,7 @@ export type SoundBarStartBroadcastParams = {
 };
 
 function stopAllKnownSessions(): void {
-  for (const sessionId of Object.values(sharedSessionByEmoji.value)) {
+  for (const sessionId of Object.values(sharedSessionByEmoji.value).flat()) {
     stopSoundBarEmojiGate(sessionId);
     stopSoundBarSession(sessionId);
   }

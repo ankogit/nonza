@@ -71,6 +71,10 @@ export function stopAllSoundBarEmojiEffects(): void {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
+  syncCanvasSize();
+  if (ctx && canvas) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 function cubicIn(t: number): number {

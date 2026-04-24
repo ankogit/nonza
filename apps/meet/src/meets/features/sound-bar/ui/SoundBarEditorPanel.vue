@@ -6,10 +6,10 @@
           v-model="volume"
           label="Volume"
           color="orange"
+          compact
           :min="0"
           :max="500"
           :step="1"
-          :size="64"
           :format-value="(v: number) => `${Math.round(v)}%`"
         />
       </div>
@@ -66,10 +66,10 @@
           v-model="speed"
           label="Speed"
           color="blue"
+          compact
           :min="50"
           :max="150"
           :step="1"
-          :size="64"
           :format-value="(v: number) => `${(v / 100).toFixed(2)}x`"
         />
       </div>

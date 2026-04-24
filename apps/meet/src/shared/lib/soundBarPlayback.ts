@@ -13,7 +13,10 @@ import {
   connect as toneConnect,
 } from "tone";
 import { getOutputMuted } from "./output-mute";
-import { stopSoundBarEmojiGate } from "./soundBarEmojiParticles";
+import {
+  stopAllSoundBarEmojiEffects,
+  stopSoundBarEmojiGate,
+} from "./soundBarEmojiParticles";
 import { subscribeSoundBarVolume } from "./soundBarVolume";
 import { TimestretchWorklet } from "./audio/TimestretchWorklet";
 
@@ -186,7 +189,7 @@ function cleanupSession(sessionId: SessionId): void {
 }
 
 /** Одношоты без gate/loop при спаме создают по AudioContext на звук — ограничиваем хвост. */
-const MAX_EVICTABLE_SOUND_BAR_SESSIONS = 12;
+const MAX_EVICTABLE_SOUND_BAR_SESSIONS = 28;
 
 function countEvictableSoundBarSessions(): number {
   let n = 0;
@@ -1586,4 +1589,19 @@ export function stopSoundBarSession(sessionId: SessionId): void {
     return;
   }
   cleanupSession(sessionId);
+}
+
+export function stopAllSoundBarPlaybackImmediately(): void {
+  stopAllSoundBarEmojiEffects();
+  const ids = [...activeBySessionId.keys()];
+  for (const sessionId of ids) {
+    clearSessionCancelled(sessionId);
+    cleanupSession(sessionId);
+  }
+  gatePendReleaseBySessionId.clear();
+  for (const [, t] of cancelledSessionTtlBySessionId) {
+    clearTimeout(t);
+  }
+  cancelledSessionTtlBySessionId.clear();
+  cancelledSessionIds.clear();
 }

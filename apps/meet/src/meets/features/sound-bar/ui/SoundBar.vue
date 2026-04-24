@@ -6,7 +6,7 @@
     :class="{ 'sound-bar--panel-root': isPanel }"
   >
     <div
-      v-if="sounds.length > 0"
+      v-if="hasOrg"
       class="sound-bar__host"
       :class="{ 'sound-bar__host--panel': isPanel }"
     >
@@ -40,7 +40,7 @@
           aria-busy="true"
           aria-label="Загрузка звуков"
         >
-          <span class="sound-bar__decode-spinner" aria-hidden="true" />
+          <PixelIcon name="loading" variant="large" />
         </div>
         <div class="sound-bar__volume">
           <button
@@ -106,6 +106,20 @@
               @click="activeEditorTab = 'eq'"
             >
               EQ
+            </button>
+            <button
+              v-if="hasOrg"
+              type="button"
+              role="tab"
+              class="sound-bar__playback-tab sound-bar__playback-tab--upload"
+              :class="{
+                'sound-bar__playback-tab--active':
+                  activeEditorTab === 'upload',
+              }"
+              :aria-selected="activeEditorTab === 'upload'"
+              @click="activeEditorTab = 'upload'"
+            >
+              Upload
             </button>
           </div>
           <div
@@ -253,7 +267,7 @@
             </div>
           </div>
           <div
-            v-else
+            v-else-if="activeEditorTab === 'eq'"
             class="sound-bar__playback-main sound-bar__playback-main--fx"
           >
             <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
@@ -293,78 +307,92 @@
             </div>
           </div>
         </div>
-        <div class="sound-bar__scroll meet-scroll">
-          <div class="sound-bar__emoji-grid">
-            <Button
-              v-for="s in sounds"
-              :key="s.id"
-              type="icon"
-              icon-size="40px"
-              class="sound-bar__tile button--scale-disabled"
-              :class="{
-                'sound-bar__tile--pressed': pressedEmoji === s.emoji,
-                'sound-bar__tile--sound-selected': selectedSoundId === s.id,
-              }"
-              :variant="tileVariant(s)"
-              :disabled="!s.audioUrl"
-              :title="tileTitle(s)"
-              @click="handleRowClick(s)"
-              @pointerdown="handlePointerDown(s, $event)"
-              @pointerup="handlePointerUp(s)"
-              @pointerleave="handlePointerUp(s)"
-              @pointercancel="handlePointerUp(s)"
-              @contextmenu.stop.prevent="onSoundContextMenu(s, $event)"
+        <div
+          class="sound-bar__scroll meet-scroll"
+          :class="{ 'sound-bar__scroll--upload': activeEditorTab === 'upload' }"
+        >
+          <SoundBarUploadPanel
+            v-if="activeEditorTab === 'upload' && orgIdForUpload"
+            variant="embed"
+            :org-id="orgIdForUpload"
+            :can-edit="canEditOrganizationSounds"
+            class="sound-bar__upload-panel"
+          />
+          <template v-else>
+            <p
+              v-if="sounds.length === 0"
+              class="sound-bar__empty-grid-hint"
             >
-              <button
-                type="button"
-                class="sound-bar__keybind-mini"
+              Звуков пока нет. Откройте вкладку Upload, чтобы добавить.
+            </p>
+            <div v-else class="sound-bar__emoji-grid">
+              <Button
+                v-for="s in sounds"
+                :key="s.id"
+                type="icon"
+                icon-size="40px"
+                class="sound-bar__tile button--scale-disabled"
                 :class="{
-                  'sound-bar__keybind-mini--bound': Boolean(
-                    hotkeysBySoundId[s.id],
-                  ),
-                  'sound-bar__keybind-mini--capture':
-                    bindingCaptureSoundId === s.id,
+                  'sound-bar__tile--pressed': pressedEmoji === s.emoji,
+                  'sound-bar__tile--sound-selected': selectedSoundId === s.id,
                 }"
-                :title="tileKeybindTitle(s)"
-                tabindex="-1"
-                @click.stop="onKeybindMiniClick(s, $event)"
+                :variant="tileVariant(s)"
+                :disabled="!s.audioUrl"
+                :title="tileTitle(s)"
+                @click="handleRowClick(s)"
+                @pointerdown="handlePointerDown(s, $event)"
+                @pointerup="handlePointerUp(s)"
+                @pointerleave="handlePointerUp(s)"
+                @pointercancel="handlePointerUp(s)"
+                @contextmenu.stop.prevent="onSoundContextMenu(s, $event)"
               >
-                {{ hotkeyLabelForSound(s.id) || "·" }}
-              </button>
-              <span class="sound-bar__tile-emoji">{{ s.emoji }}</span>
-              <div
-                v-if="tilePlaybackFlags(s).any"
-                class="sound-bar__tile-badges"
-              >
-                <span v-if="tilePlaybackFlags(s).loop" class="sound-bar__badge"
-                  >L</span
+                <button
+                  type="button"
+                  class="sound-bar__keybind-mini"
+                  :class="{
+                    'sound-bar__keybind-mini--bound': Boolean(
+                      hotkeysBySoundId[s.id],
+                    ),
+                    'sound-bar__keybind-mini--capture':
+                      bindingCaptureSoundId === s.id,
+                  }"
+                  :title="tileKeybindTitle(s)"
+                  tabindex="-1"
+                  @click.stop="onKeybindMiniClick(s, $event)"
                 >
-                <span v-if="tilePlaybackFlags(s).gate" class="sound-bar__badge"
-                  >D</span
+                  {{ hotkeyLabelForSound(s.id) || "·" }}
+                </button>
+                <span class="sound-bar__tile-emoji">{{ s.emoji }}</span>
+                <div
+                  v-if="tilePlaybackFlags(s).any"
+                  class="sound-bar__tile-badges"
                 >
-                <span
-                  v-if="tilePlaybackFlags(s).reverse"
-                  class="sound-bar__badge"
-                  >R</span
-                >
-                <span
-                  v-if="tilePlaybackFlags(s).pendulum"
-                  class="sound-bar__badge"
-                  >P</span
-                >
-              </div>
-            </Button>
-          </div>
+                  <span
+                    v-if="tilePlaybackFlags(s).loop"
+                    class="sound-bar__badge"
+                    >L</span
+                  >
+                  <span
+                    v-if="tilePlaybackFlags(s).gate"
+                    class="sound-bar__badge"
+                    >D</span
+                  >
+                  <span
+                    v-if="tilePlaybackFlags(s).reverse"
+                    class="sound-bar__badge"
+                    >R</span
+                  >
+                  <span
+                    v-if="tilePlaybackFlags(s).pendulum"
+                    class="sound-bar__badge"
+                    >P</span
+                  >
+                </div>
+              </Button>
+            </div>
+          </template>
         </div>
       </div>
-    </div>
-    <div
-      v-else-if="isPanel"
-      class="sound-bar__surface sound-bar__surface--panel sound-bar__surface--empty"
-      role="status"
-      aria-label="Звуки организации"
-    >
-      <p class="sound-bar__empty-text">Нет звуков организации</p>
     </div>
   </div>
 </template>
@@ -375,6 +403,7 @@ import type { Room as LiveKitRoom } from "livekit-client";
 
 import { useOrganizationSounds, useSoundBarRoomChannel } from "../lib";
 import type { OrganizationSound } from "../model/types";
+import SoundBarUploadPanel from "./SoundBarUploadPanel.vue";
 import { Button, Knob, PixelIcon, Switch } from "@shared/ui";
 import {
   soundBarVolume,
@@ -383,6 +412,7 @@ import {
   toggleSoundBarMuted,
   getSoundBarLocalUserId,
   preloadSoundBarAudioEntries,
+  stopAllSoundBarPlaybackImmediately,
 } from "@shared/lib";
 
 const soundBarVolumeRef = soundBarVolume;
@@ -398,9 +428,13 @@ const props = withDefaults(
     livekitRoom: LiveKitRoom | null;
     previewMode?: boolean;
     layout?: "popover" | "panel";
+    canEditOrganizationSounds?: boolean;
   }>(),
-  { layout: "popover" },
+  { layout: "popover", canEditOrganizationSounds: true },
 );
+
+const hasOrg = computed(() => Boolean(props.orgId?.trim()));
+const orgIdForUpload = computed(() => props.orgId?.trim() ?? "");
 
 const rootRef = ref<HTMLElement | null>(null);
 const popoverOpen = ref(false);
@@ -540,7 +574,9 @@ const fxReverbDecayMs = ref(1200);
 const eqLowDb = ref(0);
 const eqMidDb = ref(0);
 const eqHighDb = ref(0);
-const activeEditorTab = ref<"playback" | "fx" | "eq">("playback");
+const activeEditorTab = ref<"playback" | "fx" | "eq" | "upload">(
+  "playback",
+);
 const playbackStateReady = ref(false);
 const DEBUG_KEY = "nonza_soundbar_debug";
 
@@ -1122,7 +1158,7 @@ function createSessionId() {
 }
 
 function isActive(emoji: string): boolean {
-  return Boolean(sessionByEmoji.value[emoji]);
+  return (sessionByEmoji.value[emoji]?.length ?? 0) > 0;
 }
 
 function tileTitle(s: OrganizationSound): string {
@@ -1166,12 +1202,15 @@ function gatePressStart(sound: OrganizationSound): void {
     selectedSoundId: selectedSoundId.value,
   });
   if (!cfg.gateEnabled) return;
-  const existing = sessionByEmoji.value[sound.emoji];
-  if (existing) {
-    void stopAndBroadcast({ sessionId: existing });
+  const existingIds = sessionByEmoji.value[sound.emoji] ?? [];
+  for (const id of existingIds) {
+    void stopAndBroadcast({ sessionId: id });
   }
   const sessionId = createSessionId();
-  sessionByEmoji.value = { ...sessionByEmoji.value, [sound.emoji]: sessionId };
+  sessionByEmoji.value = {
+    ...sessionByEmoji.value,
+    [sound.emoji]: [sessionId],
+  };
   pressedEmoji.value = sound.emoji;
   void startAndBroadcast({
     sessionId,
@@ -1192,7 +1231,8 @@ function gatePressEnd(sound: OrganizationSound): void {
   gateKeydownFromKeyboard.delete(sound.emoji);
   const cfg = broadcastPlaybackForSound(sound);
   if (!cfg.gateEnabled) return;
-  const sessionId = sessionByEmoji.value[sound.emoji];
+  const ids = sessionByEmoji.value[sound.emoji] ?? [];
+  const sessionId = ids[ids.length - 1];
   if (!sessionId) return;
   void stopAndBroadcast({ sessionId });
   if (pressedEmoji.value === sound.emoji) pressedEmoji.value = null;
@@ -1250,7 +1290,8 @@ function assignHotkey(soundId: string, code: string): void {
 }
 
 function stopAllActivePlayback(): void {
-  const activeSessionIds = Object.values(sessionByEmoji.value);
+  const activeSessionIds = Object.values(sessionByEmoji.value).flat();
+  stopAllSoundBarPlaybackImmediately();
   for (const sessionId of activeSessionIds) {
     void stopAndBroadcast({ sessionId });
   }
@@ -1342,7 +1383,8 @@ function handleWindowKeyup(e: KeyboardEvent): void {
     gatePressEnd(sound);
     return;
   }
-  const sessionId = sessionByEmoji.value[emoji];
+  const ids = sessionByEmoji.value[emoji] ?? [];
+  const sessionId = ids[ids.length - 1];
   if (!sessionId) return;
   void stopAndBroadcast({ sessionId });
 }
@@ -1383,18 +1425,20 @@ function handleRowClick(sound: OrganizationSound) {
   });
   if (cfg.gateEnabled) return;
 
-  const existing = sessionByEmoji.value[sound.emoji];
+  const existingIds = sessionByEmoji.value[sound.emoji] ?? [];
 
   if (cfg.loopEnabled) {
-    if (existing) {
-      void stopAndBroadcast({ sessionId: existing });
+    if (existingIds.length > 0) {
+      for (const id of existingIds) {
+        void stopAndBroadcast({ sessionId: id });
+      }
       return;
     }
 
     const sessionId = createSessionId();
     sessionByEmoji.value = {
       ...sessionByEmoji.value,
-      [sound.emoji]: sessionId,
+      [sound.emoji]: [sessionId],
     };
     void startAndBroadcast({
       sessionId,
@@ -1407,7 +1451,11 @@ function handleRowClick(sound: OrganizationSound) {
   }
 
   const sessionId = createSessionId();
-  sessionByEmoji.value = { ...sessionByEmoji.value, [sound.emoji]: sessionId };
+  const cur = sessionByEmoji.value[sound.emoji] ?? [];
+  sessionByEmoji.value = {
+    ...sessionByEmoji.value,
+    [sound.emoji]: [...cur, sessionId],
+  };
   void startAndBroadcast({
     sessionId,
     emoji: sound.emoji,
@@ -1415,9 +1463,12 @@ function handleRowClick(sound: OrganizationSound) {
     audioVersion: sound.version,
     ...cfg,
     onLocalPlaybackEnded: () => {
-      if (sessionByEmoji.value[sound.emoji] !== sessionId) return;
+      const list = sessionByEmoji.value[sound.emoji] ?? [];
+      if (!list.includes(sessionId)) return;
+      const filtered = list.filter((id) => id !== sessionId);
       const next = { ...sessionByEmoji.value };
-      delete next[sound.emoji];
+      if (filtered.length === 0) delete next[sound.emoji];
+      else next[sound.emoji] = filtered;
       sessionByEmoji.value = next;
     },
   });
@@ -1465,21 +1516,6 @@ function handleRowClick(sound: OrganizationSound) {
   justify-content: center;
   background: rgba(10, 10, 10, 0.72);
   pointer-events: all;
-}
-
-.sound-bar__decode-spinner {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.85);
-  animation: sound-bar-spin 0.7s linear infinite;
-}
-
-@keyframes sound-bar-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .sound-bar__surface--popover {
@@ -1543,6 +1579,23 @@ function handleRowClick(sound: OrganizationSound) {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.42);
   text-align: center;
+}
+
+.sound-bar__empty-grid-hint {
+  margin: 10px 4px 14px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(186, 177, 168, 0.72);
+  text-align: center;
+}
+
+.sound-bar__scroll--upload {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sound-bar__upload-panel {
+  padding-bottom: 6px;
 }
 
 .sound-bar__volume {
