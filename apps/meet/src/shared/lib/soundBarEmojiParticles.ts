@@ -8,6 +8,7 @@ let ctx: CanvasRenderingContext2D | null = null;
 let rafId: number | null = null;
 
 type Particle = {
+  sessionId: string;
   symbol: string;
   size: number;
   sx: number;
@@ -106,7 +107,7 @@ function syncCanvasSize(): void {
   }
 }
 
-function spawnParticle(symbol: string): void {
+function spawnParticle(symbol: string, sessionId: string): void {
   if (!canvas) return;
   const w = canvas.width;
   const h = canvas.height;
@@ -116,6 +117,7 @@ function spawnParticle(symbol: string): void {
   const ex = Math.floor(w * (-0.2 + Math.random() * 1.4));
   const ey = -h * 0.2;
   particles.push({
+    sessionId,
     symbol,
     size,
     sx,
@@ -128,9 +130,9 @@ function spawnParticle(symbol: string): void {
   });
 }
 
-function spawnMany(symbol: string, count: number): void {
+function spawnMany(symbol: string, count: number, sessionId: string): void {
   for (let i = 0; i < count; i++) {
-    spawnParticle(symbol);
+    spawnParticle(symbol, sessionId);
   }
 }
 
@@ -195,7 +197,7 @@ function emitOverWindow(
       return false;
     }
     const n = Math.max(1, Math.round(basePerTick * (0.45 + Math.random() * 0.45)));
-    spawnMany(symbol, n);
+    spawnMany(symbol, n, sessionId);
     scheduleFrame();
     return true;
   };
@@ -235,13 +237,14 @@ export function triggerSoundBarEmojiLoopIntro(
 export function triggerSoundBarEmojiLoopPulse(
   symbol: string,
   durationSec: number = DEFAULT_CLIP_DURATION_SEC,
+  sessionId: string,
 ): void {
   if (!symbol.trim()) return;
   ensureCanvas();
   if (!canvas) return;
   const d = clampClipDurationSec(durationSec);
   const n = Math.min(7, Math.max(1, Math.round(1 + d * 2.8)));
-  spawnMany(symbol, n);
+  spawnMany(symbol, n, sessionId);
   scheduleFrame();
 }
 
@@ -260,7 +263,7 @@ export function startSoundBarEmojiGate(
   const spawnCount = Math.min(5, Math.max(2, Math.round(2 + d * 0.22)));
 
   const id = window.setInterval(() => {
-    spawnMany(symbol, spawnCount);
+    spawnMany(symbol, spawnCount, sessionId);
     scheduleFrame();
   }, intervalMs);
 

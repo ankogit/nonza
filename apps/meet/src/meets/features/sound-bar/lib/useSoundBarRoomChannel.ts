@@ -114,7 +114,7 @@ async function handleAction(
       },
       onLoopTick:
         loopEnabled && !gateEnabled
-          ? () => triggerSoundBarEmojiLoopPulse(emoji, clipLapSec)
+          ? () => triggerSoundBarEmojiLoopPulse(emoji, clipLapSec, sessionId)
           : undefined,
     });
     return;
