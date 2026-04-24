@@ -177,6 +177,7 @@ function onListPointerDown(s: OrganizationSound, ev: PointerEvent) {
   void startSoundBarSession({
     sessionId,
     audioUrl: s.audioUrl,
+    audioVersion: s.version,
     loopEnabled: s.loopEnabled,
     gateEnabled: s.gateEnabled,
     sessionVolume: Math.max(0, Math.min(5, Number(s.volume) / 100)),
@@ -226,6 +227,7 @@ function onListClick(s: OrganizationSound) {
     void startSoundBarSession({
       sessionId,
       audioUrl: s.audioUrl,
+      audioVersion: s.version,
       loopEnabled: true,
       gateEnabled: false,
       sessionVolume: Math.max(0, Math.min(5, Number(s.volume) / 100)),
@@ -250,6 +252,7 @@ function onListClick(s: OrganizationSound) {
   void startSoundBarSession({
     sessionId: createSessionId(),
     audioUrl: s.audioUrl,
+    audioVersion: s.version,
     loopEnabled: false,
     gateEnabled: false,
     sessionVolume: Math.max(0, Math.min(5, Number(s.volume) / 100)),

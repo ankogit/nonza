@@ -20,8 +20,13 @@ import { TimestretchWorklet } from "./audio/TimestretchWorklet";
 type SessionId = string;
 
 type SessionHandle =
-  | { kind: "html"; audio: HTMLAudioElement }
-  | { kind: "wa"; dispose: () => void };
+  | { kind: "html"; audio: HTMLAudioElement; evictable: boolean }
+  | {
+      kind: "wa";
+      dispose: () => void;
+      evictable: boolean;
+      runGateDryStop: () => void;
+    };
 
 const activeBySessionId = new Map<SessionId, SessionHandle>();
 
@@ -49,30 +54,57 @@ function getDecodeContext(): AudioContext {
   return decodeCtx;
 }
 
-async function decodeSoundBarUrl(url: string): Promise<AudioBuffer> {
-  const cached = bufferCache.get(url);
+function makeSoundBarBufferKey(url: string, audioVersion: number): string {
+  const t = url.trim();
+  const v = Number.isFinite(audioVersion) ? Math.floor(audioVersion) : 0;
+  return `${t}\0v${v}`;
+}
+
+async function decodeSoundBarUrl(
+  url: string,
+  audioVersion = 0,
+): Promise<AudioBuffer> {
+  const key = makeSoundBarBufferKey(url, audioVersion);
+  const cached = bufferCache.get(key);
   if (cached) return cached;
 
-  const existing = inFlightDecodes.get(url);
+  const existing = inFlightDecodes.get(key);
   if (existing) return existing;
 
   const promise = (async () => {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url.trim());
       if (!response.ok) throw new Error(`soundbar fetch ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
       const buffer = await getDecodeContext().decodeAudioData(
         arrayBuffer.slice(0),
       );
-      bufferCache.set(url, buffer);
+      bufferCache.set(key, buffer);
       return buffer;
     } finally {
-      inFlightDecodes.delete(url);
+      inFlightDecodes.delete(key);
     }
   })();
 
-  inFlightDecodes.set(url, promise);
+  inFlightDecodes.set(key, promise);
   return await promise;
+}
+
+/** Параллельный decode всех уникальных (url, version) для саундбара. */
+export async function preloadSoundBarAudioEntries(
+  entries: { url: string; version: number }[],
+): Promise<void> {
+  const seen = new Set<string>();
+  const tasks: Promise<AudioBuffer>[] = [];
+  for (const e of entries) {
+    const u = e.url?.trim() ?? "";
+    if (!u) continue;
+    const key = makeSoundBarBufferKey(u, e.version);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tasks.push(decodeSoundBarUrl(u, e.version));
+  }
+  await Promise.all(tasks);
 }
 
 function reverseAudioBuffer(
@@ -153,6 +185,37 @@ function cleanupSession(sessionId: SessionId): void {
   }
 }
 
+/** Одношоты без gate/loop при спаме создают по AudioContext на звук — ограничиваем хвост. */
+const MAX_EVICTABLE_SOUND_BAR_SESSIONS = 12;
+
+function countEvictableSoundBarSessions(): number {
+  let n = 0;
+  for (const h of activeBySessionId.values()) {
+    if (h.evictable) n++;
+  }
+  return n;
+}
+
+function evictOldestEvictableSoundBarSession(): void {
+  for (const id of activeBySessionId.keys()) {
+    const h = activeBySessionId.get(id);
+    if (h?.evictable) {
+      cleanupSession(id);
+      return;
+    }
+  }
+}
+
+/** Перед новым коротким one-shot освобождаем слоты, не трогая loop/gate. */
+function ensureEvictableSoundBarCapacity(merged: SoundBarPlaybackStartParams): void {
+  const incomingEvictable =
+    !merged.loopEnabled && !Boolean(merged.gateEnabled);
+  if (!incomingEvictable) return;
+  while (countEvictableSoundBarSessions() >= MAX_EVICTABLE_SOUND_BAR_SESSIONS) {
+    evictOldestEvictableSoundBarSession();
+  }
+}
+
 async function applySink(audio: HTMLAudioElement): Promise<void> {
   try {
     await applyStoredOutputDevice(audio);
@@ -194,6 +257,8 @@ const SEAMLESS_RELEASE_FADE_SEC = 0.001;
 const SEAMLESS_CHAIN_LOOKAHEAD_BASE_MS = 2;
 const SEAMLESS_CHAIN_LOOKAHEAD_MAX_MS = 8;
 const MIN_AUDIBLE_SEGMENT_SEC = 0.02;
+/** Верхняя граница «догоняния» по сети при remote-start (секунды wall). */
+const NETWORK_LAG_TRIM_CAP_SEC = 0.45;
 const NEUTRAL_PITCH_EPSILON = 0.01;
 const PITCH_SHIFT_WINDOW_SEC = 0.14;
 const PITCH_SHIFT_STAGE_LIMIT_SEMITONES = 8;
@@ -202,10 +267,15 @@ const SOURCE_ONLY_DRAIN_TAIL_MS = 260;
 const MAX_PITCH_SHIFT_DRAIN_TAIL_MS = 5000;
 const HARD_SAFE_PITCH_TAIL_MS = 600;
 const MAX_FX_TAIL_MS = 7000;
+/** После отпускания gate — плавное затухание выхода с FX-хвостом (delay/reverb). */
+const GATE_FX_TAIL_OUT_RAMP_SEC = 0.06;
 
 function closeAudioContextQuietly(ctx: AudioContext): void {
+  if (ctx.state === "closed") return;
   try {
-    void ctx.close();
+    void ctx.close().catch(() => {
+      /* двойной close / Tone уже закрыл underlying context */
+    });
   } catch {
     /* ignore */
   }
@@ -375,9 +445,13 @@ function fireReady(
   onPlaybackReady?.({ durationSec, heardLapSec, heardTotalOnceSec });
 }
 
+export type SoundBarPlaybackSyncOrigin = "local" | "remote";
+
 export type SoundBarPlaybackStartParams = {
   sessionId: SessionId;
   audioUrl: string;
+  /** Версия файла; влияет на ключ decode-кэша. */
+  audioVersion?: number;
   loopEnabled: boolean;
   gateEnabled?: boolean;
   sessionVolume: number;
@@ -386,11 +460,35 @@ export type SoundBarPlaybackStartParams = {
   fx: SoundBarFxSettings;
   reverse: boolean;
   pendulum: boolean;
+  /** Локальный старт — без сетевого trim; remote — компенсация задержки канала. */
+  syncOrigin?: SoundBarPlaybackSyncOrigin;
+  /** Время отправки `start` с точки зрения отправителя (wall ms). */
+  senderTsMs?: number;
+  /** Время приёма сообщения у получателя (wall ms). */
+  receivedAtMs?: number;
   onEnded?: () => void;
   onLoopTick?: () => void;
   onPlaybackReady?: (info: SoundBarPlaybackReadyInfo) => void;
   onGateNonLoopClipEnded?: () => void;
 };
+
+function computeInitialRemoteTrimSourceSec(
+  params: SoundBarPlaybackStartParams,
+  effectiveRate: number,
+  playBufDurationSec: number,
+): number {
+  if (params.syncOrigin !== "remote") return 0;
+  if (params.gateEnabled) return 0;
+  const ts = params.senderTsMs;
+  const rx = params.receivedAtMs;
+  if (typeof ts !== "number" || typeof rx !== "number") return 0;
+  const wallLagSec = Math.max(0, (rx - ts) / 1000);
+  const cappedWall = Math.min(wallLagSec, NETWORK_LAG_TRIM_CAP_SEC);
+  const trimSrc = cappedWall * Math.max(0.25, Math.min(4, effectiveRate));
+  if (trimSrc <= MIN_AUDIBLE_SEGMENT_SEC) return 0;
+  const maxTrim = Math.max(0, playBufDurationSec - MIN_AUDIBLE_SEGMENT_SEC);
+  return Math.min(trimSrc, maxTrim);
+}
 
 async function startHtmlSoundBarSession(
   sessionId: SessionId,
@@ -424,7 +522,12 @@ async function startHtmlSoundBarSession(
     }),
   );
 
-  activeBySessionId.set(sessionId, { kind: "html", audio });
+  const gateHtml = Boolean(params.gateEnabled);
+  activeBySessionId.set(sessionId, {
+    kind: "html",
+    audio,
+    evictable: !loopEnabled && !gateHtml,
+  });
 
   let playbackReadyFired = false;
   function firePlaybackReadyOnce(): void {
@@ -432,6 +535,19 @@ async function startHtmlSoundBarSession(
     const d = audio.duration;
     if (!Number.isFinite(d) || d <= 0) return;
     playbackReadyFired = true;
+    if (!loopEnabled) {
+      const trim = computeInitialRemoteTrimSourceSec(params, effectiveRate, d);
+      if (
+        trim > MIN_AUDIBLE_SEGMENT_SEC &&
+        trim < d - MIN_AUDIBLE_SEGMENT_SEC
+      ) {
+        try {
+          audio.currentTime = trim;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     const base = clampClipDurationSec(d);
     fireReady(sessionId, base, effectiveRate, params.pendulum, onPlaybackReady);
   }
@@ -522,6 +638,20 @@ async function startWebAudioSoundBarSession(
   const baseSec = clampClipDurationSec(forward.duration);
   const fullDurationSec = forward.duration;
 
+  /**
+   * Сухой вход обрубили; delay/reverb ещё «дышат» — не глушить voiceGain сразу.
+   * Только простой gate: при gate+pendulum (ping‑pong) оставляем прежнюю логику.
+   */
+  const gateFxSessionTailMs = (() => {
+    if (!gateEnabled) return 0;
+    if (pendulum) return 0;
+    let ms = 0;
+    if (fxDelayWet > 0.001) ms += Math.ceil(1200 + fxDelayWet * 3800);
+    if (fxReverbWet > 0.001) ms += Math.ceil(1500 + fxReverbWet * 4500);
+    if (ms <= 0) return 0;
+    return Math.min(ms, MAX_FX_TAIL_MS);
+  })();
+
   let ctx: AudioContext;
   try {
     ctx = new AudioContext({ sampleRate: forward.sampleRate });
@@ -594,13 +724,38 @@ async function startWebAudioSoundBarSession(
       disposeVoice();
     }
     activeVoiceDisposers.clear();
+    try {
+      gainNode.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      toneCtx.dispose();
+    } catch {
+      /* ignore */
+    }
     closeAudioContextQuietly(ctx);
   };
 
-  activeBySessionId.set(sessionId, { kind: "wa", dispose });
-
   const reverseBuf = reverse ? reverseAudioBuffer(ctx, forward) : null;
   const playBuf = reverse && !pendulum && reverseBuf ? reverseBuf : forward;
+
+  const remoteTrimSourceSec = computeInitialRemoteTrimSourceSec(
+    params,
+    effectiveRate,
+    playBuf.duration,
+  );
+  const remoteSegOneShot =
+    remoteTrimSourceSec > MIN_AUDIBLE_SEGMENT_SEC
+      ? { offsetSec: remoteTrimSourceSec }
+      : undefined;
+  const remoteSegLoopFirst =
+    remoteTrimSourceSec > MIN_AUDIBLE_SEGMENT_SEC
+      ? {
+          offsetSec: remoteTrimSourceSec,
+          offsetSecAppliesOnlyToFirstVoice: true as const,
+        }
+      : undefined;
 
   function stopCurrentPlayback(): void {
     currentLapCleanup?.();
@@ -611,11 +766,30 @@ async function startWebAudioSoundBarSession(
     activeVoiceDisposers.clear();
   }
 
-  function stopPlaybackAndFinalizeSession(): void {
+  function runGateDryStop(): void {
     stopCurrentPlayback();
     stopSoundBarEmojiGate(sessionId);
-    cleanupSession(sessionId);
+    if (gateFxSessionTailMs > 0) {
+      const rampMs = Math.ceil(GATE_FX_TAIL_OUT_RAMP_SEC * 1000);
+      const deferMs = gateFxSessionTailMs + rampMs + 220;
+      window.setTimeout(() => {
+        cleanupSession(sessionId);
+      }, deferMs);
+    } else {
+      cleanupSession(sessionId);
+    }
   }
+
+  function stopPlaybackAndFinalizeSession(): void {
+    runGateDryStop();
+  }
+
+  activeBySessionId.set(sessionId, {
+    kind: "wa",
+    dispose,
+    evictable: !loopEnabled && !gateEnabled,
+    runGateDryStop,
+  });
 
   function sliceBufferSegment(
     buffer: AudioBuffer,
@@ -653,6 +827,8 @@ async function startWebAudioSoundBarSession(
       durationSec?: number;
       seamlessFromHold?: boolean;
       seamlessChain?: boolean;
+      /** Только первый voice в режиме loop; дальше offset сбрасывается. */
+      offsetSecAppliesOnlyToFirstVoice?: boolean;
     },
   ): void {
     if (stopped) return;
@@ -714,7 +890,11 @@ async function startWebAudioSoundBarSession(
       if (stopped) return;
       if (loopThis) {
         onLoopLap?.();
-        playWithSessionPipeline(buffer, true, onDone, onLoopLap, seg);
+        const nextSeg =
+          seg?.offsetSecAppliesOnlyToFirstVoice === true
+            ? { ...seg, offsetSec: 0, offsetSecAppliesOnlyToFirstVoice: false }
+            : seg;
+        playWithSessionPipeline(buffer, true, onDone, onLoopLap, nextSeg);
         return;
       }
       if (seg?.seamlessChain) return;
@@ -890,52 +1070,86 @@ async function startWebAudioSoundBarSession(
       disposed = true;
       activeVoiceDisposers.delete(disposeVoice);
       const t = ctx.currentTime;
-      try {
-        voiceGain.gain.cancelScheduledValues(t);
-        voiceGain.gain.setValueAtTime(Math.max(0, voiceGain.gain.value), t);
-        voiceGain.gain.linearRampToValueAtTime(0, t + VOICE_FADE_SEC);
-      } catch {
-        /* ignore */
+      const useFxTailGateStop = gateFxSessionTailMs > 0;
+
+      const disconnectGraph = (): void => {
+        try {
+          source.disconnect();
+        } catch {
+          /* ignore */
+        }
+        try {
+          worklet?.workletNode?.disconnect();
+        } catch {
+          /* ignore */
+        }
+        try {
+          for (const node of pitchShiftNodes) {
+            node.disconnect();
+            node.dispose();
+          }
+          pitchShiftNodes = [];
+        } catch {
+          /* ignore */
+        }
+        try {
+          for (const node of fxNodes) {
+            node.disconnect();
+            node.dispose();
+          }
+          fxNodes = [];
+        } catch {
+          /* ignore */
+        }
+      };
+
+      if (!useFxTailGateStop) {
+        try {
+          voiceGain.gain.cancelScheduledValues(t);
+          voiceGain.gain.setValueAtTime(Math.max(0, voiceGain.gain.value), t);
+          voiceGain.gain.linearRampToValueAtTime(0, t + VOICE_FADE_SEC);
+        } catch {
+          /* ignore */
+        }
+        if (started) {
+          try {
+            source.stop(t + VOICE_FADE_SEC);
+          } catch {
+            /* ignore */
+          }
+        }
+        window.setTimeout(
+          disconnectGraph,
+          Math.ceil((VOICE_FADE_SEC + 0.02) * 1000),
+        );
+        return;
       }
+
       if (started) {
         try {
-          source.stop(t + VOICE_FADE_SEC);
+          source.stop(t + 0.003);
         } catch {
           /* ignore */
         }
       }
+      const rampMs = Math.ceil(GATE_FX_TAIL_OUT_RAMP_SEC * 1000);
+      window.setTimeout(() => {
+        if (stopped) return;
+        try {
+          const t2 = ctx.currentTime;
+          voiceGain.gain.cancelScheduledValues(t2);
+          voiceGain.gain.setValueAtTime(Math.max(1e-4, voiceGain.gain.value), t2);
+          voiceGain.gain.linearRampToValueAtTime(
+            0,
+            t2 + GATE_FX_TAIL_OUT_RAMP_SEC,
+          );
+        } catch {
+          /* ignore */
+        }
+      }, gateFxSessionTailMs);
       window.setTimeout(
-        () => {
-          try {
-            source.disconnect();
-          } catch {
-            /* ignore */
-          }
-          try {
-            worklet?.workletNode?.disconnect();
-          } catch {
-            /* ignore */
-          }
-          try {
-            for (const node of pitchShiftNodes) {
-              node.disconnect();
-              node.dispose();
-            }
-            pitchShiftNodes = [];
-          } catch {
-            /* ignore */
-          }
-          try {
-            for (const node of fxNodes) {
-              node.disconnect();
-              node.dispose();
-            }
-            fxNodes = [];
-          } catch {
-            /* ignore */
-          }
-        },
-        Math.ceil((VOICE_FADE_SEC + 0.02) * 1000),
+        disconnectGraph,
+        gateFxSessionTailMs + rampMs + 80,
       );
     };
     activeVoiceDisposers.add(disposeVoice);
@@ -957,9 +1171,21 @@ async function startWebAudioSoundBarSession(
 
   if (!gateEnabled && !pendulum) {
     if (loopEnabled) {
-      playWithSessionPipeline(playBuf, true, () => {}, onLoopTick);
+      playWithSessionPipeline(
+        playBuf,
+        true,
+        () => {},
+        onLoopTick,
+        remoteSegLoopFirst,
+      );
     } else {
-      playWithSessionPipeline(playBuf, false, () => finishNatural());
+      playWithSessionPipeline(
+        playBuf,
+        false,
+        () => finishNatural(),
+        undefined,
+        remoteSegOneShot,
+      );
     }
     return;
   }
@@ -1152,14 +1378,26 @@ async function startWebAudioSoundBarSession(
       return;
     }
 
-    playWithSessionPipeline(reverseOnlyBuffer, false, () => finishNatural());
+    playWithSessionPipeline(
+      reverseOnlyBuffer,
+      false,
+      () => finishNatural(),
+      undefined,
+      remoteSegOneShot,
+    );
     return;
   }
 
   if (loopEnabled && pendulum && !gateEnabled) {
     const revFull = reverseAudioBuffer(ctx, forward);
+    let pingPongPrimed = true;
     function playPingPongCycle(): void {
       if (stopped) return;
+      const fwdSeg =
+        pingPongPrimed && remoteSegOneShot
+          ? { ...remoteSegOneShot, seamlessChain: true as const }
+          : { seamlessChain: true as const };
+      pingPongPrimed = false;
       playWithSessionPipeline(forward, false, () => {
         if (stopped) return;
         playWithSessionPipeline(revFull, false, () => {
@@ -1167,29 +1405,47 @@ async function startWebAudioSoundBarSession(
           onLoopTick?.();
           playPingPongCycle();
         }, undefined, { seamlessChain: true });
-      }, undefined, { seamlessChain: true });
+      }, undefined, fwdSeg);
     }
     playPingPongCycle();
     return;
   }
 
   if (pendulum && !gateEnabled) {
-    playWithSessionPipeline(forward, false, () => {
-      if (stopped) return;
-      const revB = reverseAudioBuffer(ctx, forward);
-      playWithSessionPipeline(revB, false, () => {
-        cleanupSession(sessionId);
-      });
-    });
+    playWithSessionPipeline(
+      forward,
+      false,
+      () => {
+        if (stopped) return;
+        const revB = reverseAudioBuffer(ctx, forward);
+        playWithSessionPipeline(revB, false, () => {
+          cleanupSession(sessionId);
+        });
+      },
+      undefined,
+      remoteSegOneShot,
+    );
     return;
   }
 
   if (loopEnabled) {
-    playWithSessionPipeline(playBuf, true, () => {}, onLoopTick);
+    playWithSessionPipeline(
+      playBuf,
+      true,
+      () => {},
+      onLoopTick,
+      remoteSegLoopFirst,
+    );
     return;
   }
 
-  playWithSessionPipeline(playBuf, false, () => finishNatural());
+  playWithSessionPipeline(
+    playBuf,
+    false,
+    () => finishNatural(),
+    undefined,
+    remoteSegOneShot,
+  );
 }
 
 export async function startSoundBarSession(
@@ -1214,8 +1470,14 @@ export async function startSoundBarSession(
 
   const gateEnabled = Boolean(params.gateEnabled);
   const reverseEff = Boolean(reverse) && (!pendulum || gateEnabled);
+  const audioVersionNorm =
+    typeof params.audioVersion === "number" && Number.isFinite(params.audioVersion)
+      ? Math.floor(params.audioVersion)
+      : 0;
   const merged: SoundBarPlaybackStartParams = {
     ...params,
+    audioVersion: audioVersionNorm,
+    syncOrigin: params.syncOrigin ?? "local",
     playbackPitch: clampPlaybackPitch(playbackPitch),
     fx: {
       filterHz: clampFxFilterHz(fx?.filterHz ?? 20000),
@@ -1233,6 +1495,8 @@ export async function startSoundBarSession(
   if (isNeutralPitch(merged.playbackPitch)) {
     merged.playbackPitch = 1;
   }
+
+  ensureEvictableSoundBarCapacity(merged);
 
   const speed = clampPlaybackSpeed(params.playbackSpeed);
   const effectiveRate = speed;
@@ -1265,7 +1529,7 @@ export async function startSoundBarSession(
   if (onEnded) onEndedBySessionId.set(sessionId, onEnded);
 
   try {
-    const forward = await decodeSoundBarUrl(trimmed);
+    const forward = await decodeSoundBarUrl(trimmed, merged.audioVersion ?? 0);
     if (isSessionCancelled(sessionId)) {
       cleanupSession(sessionId);
       return;
@@ -1278,7 +1542,10 @@ export async function startSoundBarSession(
     }
     if (complexPlaybackRequested) {
       try {
-        const forwardRetry = await decodeSoundBarUrl(trimmed);
+        const forwardRetry = await decodeSoundBarUrl(
+          trimmed,
+          merged.audioVersion ?? 0,
+        );
         if (isSessionCancelled(sessionId)) {
           cleanupSession(sessionId);
           return;
@@ -1311,6 +1578,11 @@ export function stopSoundBarSession(sessionId: SessionId): void {
   const release = gatePendReleaseBySessionId.get(sessionId);
   if (release) {
     release();
+    return;
+  }
+  const h = activeBySessionId.get(sessionId);
+  if (h?.kind === "wa") {
+    h.runGateDryStop();
     return;
   }
   cleanupSession(sessionId);

@@ -28,6 +28,8 @@ export type SoundBarActionStartPayload = {
   senderIdentity: string;
   emoji: string;
   audioUrl: string;
+  /** Версия файла на бэкенде; влияет на ключ decode-кэша у получателей. */
+  audioVersion: number;
   loopEnabled: boolean;
   gateEnabled: boolean;
   sessionVolume: number;
