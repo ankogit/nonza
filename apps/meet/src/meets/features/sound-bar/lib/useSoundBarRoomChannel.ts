@@ -17,9 +17,24 @@ import {
 import type {
   SoundBarActionMessage,
   SoundBarActionStartPayload,
+  SoundBarFxSettings,
 } from "../model/types";
 
 const DATA_TOPIC = "sound_bar";
+const DEBUG_KEY = "nonza_soundbar_debug";
+
+function debugEnabled(): boolean {
+  try {
+    return localStorage.getItem(DEBUG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(event: string, payload?: unknown): void {
+  if (!debugEnabled()) return;
+  console.debug(`[soundbar/channel] ${event}`, payload ?? "");
+}
 
 const sharedSessionByEmoji = ref<Record<string, string>>({});
 
@@ -64,11 +79,62 @@ function clampPlaybackPitch(n: unknown): number {
   return Math.max(0.25, Math.min(4, n));
 }
 
+function clampFxPercent(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function clampFxFilterHz(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 20000;
+  return Math.max(200, Math.min(20000, Math.round(n)));
+}
+
+function clampDelayTimeMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 200;
+  return Math.max(10, Math.min(2000, Math.round(n)));
+}
+
+function clampReverbDecayMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1200;
+  return Math.max(100, Math.min(6000, Math.round(n)));
+}
+
+function clampEqDb(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 0;
+  return Math.max(-24, Math.min(24, Math.round(n)));
+}
+
+function parseFx(raw: unknown): SoundBarFxSettings {
+  const fx = raw as Record<string, unknown> | null;
+  return {
+    filterHz: clampFxFilterHz(fx?.filterHz),
+    distortion: clampFxPercent(fx?.distortion),
+    delayWet: clampFxPercent(fx?.delayWet),
+    delayTimeMs: clampDelayTimeMs(fx?.delayTimeMs),
+    reverbWet: clampFxPercent(fx?.reverbWet),
+    reverbDecayMs: clampReverbDecayMs(fx?.reverbDecayMs),
+    eqLowDb: clampEqDb(fx?.eqLowDb),
+    eqMidDb: clampEqDb(fx?.eqMidDb),
+    eqHighDb: clampEqDb(fx?.eqHighDb),
+  };
+}
+
 async function handleAction(
   payload: SoundBarActionMessage["payload"],
   opts?: { onPlaybackEnded?: () => void },
 ) {
   if (payload.action === "start") {
+    debugLog("handleAction:start", {
+      sessionId: payload.sessionId,
+      emoji: payload.emoji,
+      gateEnabled: payload.gateEnabled,
+      loopEnabled: payload.loopEnabled,
+      reverse: payload.reverse,
+      pendulum: payload.pendulum,
+      playbackSpeed: payload.playbackSpeed,
+      playbackPitch: payload.playbackPitch,
+      fx: payload.fx,
+    });
     const {
       emoji,
       sessionId,
@@ -78,6 +144,7 @@ async function handleAction(
       sessionVolume,
       playbackSpeed,
       playbackPitch,
+      fx,
       reverse,
       pendulum,
     } = payload;
@@ -91,6 +158,7 @@ async function handleAction(
       sessionVolume,
       playbackSpeed,
       playbackPitch,
+      fx,
       reverse,
       pendulum,
       onEnded: opts?.onPlaybackEnded,
@@ -174,6 +242,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
     const playbackSpeed = clampPlaybackSpeed(p.playbackSpeed);
     const playbackPitch =
       typeof p.playbackPitch === "number" ? clampPlaybackPitch(p.playbackPitch) : 1;
+    const fx = parseFx(p.fx);
     const pendulum = typeof p.pendulum === "boolean" ? p.pendulum : false;
     let reverse = typeof p.reverse === "boolean" ? p.reverse : false;
     if (pendulum && !gateEnabled) {
@@ -200,6 +269,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
             sessionVolume,
             playbackSpeed,
             playbackPitch,
+            fx,
             reverse,
             pendulum,
             ts: p.ts as number,
@@ -272,6 +342,7 @@ export type SoundBarStartBroadcastParams = {
   sessionVolume: number;
   playbackSpeed: number;
   playbackPitch: number;
+  fx: SoundBarFxSettings;
   reverse: boolean;
   pendulum: boolean;
   onLocalPlaybackEnded?: () => void;
@@ -348,10 +419,12 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
       sessionVolume: params.sessionVolume,
       playbackSpeed: params.playbackSpeed,
       playbackPitch: params.playbackPitch,
+      fx: params.fx,
       reverse: params.reverse,
       pendulum,
       ts: Date.now(),
     };
+    debugLog("startAndBroadcast:payload", payload);
 
     void handleAction(payload, {
       onPlaybackEnded: params.onLocalPlaybackEnded,

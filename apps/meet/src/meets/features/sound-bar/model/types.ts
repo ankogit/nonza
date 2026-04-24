@@ -10,6 +10,18 @@ export interface OrganizationSound {
   speed: number;
 }
 
+export type SoundBarFxSettings = {
+  filterHz: number;
+  distortion: number;
+  delayWet: number;
+  delayTimeMs: number;
+  reverbWet: number;
+  reverbDecayMs: number;
+  eqLowDb: number;
+  eqMidDb: number;
+  eqHighDb: number;
+};
+
 export type SoundBarActionStartPayload = {
   action: "start";
   sessionId: string;
@@ -21,6 +33,7 @@ export type SoundBarActionStartPayload = {
   sessionVolume: number;
   playbackSpeed: number;
   playbackPitch: number;
+  fx: SoundBarFxSettings;
   reverse: boolean;
   pendulum: boolean;
   ts: number;

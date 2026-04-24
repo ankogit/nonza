@@ -8,6 +8,7 @@ type CreateWorkletParams = {
 
 const DEFAULT_MODULE_PATH = "/audio-worklets/phase-vocoder-processor.js";
 const loadedByContext = new WeakMap<AudioContext, Promise<void>>();
+const readyByContext = new WeakSet<AudioContext>();
 
 export class TimestretchWorklet {
   bufferSource: AudioBufferSourceNode | null;
@@ -16,27 +17,14 @@ export class TimestretchWorklet {
   playbackRate: number;
   workletNode: AudioWorkletNode | null;
 
-  static async createWorklet({
-    ctx,
-    bufferSource,
-    modulePath,
-    opts = {},
-    pitch,
-  }: CreateWorkletParams): Promise<TimestretchWorklet> {
+  private static setupWorklet(
+    ctx: AudioContext,
+    bufferSource: AudioBufferSourceNode | undefined,
+    opts: AudioWorkletNodeOptions,
+    pitch: number | undefined,
+  ): TimestretchWorklet {
     const worklet = new TimestretchWorklet(ctx);
-
-    let modulePromise = loadedByContext.get(ctx);
-    if (!modulePromise) {
-      modulePromise = ctx.audioWorklet.addModule(modulePath || DEFAULT_MODULE_PATH);
-      loadedByContext.set(ctx, modulePromise);
-    }
-    await modulePromise;
-
-    worklet.workletNode = new AudioWorkletNode(
-      ctx,
-      "phase-vocoder-processor",
-      opts,
-    );
+    worklet.workletNode = new AudioWorkletNode(ctx, "phase-vocoder-processor", opts);
 
     if (pitch != null) {
       worklet.updatePitch(pitch);
@@ -57,6 +45,43 @@ export class TimestretchWorklet {
     };
 
     return worklet;
+  }
+
+  static async ensureModuleLoaded(
+    ctx: AudioContext,
+    modulePath?: string,
+  ): Promise<void> {
+    if (readyByContext.has(ctx)) return;
+    let modulePromise = loadedByContext.get(ctx);
+    if (!modulePromise) {
+      modulePromise = ctx.audioWorklet.addModule(modulePath || DEFAULT_MODULE_PATH);
+      loadedByContext.set(ctx, modulePromise);
+    }
+    await modulePromise;
+    readyByContext.add(ctx);
+  }
+
+  static createWorkletSync({
+    ctx,
+    bufferSource,
+    opts = {},
+    pitch,
+  }: Omit<CreateWorkletParams, "modulePath">): TimestretchWorklet {
+    if (!readyByContext.has(ctx)) {
+      throw new Error("Worklet module is not loaded. Call ensureModuleLoaded first.");
+    }
+    return TimestretchWorklet.setupWorklet(ctx, bufferSource, opts, pitch);
+  }
+
+  static async createWorklet({
+    ctx,
+    bufferSource,
+    modulePath,
+    opts = {},
+    pitch,
+  }: CreateWorkletParams): Promise<TimestretchWorklet> {
+    await TimestretchWorklet.ensureModuleLoaded(ctx, modulePath);
+    return TimestretchWorklet.setupWorklet(ctx, bufferSource, opts, pitch);
   }
 
   constructor(ctx: AudioContext) {

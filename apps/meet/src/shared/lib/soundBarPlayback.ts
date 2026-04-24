@@ -4,7 +4,12 @@ import {
 } from "./audio-devices";
 import {
   Context as ToneContext,
+  Distortion as ToneDistortion,
+  EQ3 as ToneEQ3,
+  FeedbackDelay as ToneFeedbackDelay,
+  Filter as ToneFilter,
   PitchShift as TonePitchShift,
+  Reverb as ToneReverb,
   connect as toneConnect,
 } from "tone";
 import { getOutputMuted } from "./output-mute";
@@ -26,6 +31,10 @@ const unsubscribeMasterBySessionId = new Map<SessionId, () => void>();
 const onEndedBySessionId = new Map<SessionId, () => void>();
 const loopTickCleanupBySessionId = new Map<SessionId, () => void>();
 const cancelledSessionIds = new Set<SessionId>();
+const cancelledSessionTtlBySessionId = new Map<
+  SessionId,
+  ReturnType<typeof setTimeout>
+>();
 const playbackReadyFallbackBySessionId = new Map<
   SessionId,
   ReturnType<typeof setTimeout>
@@ -122,7 +131,6 @@ function cleanupSession(sessionId: SessionId): void {
   stopSoundBarEmojiGate(sessionId);
   gatePendReleaseBySessionId.delete(sessionId);
   clearPlaybackReadyFallback(sessionId);
-  cancelledSessionIds.delete(sessionId);
 
   const unsubMaster = unsubscribeMasterBySessionId.get(sessionId);
   if (unsubMaster) {
@@ -182,14 +190,18 @@ const FALLBACK_CLIP_DURATION_SEC = 2.5;
 /** После play() duration иногда приходит с задержкой; не ждём вечно. */
 const PLAYBACK_READY_FALLBACK_MS = 400;
 const VOICE_FADE_SEC = 0.01;
+const SEAMLESS_RELEASE_FADE_SEC = 0.001;
+const SEAMLESS_CHAIN_LOOKAHEAD_BASE_MS = 2;
+const SEAMLESS_CHAIN_LOOKAHEAD_MAX_MS = 8;
 const MIN_AUDIBLE_SEGMENT_SEC = 0.02;
 const NEUTRAL_PITCH_EPSILON = 0.01;
 const PITCH_SHIFT_WINDOW_SEC = 0.14;
 const PITCH_SHIFT_STAGE_LIMIT_SEMITONES = 8;
 const PITCH_SHIFT_DRAIN_TAIL_MS = 220;
-const SOURCE_ONLY_DRAIN_TAIL_MS = 40;
+const SOURCE_ONLY_DRAIN_TAIL_MS = 260;
 const MAX_PITCH_SHIFT_DRAIN_TAIL_MS = 5000;
 const HARD_SAFE_PITCH_TAIL_MS = 600;
+const MAX_FX_TAIL_MS = 7000;
 
 function closeAudioContextQuietly(ctx: AudioContext): void {
   try {
@@ -228,6 +240,45 @@ function clampPlaybackPitch(v: number): number {
   return Math.max(0.25, Math.min(4, v));
 }
 
+function clampFxPercent(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(100, v));
+}
+
+function clampFxFilterHz(v: number): number {
+  if (!Number.isFinite(v)) return 20000;
+  return Math.max(200, Math.min(20000, v));
+}
+
+function clampDelayTimeMs(v: number): number {
+  if (!Number.isFinite(v)) return 200;
+  return Math.max(10, Math.min(2000, v));
+}
+
+function clampReverbDecayMs(v: number): number {
+  if (!Number.isFinite(v)) return 1200;
+  return Math.max(100, Math.min(6000, v));
+}
+
+function clampEqDb(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(-24, Math.min(24, v));
+}
+
+function hasActiveFx(fx: SoundBarFxSettings): boolean {
+  return (
+    clampFxPercent(fx.distortion) > 0 ||
+    clampFxPercent(fx.delayWet) > 0 ||
+    clampFxPercent(fx.reverbWet) > 0 ||
+    clampDelayTimeMs(fx.delayTimeMs) !== 200 ||
+    clampReverbDecayMs(fx.reverbDecayMs) !== 1200 ||
+    clampEqDb(fx.eqLowDb) !== 0 ||
+    clampEqDb(fx.eqMidDb) !== 0 ||
+    clampEqDb(fx.eqHighDb) !== 0 ||
+    clampFxFilterHz(fx.filterHz) < 19950
+  );
+}
+
 function clampRange(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -252,10 +303,24 @@ function splitPitchShiftSemitones(total: number): number[] {
 
 function markSessionCancelled(sessionId: SessionId): void {
   cancelledSessionIds.add(sessionId);
+  const prevTtl = cancelledSessionTtlBySessionId.get(sessionId);
+  if (prevTtl != null) {
+    clearTimeout(prevTtl);
+  }
+  const ttl = window.setTimeout(() => {
+    cancelledSessionIds.delete(sessionId);
+    cancelledSessionTtlBySessionId.delete(sessionId);
+  }, 60_000);
+  cancelledSessionTtlBySessionId.set(sessionId, ttl);
 }
 
 function clearSessionCancelled(sessionId: SessionId): void {
   cancelledSessionIds.delete(sessionId);
+  const ttl = cancelledSessionTtlBySessionId.get(sessionId);
+  if (ttl != null) {
+    clearTimeout(ttl);
+    cancelledSessionTtlBySessionId.delete(sessionId);
+  }
 }
 
 function isSessionCancelled(sessionId: SessionId): boolean {
@@ -266,6 +331,18 @@ export type SoundBarPlaybackReadyInfo = {
   durationSec: number;
   heardLapSec: number;
   heardTotalOnceSec: number;
+};
+
+export type SoundBarFxSettings = {
+  filterHz: number;
+  distortion: number;
+  delayWet: number;
+  delayTimeMs: number;
+  reverbWet: number;
+  reverbDecayMs: number;
+  eqLowDb: number;
+  eqMidDb: number;
+  eqHighDb: number;
 };
 
 function heardTiming(
@@ -306,6 +383,7 @@ export type SoundBarPlaybackStartParams = {
   sessionVolume: number;
   playbackSpeed: number;
   playbackPitch: number;
+  fx: SoundBarFxSettings;
   reverse: boolean;
   pendulum: boolean;
   onEnded?: () => void;
@@ -421,6 +499,7 @@ async function startWebAudioSoundBarSession(
     sessionVolume,
     playbackSpeed,
     playbackPitch,
+    fx,
     reverse,
     onLoopTick,
     onPlaybackReady,
@@ -430,6 +509,15 @@ async function startWebAudioSoundBarSession(
   const volMul = clampSessionVolume(sessionVolume);
   const speed = clampPlaybackSpeed(playbackSpeed);
   const pitch = clampPlaybackPitch(playbackPitch);
+  const fxFilterHz = clampFxFilterHz(fx.filterHz);
+  const fxDistortion = clampFxPercent(fx.distortion) / 100;
+  const fxDelayWet = clampFxPercent(fx.delayWet) / 100;
+  const fxDelayTimeSec = clampDelayTimeMs(fx.delayTimeMs) / 1000;
+  const fxReverbWet = clampFxPercent(fx.reverbWet) / 100;
+  const fxReverbDecaySec = clampReverbDecayMs(fx.reverbDecayMs) / 1000;
+  const eqLowDb = clampEqDb(fx.eqLowDb);
+  const eqMidDb = clampEqDb(fx.eqMidDb);
+  const eqHighDb = clampEqDb(fx.eqHighDb);
   const effectiveRate = speed;
   const baseSec = clampClipDurationSec(forward.duration);
   const fullDurationSec = forward.duration;
@@ -445,13 +533,17 @@ async function startWebAudioSoundBarSession(
   if (abortIfSessionCancelled(sessionId, ctx)) return;
   await applySinkToAudioContext(ctx);
   if (abortIfSessionCancelled(sessionId, ctx)) return;
+  if (Math.abs(speed - 1) > 0.0001) {
+    await TimestretchWorklet.ensureModuleLoaded(ctx);
+    if (abortIfSessionCancelled(sessionId, ctx)) return;
+  }
 
   const toneCtx = new ToneContext({ context: ctx, lookAhead: 0 });
   const gainNode = ctx.createGain();
   gainNode.connect(ctx.destination);
 
   let stopped = false;
-  let currentDisposeVoice: (() => void) | null = null;
+  const activeVoiceDisposers = new Set<() => void>();
   let currentLapCleanup: (() => void) | null = null;
   let currentSegmentStartedAtSec = 0;
   let currentSegmentSourceOffsetSec = 0;
@@ -498,8 +590,10 @@ async function startWebAudioSoundBarSession(
     stopped = true;
     currentLapCleanup?.();
     currentLapCleanup = null;
-    currentDisposeVoice?.();
-    currentDisposeVoice = null;
+    for (const disposeVoice of activeVoiceDisposers) {
+      disposeVoice();
+    }
+    activeVoiceDisposers.clear();
     closeAudioContextQuietly(ctx);
   };
 
@@ -511,8 +605,10 @@ async function startWebAudioSoundBarSession(
   function stopCurrentPlayback(): void {
     currentLapCleanup?.();
     currentLapCleanup = null;
-    currentDisposeVoice?.();
-    currentDisposeVoice = null;
+    for (const disposeVoice of activeVoiceDisposers) {
+      disposeVoice();
+    }
+    activeVoiceDisposers.clear();
   }
 
   function stopPlaybackAndFinalizeSession(): void {
@@ -555,10 +651,14 @@ async function startWebAudioSoundBarSession(
     seg?: {
       offsetSec?: number;
       durationSec?: number;
+      seamlessFromHold?: boolean;
+      seamlessChain?: boolean;
     },
   ): void {
     if (stopped) return;
-    stopCurrentPlayback();
+    if (!seg?.seamlessChain) {
+      stopCurrentPlayback();
+    }
 
     const offsetSec = Math.max(0, seg?.offsetSec ?? 0);
     const durationSec = seg?.durationSec;
@@ -567,12 +667,17 @@ async function startWebAudioSoundBarSession(
     const playBuffer = hasSegmentWindow
       ? sliceBufferSegment(buffer, offsetSec, durationSec)
       : buffer;
+    const audibleDurationSec = playBuffer.duration / Math.max(0.001, speed);
 
     const voiceGain = ctx.createGain();
     voiceGain.connect(gainNode);
     const now = ctx.currentTime;
+    const fadeInSec =
+      seg?.seamlessFromHold || seg?.seamlessChain
+        ? SEAMLESS_RELEASE_FADE_SEC
+        : VOICE_FADE_SEC;
     voiceGain.gain.setValueAtTime(0, now);
-    voiceGain.gain.linearRampToValueAtTime(1, now + VOICE_FADE_SEC);
+    voiceGain.gain.linearRampToValueAtTime(1, now + fadeInSec);
 
     const pitchRatio = clampPlaybackPitch(pitch);
     const compensatedPitchRatio = pitchRatio / Math.max(0.0001, speed);
@@ -593,9 +698,10 @@ async function startWebAudioSoundBarSession(
           ),
         )
       : SOURCE_ONLY_DRAIN_TAIL_MS;
+    const speedTailMs = Math.max(0, Math.ceil((speed - 1) * 180));
     const finalDrainTailMs = hasPitchShiftTail
-      ? Math.max(pitchShiftDrainTailMs, HARD_SAFE_PITCH_TAIL_MS)
-      : pitchShiftDrainTailMs;
+      ? Math.max(pitchShiftDrainTailMs + speedTailMs, HARD_SAFE_PITCH_TAIL_MS)
+      : pitchShiftDrainTailMs + speedTailMs;
     let doneFired = false;
     const finishDone = () => {
       if (doneFired || stopped) return;
@@ -611,93 +717,178 @@ async function startWebAudioSoundBarSession(
         playWithSessionPipeline(buffer, true, onDone, onLoopLap, seg);
         return;
       }
-      window.setTimeout(
-        () => finishDone(),
-        finalDrainTailMs,
-      );
+      if (seg?.seamlessChain) return;
+      window.setTimeout(() => finishDone(), finalDrainTailMs + fxTailBonusMs);
     };
     const source = ctx.createBufferSource();
     source.buffer = playBuffer;
     source.loop = false;
     source.playbackRate.value = speed;
-    setCurrentSegmentClock(offsetSec);
-
     let worklet: TimestretchWorklet | null = null;
     let pitchShiftNodes: TonePitchShift[] = [];
+    let fxNodes: Array<
+      ToneEQ3 | ToneFilter | ToneDistortion | ToneFeedbackDelay | ToneReverb
+    > = [];
+    let fxTailBonusMs = 0;
     let disposed = false;
     let started = false;
+    const needsWorklet = Math.abs(speed - 1) > 0.0001;
 
-    void TimestretchWorklet.createWorklet({
-      ctx,
-      bufferSource: source,
-      pitch: 1,
-      opts: {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [
-          Math.max(1, Math.min(2, playBuffer.numberOfChannels)),
-        ],
-      },
-    })
-      .then((w) => {
-        if (stopped || disposed) {
-          try {
-            w.workletNode?.disconnect();
-          } catch {
-            /* ignore */
-          }
-          return;
-        }
-        worklet = w;
-        w.updateSpeed(speed);
-        w.updatePitch(1);
-
-        if (Math.abs(compensatedPitchRatio - 1) <= NEUTRAL_PITCH_EPSILON) {
-          w.workletNode?.connect(voiceGain);
-        } else {
-          pitchShiftNodes = plannedPitchShiftStages.map(
-            (stage) =>
-              new TonePitchShift({
-                context: toneCtx,
-                pitch: stage,
-                windowSize: PITCH_SHIFT_WINDOW_SEC,
-                feedback: 0,
-                wet: 1,
-              }),
-          );
-          if (pitchShiftNodes.length > 0) {
-            toneConnect(
-              w.workletNode as unknown as AudioNode,
-              pitchShiftNodes[0],
-            );
-            for (let i = 1; i < pitchShiftNodes.length; i++) {
-              toneConnect(pitchShiftNodes[i - 1], pitchShiftNodes[i]);
-            }
-            toneConnect(
-              pitchShiftNodes[pitchShiftNodes.length - 1],
-              voiceGain as unknown as AudioNode,
-            );
-          } else {
-            w.workletNode?.connect(voiceGain);
-          }
-        }
-
-        source.start();
-        started = true;
-      })
-      .catch(() => {
-        if (stopped || disposed) return;
-        cleanupSession(sessionId);
+    function buildFxChain(): AudioNode {
+      fxNodes = [];
+      const eqNode = new ToneEQ3({
+        context: toneCtx,
+        low: eqLowDb,
+        mid: eqMidDb,
+        high: eqHighDb,
       });
+      fxNodes.push(eqNode);
+      const filterNode = new ToneFilter({
+        context: toneCtx,
+        type: "lowpass",
+        frequency: fxFilterHz,
+        Q: 0.6,
+      });
+      fxNodes.push(filterNode);
+
+      if (fxDistortion > 0.001) {
+        fxNodes.push(
+          new ToneDistortion({
+            context: toneCtx,
+            distortion: Math.min(0.95, fxDistortion),
+            wet: 1,
+          }),
+        );
+      }
+      if (fxDelayWet > 0.001) {
+        fxNodes.push(
+          new ToneFeedbackDelay({
+            context: toneCtx,
+            delayTime: fxDelayTimeSec,
+            feedback: Math.min(0.7, 0.2 + fxDelayWet * 0.5),
+            wet: fxDelayWet,
+          }),
+        );
+        fxTailBonusMs = Math.max(fxTailBonusMs, Math.ceil(1200 + fxDelayWet * 3800));
+      }
+      if (fxReverbWet > 0.001) {
+        fxNodes.push(
+          new ToneReverb({
+            context: toneCtx,
+            decay: fxReverbDecaySec,
+            preDelay: 0.01,
+            wet: fxReverbWet,
+          }),
+        );
+        fxTailBonusMs = Math.max(fxTailBonusMs, Math.ceil(1500 + fxReverbWet * 4500));
+      }
+      fxTailBonusMs = Math.min(fxTailBonusMs, MAX_FX_TAIL_MS);
+
+      for (let i = 1; i < fxNodes.length; i++) {
+        toneConnect(fxNodes[i - 1], fxNodes[i]);
+      }
+      return fxNodes[fxNodes.length - 1] as unknown as AudioNode;
+    }
+
+    function connectPitchAndFxFrom(input: AudioNode): void {
+      const fxOutputNode = buildFxChain();
+      toneConnect(fxOutputNode, voiceGain as unknown as AudioNode);
+
+      if (Math.abs(compensatedPitchRatio - 1) <= NEUTRAL_PITCH_EPSILON) {
+        toneConnect(input, fxNodes[0]!);
+        return;
+      }
+
+      pitchShiftNodes = plannedPitchShiftStages.map(
+        (stage) =>
+          new TonePitchShift({
+            context: toneCtx,
+            pitch: stage,
+            windowSize: PITCH_SHIFT_WINDOW_SEC,
+            feedback: 0,
+            wet: 1,
+          }),
+      );
+      if (pitchShiftNodes.length === 0) {
+        toneConnect(input, fxNodes[0]!);
+        return;
+      }
+
+      toneConnect(input, pitchShiftNodes[0]);
+      for (let i = 1; i < pitchShiftNodes.length; i++) {
+        toneConnect(pitchShiftNodes[i - 1], pitchShiftNodes[i]);
+      }
+      toneConnect(pitchShiftNodes[pitchShiftNodes.length - 1], fxNodes[0]!);
+    }
+
+    if (!needsWorklet) {
+      connectPitchAndFxFrom(source);
+      setCurrentSegmentClock(offsetSec);
+      source.start();
+      started = true;
+    } else {
+      try {
+        worklet = TimestretchWorklet.createWorkletSync({
+          ctx,
+          bufferSource: source,
+          pitch: 1,
+          opts: {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [
+              Math.max(1, Math.min(2, playBuffer.numberOfChannels)),
+            ],
+          },
+        });
+      } catch {
+        cleanupSession(sessionId);
+        return;
+      }
+      if (stopped || disposed) {
+        try {
+          worklet.workletNode?.disconnect();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      worklet.updateSpeed(speed);
+      worklet.updatePitch(1);
+      connectPitchAndFxFrom(worklet.workletNode as unknown as AudioNode);
+      setCurrentSegmentClock(offsetSec);
+      source.start();
+      started = true;
+    }
 
     source.onended = () => {
       if (stopped || disposed) return;
       onVoiceStop();
+      if (seg?.seamlessChain) {
+        finishDone();
+      }
     };
 
-    currentDisposeVoice = () => {
+    if (seg?.seamlessChain && !loopThis && speed > 1 && audibleDurationSec > 0) {
+      const adaptiveLookaheadMs = Math.min(
+        SEAMLESS_CHAIN_LOOKAHEAD_MAX_MS,
+        Math.max(
+          SEAMLESS_CHAIN_LOOKAHEAD_BASE_MS,
+          SEAMLESS_CHAIN_LOOKAHEAD_BASE_MS + (speed - 1) * 2,
+        ),
+      );
+      const triggerMs = Math.max(
+        0,
+        audibleDurationSec * 1000 - adaptiveLookaheadMs,
+      );
+      window.setTimeout(() => {
+        if (stopped || disposed) return;
+        finishDone();
+      }, triggerMs);
+    }
+    const disposeVoice = () => {
       if (disposed) return;
       disposed = true;
+      activeVoiceDisposers.delete(disposeVoice);
       const t = ctx.currentTime;
       try {
         voiceGain.gain.cancelScheduledValues(t);
@@ -734,10 +925,20 @@ async function startWebAudioSoundBarSession(
           } catch {
             /* ignore */
           }
+          try {
+            for (const node of fxNodes) {
+              node.disconnect();
+              node.dispose();
+            }
+            fxNodes = [];
+          } catch {
+            /* ignore */
+          }
         },
         Math.ceil((VOICE_FADE_SEC + 0.02) * 1000),
       );
     };
+    activeVoiceDisposers.add(disposeVoice);
 
   }
 
@@ -776,7 +977,7 @@ async function startWebAudioSoundBarSession(
           if (stopped || userReleased) return;
           playReverse = !playReverse;
           playGateLoopCycle();
-        });
+        }, undefined, { seamlessChain: true });
       }
 
       gatePendReleaseBySessionId.set(sessionId, () => {
@@ -821,6 +1022,7 @@ async function startWebAudioSoundBarSession(
         {
           offsetSec: offFwd,
           durationSec: durFwd,
+          seamlessFromHold: true,
         },
       );
     }
@@ -835,7 +1037,6 @@ async function startWebAudioSoundBarSession(
       const playedRev = reverseExhausted
         ? fullDurationSec
         : getCurrentHeldSourceSec(fullDurationSec);
-      stopCurrentPlayback();
       stopSoundBarEmojiGate(sessionId);
       playForwardTailAfterReverseHold(playedRev);
     });
@@ -859,7 +1060,7 @@ async function startWebAudioSoundBarSession(
           if (stopped || userReleased) return;
           playForward = !playForward;
           playGatePendulumCycle();
-        });
+        }, undefined, { seamlessChain: true });
       }
 
       gatePendReleaseBySessionId.set(sessionId, () => {
@@ -899,6 +1100,7 @@ async function startWebAudioSoundBarSession(
         {
           offsetSec: off,
           durationSec: played,
+          seamlessFromHold: true,
         },
       );
     }
@@ -913,7 +1115,6 @@ async function startWebAudioSoundBarSession(
       const playedSec = forwardExhausted
         ? fullDurationSec
         : getCurrentHeldSourceSec(fullDurationSec);
-      stopCurrentPlayback();
       stopSoundBarEmojiGate(sessionId);
       playReverseFromPlayedSeconds(playedSec);
     });
@@ -965,8 +1166,8 @@ async function startWebAudioSoundBarSession(
           if (stopped) return;
           onLoopTick?.();
           playPingPongCycle();
-        });
-      });
+        }, undefined, { seamlessChain: true });
+      }, undefined, { seamlessChain: true });
     }
     playPingPongCycle();
     return;
@@ -1002,9 +1203,13 @@ export async function startSoundBarSession(
     onEnded,
     onPlaybackReady,
     playbackPitch,
+    fx,
   } = params;
 
-  clearSessionCancelled(sessionId);
+  if (isSessionCancelled(sessionId)) {
+    clearSessionCancelled(sessionId);
+    return;
+  }
   if (activeBySessionId.has(sessionId)) cleanupSession(sessionId);
 
   const gateEnabled = Boolean(params.gateEnabled);
@@ -1012,6 +1217,17 @@ export async function startSoundBarSession(
   const merged: SoundBarPlaybackStartParams = {
     ...params,
     playbackPitch: clampPlaybackPitch(playbackPitch),
+    fx: {
+      filterHz: clampFxFilterHz(fx?.filterHz ?? 20000),
+      distortion: clampFxPercent(fx?.distortion ?? 0),
+      delayWet: clampFxPercent(fx?.delayWet ?? 0),
+      delayTimeMs: clampDelayTimeMs(fx?.delayTimeMs ?? 200),
+      reverbWet: clampFxPercent(fx?.reverbWet ?? 0),
+      reverbDecayMs: clampReverbDecayMs(fx?.reverbDecayMs ?? 1200),
+      eqLowDb: clampEqDb(fx?.eqLowDb ?? 0),
+      eqMidDb: clampEqDb(fx?.eqMidDb ?? 0),
+      eqHighDb: clampEqDb(fx?.eqHighDb ?? 0),
+    },
     reverse: reverseEff,
   };
   if (isNeutralPitch(merged.playbackPitch)) {
@@ -1020,6 +1236,13 @@ export async function startSoundBarSession(
 
   const speed = clampPlaybackSpeed(params.playbackSpeed);
   const effectiveRate = speed;
+  const complexPlaybackRequested =
+    Boolean(merged.gateEnabled) ||
+    merged.pendulum ||
+    merged.reverse ||
+    Math.abs(speed - 1) > 0.0001 ||
+    !isNeutralPitch(merged.playbackPitch) ||
+    hasActiveFx(merged.fx);
 
   if (getOutputMuted()) {
     fireReady(
@@ -1049,6 +1272,28 @@ export async function startSoundBarSession(
     }
     await startWebAudioSoundBarSession(sessionId, merged, forward);
   } catch {
+    if (isSessionCancelled(sessionId)) {
+      cleanupSession(sessionId);
+      return;
+    }
+    if (complexPlaybackRequested) {
+      try {
+        const forwardRetry = await decodeSoundBarUrl(trimmed);
+        if (isSessionCancelled(sessionId)) {
+          cleanupSession(sessionId);
+          return;
+        }
+        await startWebAudioSoundBarSession(sessionId, merged, forwardRetry);
+        return;
+      } catch {
+        if (isSessionCancelled(sessionId)) {
+          cleanupSession(sessionId);
+          return;
+        }
+        cleanupSession(sessionId);
+        return;
+      }
+    }
     if (isSessionCancelled(sessionId)) {
       cleanupSession(sessionId);
       return;

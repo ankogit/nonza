@@ -56,7 +56,53 @@
           />
         </div>
         <div class="sound-bar__playback">
-          <div class="sound-bar__playback-main">
+          <div
+            class="sound-bar__playback-tabs"
+            role="tablist"
+            aria-label="Sound settings tabs"
+          >
+            <button
+              type="button"
+              role="tab"
+              class="sound-bar__playback-tab"
+              :class="{
+                'sound-bar__playback-tab--active':
+                  activeEditorTab === 'playback',
+              }"
+              :aria-selected="activeEditorTab === 'playback'"
+              @click="activeEditorTab = 'playback'"
+            >
+              Playback
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="sound-bar__playback-tab"
+              :class="{
+                'sound-bar__playback-tab--active': activeEditorTab === 'fx',
+              }"
+              :aria-selected="activeEditorTab === 'fx'"
+              @click="activeEditorTab = 'fx'"
+            >
+              FX
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="sound-bar__playback-tab"
+              :class="{
+                'sound-bar__playback-tab--active': activeEditorTab === 'eq',
+              }"
+              :aria-selected="activeEditorTab === 'eq'"
+              @click="activeEditorTab = 'eq'"
+            >
+              EQ
+            </button>
+          </div>
+          <div
+            v-if="activeEditorTab === 'playback'"
+            class="sound-bar__playback-main"
+          >
             <div class="sound-bar__toggles">
               <Switch
                 :model-value="panelLoop"
@@ -124,6 +170,119 @@
               />
             </div>
           </div>
+          <div
+            v-else-if="activeEditorTab === 'fx'"
+            class="sound-bar__playback-main sound-bar__playback-main--fx"
+          >
+            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
+              <Knob
+                :model-value="fxFilterHz"
+                :min="200"
+                :max="20000"
+                :step="100"
+                compact
+                label="LPF"
+                color="orange"
+                :format-value="formatFilterHz"
+                @update:model-value="fxFilterHz = $event"
+              />
+              <Knob
+                :model-value="fxDistortion"
+                :min="0"
+                :max="100"
+                :step="1"
+                compact
+                label="Drive"
+                color="red"
+                :format-value="formatPercent"
+                @update:model-value="fxDistortion = $event"
+              />
+              <Knob
+                :model-value="fxDelayWet"
+                :min="0"
+                :max="100"
+                :step="1"
+                compact
+                label="Delay"
+                color="blue"
+                :format-value="formatPercent"
+                @update:model-value="fxDelayWet = $event"
+              />
+              <Knob
+                :model-value="fxDelayTimeMs"
+                :min="10"
+                :max="2000"
+                :step="10"
+                compact
+                label="D Time"
+                color="blue"
+                :format-value="formatMs"
+                @update:model-value="fxDelayTimeMs = $event"
+              />
+              <Knob
+                :model-value="fxReverbWet"
+                :min="0"
+                :max="100"
+                :step="1"
+                compact
+                label="Reverb"
+                color="purple"
+                :format-value="formatPercent"
+                @update:model-value="fxReverbWet = $event"
+              />
+              <Knob
+                :model-value="fxReverbDecayMs"
+                :min="100"
+                :max="6000"
+                :step="50"
+                compact
+                label="R Time"
+                color="purple"
+                :format-value="formatMs"
+                @update:model-value="fxReverbDecayMs = $event"
+              />
+            </div>
+          </div>
+          <div
+            v-else
+            class="sound-bar__playback-main sound-bar__playback-main--fx"
+          >
+            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
+              <Knob
+                :model-value="eqLowDb"
+                :min="-24"
+                :max="24"
+                :step="1"
+                compact
+                label="EQ Low"
+                color="blue"
+                :format-value="formatDb"
+                @update:model-value="eqLowDb = $event"
+              />
+              <Knob
+                :model-value="eqMidDb"
+                :min="-24"
+                :max="24"
+                :step="1"
+                compact
+                label="EQ Mid"
+                color="purple"
+                :format-value="formatDb"
+                @update:model-value="eqMidDb = $event"
+              />
+              <Knob
+                :model-value="eqHighDb"
+                :min="-24"
+                :max="24"
+                :step="1"
+                compact
+                label="EQ High"
+                color="orange"
+                :format-value="formatDb"
+                @update:model-value="eqHighDb = $event"
+              />
+            </div>
+          </div>
         </div>
         <div class="sound-bar__scroll meet-scroll">
           <div class="sound-bar__emoji-grid">
@@ -151,8 +310,11 @@
                 type="button"
                 class="sound-bar__keybind-mini"
                 :class="{
-                  'sound-bar__keybind-mini--bound': Boolean(hotkeysBySoundId[s.id]),
-                  'sound-bar__keybind-mini--capture': bindingCaptureSoundId === s.id,
+                  'sound-bar__keybind-mini--bound': Boolean(
+                    hotkeysBySoundId[s.id],
+                  ),
+                  'sound-bar__keybind-mini--capture':
+                    bindingCaptureSoundId === s.id,
                 }"
                 :title="tileKeybindTitle(s)"
                 tabindex="-1"
@@ -165,10 +327,22 @@
                 v-if="tilePlaybackFlags(s).any"
                 class="sound-bar__tile-badges"
               >
-                <span v-if="tilePlaybackFlags(s).loop" class="sound-bar__badge">L</span>
-                <span v-if="tilePlaybackFlags(s).gate" class="sound-bar__badge">D</span>
-                <span v-if="tilePlaybackFlags(s).reverse" class="sound-bar__badge">R</span>
-                <span v-if="tilePlaybackFlags(s).pendulum" class="sound-bar__badge">P</span>
+                <span v-if="tilePlaybackFlags(s).loop" class="sound-bar__badge"
+                  >L</span
+                >
+                <span v-if="tilePlaybackFlags(s).gate" class="sound-bar__badge"
+                  >D</span
+                >
+                <span
+                  v-if="tilePlaybackFlags(s).reverse"
+                  class="sound-bar__badge"
+                  >R</span
+                >
+                <span
+                  v-if="tilePlaybackFlags(s).pendulum"
+                  class="sound-bar__badge"
+                  >P</span
+                >
               </div>
             </Button>
           </div>
@@ -247,6 +421,15 @@ type StoredPlayback = {
   clipVolume: number;
   clipSpeed: number;
   clipPitch: number;
+  fxFilterHz: number;
+  fxDistortion: number;
+  fxDelayWet: number;
+  fxDelayTimeMs: number;
+  fxReverbWet: number;
+  fxReverbDecayMs: number;
+  eqLowDb: number;
+  eqMidDb: number;
+  eqHighDb: number;
 };
 
 const DEFAULT_PLAYBACK: StoredPlayback = {
@@ -257,6 +440,15 @@ const DEFAULT_PLAYBACK: StoredPlayback = {
   clipVolume: 100,
   clipSpeed: 100,
   clipPitch: 100,
+  fxFilterHz: 20000,
+  fxDistortion: 0,
+  fxDelayWet: 0,
+  fxDelayTimeMs: 200,
+  fxReverbWet: 0,
+  fxReverbDecayMs: 1200,
+  eqLowDb: 0,
+  eqMidDb: 0,
+  eqHighDb: 0,
 };
 
 const storePerSound = ref<Record<string, StoredPlayback>>({});
@@ -265,6 +457,7 @@ const legacyV1Panel = ref<StoredPlayback | null>(null);
 const hotkeysBySoundId = ref<Record<string, string>>({});
 const bindingCaptureSoundId = ref<string | null>(null);
 const gateKeydownFromKeyboard = new Set<string>();
+const gateEmojiByKeyCode = new Map<string, string>();
 
 const panelLoop = ref(false);
 const panelGate = ref(false);
@@ -273,6 +466,31 @@ const panelPendulum = ref(false);
 const clipVolumePct = ref(100);
 const clipSpeedPct = ref(100);
 const clipPitchPct = ref(100);
+const fxFilterHz = ref(20000);
+const fxDistortion = ref(0);
+const fxDelayWet = ref(0);
+const fxDelayTimeMs = ref(200);
+const fxReverbWet = ref(0);
+const fxReverbDecayMs = ref(1200);
+const eqLowDb = ref(0);
+const eqMidDb = ref(0);
+const eqHighDb = ref(0);
+const activeEditorTab = ref<"playback" | "fx" | "eq">("playback");
+const playbackStateReady = ref(false);
+const DEBUG_KEY = "nonza_soundbar_debug";
+
+function debugEnabled(): boolean {
+  try {
+    return localStorage.getItem(DEBUG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(event: string, payload?: unknown): void {
+  if (!debugEnabled()) return;
+  console.debug(`[soundbar/ui] ${event}`, payload ?? "");
+}
 
 function formatClipSpeed(v: number): string {
   return `${Math.round(v)}%`;
@@ -284,6 +502,22 @@ function formatClipVolume(v: number): string {
 
 function formatClipPitch(v: number): string {
   return `${Math.round(v)}%`;
+}
+
+function formatFilterHz(v: number): string {
+  return `${Math.round(v)}Hz`;
+}
+
+function formatPercent(v: number): string {
+  return `${Math.round(v)}%`;
+}
+
+function formatMs(v: number): string {
+  return `${Math.round(v)}ms`;
+}
+
+function formatDb(v: number): string {
+  return `${Math.round(v)}dB`;
 }
 
 function setPanelLoop(v: boolean) {
@@ -334,6 +568,42 @@ function normalizePlaybackRow(raw: Record<string, unknown>): StoredPlayback {
       typeof raw.clipPitch === "number"
         ? clampSpeedPct(raw.clipPitch)
         : DEFAULT_PLAYBACK.clipPitch,
+    fxFilterHz:
+      typeof raw.fxFilterHz === "number"
+        ? Math.max(200, Math.min(20000, Math.round(raw.fxFilterHz)))
+        : DEFAULT_PLAYBACK.fxFilterHz,
+    fxDistortion:
+      typeof raw.fxDistortion === "number"
+        ? Math.max(0, Math.min(100, Math.round(raw.fxDistortion)))
+        : DEFAULT_PLAYBACK.fxDistortion,
+    fxDelayWet:
+      typeof raw.fxDelayWet === "number"
+        ? Math.max(0, Math.min(100, Math.round(raw.fxDelayWet)))
+        : DEFAULT_PLAYBACK.fxDelayWet,
+    fxDelayTimeMs:
+      typeof raw.fxDelayTimeMs === "number"
+        ? Math.max(10, Math.min(2000, Math.round(raw.fxDelayTimeMs)))
+        : DEFAULT_PLAYBACK.fxDelayTimeMs,
+    fxReverbWet:
+      typeof raw.fxReverbWet === "number"
+        ? Math.max(0, Math.min(100, Math.round(raw.fxReverbWet)))
+        : DEFAULT_PLAYBACK.fxReverbWet,
+    fxReverbDecayMs:
+      typeof raw.fxReverbDecayMs === "number"
+        ? Math.max(100, Math.min(6000, Math.round(raw.fxReverbDecayMs)))
+        : DEFAULT_PLAYBACK.fxReverbDecayMs,
+    eqLowDb:
+      typeof raw.eqLowDb === "number"
+        ? Math.max(-24, Math.min(24, Math.round(raw.eqLowDb)))
+        : DEFAULT_PLAYBACK.eqLowDb,
+    eqMidDb:
+      typeof raw.eqMidDb === "number"
+        ? Math.max(-24, Math.min(24, Math.round(raw.eqMidDb)))
+        : DEFAULT_PLAYBACK.eqMidDb,
+    eqHighDb:
+      typeof raw.eqHighDb === "number"
+        ? Math.max(-24, Math.min(24, Math.round(raw.eqHighDb)))
+        : DEFAULT_PLAYBACK.eqHighDb,
   };
 }
 
@@ -353,6 +623,17 @@ function effectivePlaybackForSound(sound: OrganizationSound): StoredPlayback {
   const row = storePerSound.value[sound.id];
   if (row) return row;
   return seedFromOrg(sound);
+}
+
+function hasStoredProfile(soundId: string): boolean {
+  return Boolean(storePerSound.value[soundId]);
+}
+
+function playbackSnapshotForStart(sound: OrganizationSound): StoredPlayback {
+  if (selectedSoundId.value === sound.id) {
+    return storedFromRefs();
+  }
+  return effectivePlaybackForSound(sound);
 }
 
 function tilePlaybackFlags(sound: OrganizationSound): {
@@ -401,6 +682,15 @@ function refsFromStored(s: StoredPlayback) {
   clipVolumePct.value = s.clipVolume;
   clipSpeedPct.value = s.clipSpeed;
   clipPitchPct.value = s.clipPitch;
+  fxFilterHz.value = s.fxFilterHz;
+  fxDistortion.value = s.fxDistortion;
+  fxDelayWet.value = s.fxDelayWet;
+  fxDelayTimeMs.value = s.fxDelayTimeMs;
+  fxReverbWet.value = s.fxReverbWet;
+  fxReverbDecayMs.value = s.fxReverbDecayMs;
+  eqLowDb.value = s.eqLowDb;
+  eqMidDb.value = s.eqMidDb;
+  eqHighDb.value = s.eqHighDb;
 }
 
 function storedFromRefs(): StoredPlayback {
@@ -412,6 +702,15 @@ function storedFromRefs(): StoredPlayback {
     clipVolume: clipVolumePct.value,
     clipSpeed: clipSpeedPct.value,
     clipPitch: clipPitchPct.value,
+    fxFilterHz: fxFilterHz.value,
+    fxDistortion: fxDistortion.value,
+    fxDelayWet: fxDelayWet.value,
+    fxDelayTimeMs: fxDelayTimeMs.value,
+    fxReverbWet: fxReverbWet.value,
+    fxReverbDecayMs: fxReverbDecayMs.value,
+    eqLowDb: eqLowDb.value,
+    eqMidDb: eqMidDb.value,
+    eqHighDb: eqHighDb.value,
   });
 }
 
@@ -423,7 +722,16 @@ function playbackRowEquals(a: StoredPlayback, b: StoredPlayback): boolean {
     a.pendulum === b.pendulum &&
     a.clipVolume === b.clipVolume &&
     a.clipSpeed === b.clipSpeed &&
-    a.clipPitch === b.clipPitch
+    a.clipPitch === b.clipPitch &&
+    a.fxFilterHz === b.fxFilterHz &&
+    a.fxDistortion === b.fxDistortion &&
+    a.fxDelayWet === b.fxDelayWet &&
+    a.fxDelayTimeMs === b.fxDelayTimeMs &&
+    a.fxReverbWet === b.fxReverbWet &&
+    a.fxReverbDecayMs === b.fxReverbDecayMs &&
+    a.eqLowDb === b.eqLowDb &&
+    a.eqMidDb === b.eqMidDb &&
+    a.eqHighDb === b.eqHighDb
   );
 }
 
@@ -459,7 +767,9 @@ function applyStoredPayload(j: StoredPanelJson): void {
     storePerSound.value = next;
   }
   selectedSoundId.value =
-    typeof j.selectedId === "string" && j.selectedId.length > 0 ? j.selectedId : null;
+    typeof j.selectedId === "string" && j.selectedId.length > 0
+      ? j.selectedId
+      : null;
 
   if (j.hotkeys && typeof j.hotkeys === "object" && !Array.isArray(j.hotkeys)) {
     const nh: Record<string, string> = {};
@@ -508,6 +818,35 @@ function loadPersisted(): void {
   }
 }
 
+function hydratePlaybackStateFromCurrentSources(): void {
+  const list = sounds.value;
+  if (list.length === 0) {
+    popoverOpen.value = false;
+    selectedSoundId.value = null;
+    persistAll();
+    playbackStateReady.value = true;
+    return;
+  }
+  ensureDefaultSoundSelection(list);
+  hydrateRefsForSelection();
+  playbackStateReady.value = true;
+}
+
+function ensurePlaybackStateReady(): void {
+  if (playbackStateReady.value) return;
+  debugLog("ensurePlaybackStateReady:start", {
+    orgId: props.orgId,
+    selectedSoundId: selectedSoundId.value,
+  });
+  loadPersisted();
+  hydratePlaybackStateFromCurrentSources();
+  debugLog("ensurePlaybackStateReady:done", {
+    orgId: props.orgId,
+    selectedSoundId: selectedSoundId.value,
+    storeSize: Object.keys(storePerSound.value).length,
+  });
+}
+
 function commitActiveSnapshot(): void {
   const id = selectedSoundId.value;
   if (id === null) return;
@@ -543,7 +882,28 @@ function hydrateRefsForSelection(): void {
 
 function selectProfile(sound: OrganizationSound): void {
   if (!sound.audioUrl) return;
+  const createProfileFromCurrentRefsIfMissing = () => {
+    if (hasStoredProfile(sound.id)) return;
+    storePerSound.value = {
+      ...storePerSound.value,
+      [sound.id]: storedFromRefs(),
+    };
+  };
+
+  if (selectedSoundId.value === null) {
+    createProfileFromCurrentRefsIfMissing();
+    selectedSoundId.value = sound.id;
+    refsFromStored(effectivePlaybackForSound(sound));
+    persistAll();
+    return;
+  }
   commitActiveSnapshot();
+  if (selectedSoundId.value === sound.id) {
+    createProfileFromCurrentRefsIfMissing();
+    persistAll();
+    return;
+  }
+  createProfileFromCurrentRefsIfMissing();
   selectedSoundId.value = sound.id;
   refsFromStored(effectivePlaybackForSound(sound));
   persistAll();
@@ -557,7 +917,7 @@ function onSoundContextMenu(sound: OrganizationSound, ev: MouseEvent): void {
 }
 
 function broadcastPlaybackForSound(sound: OrganizationSound) {
-  const snap = effectivePlaybackForSound(sound);
+  const snap = playbackSnapshotForStart(sound);
   const volPct = Number.isFinite(sound.volume) ? sound.volume : 100;
   const baseVolume = Math.max(0, Math.min(5, volPct / 100));
   const profileVolume = Math.max(0, Math.min(5, snap.clipVolume / 100));
@@ -567,6 +927,17 @@ function broadcastPlaybackForSound(sound: OrganizationSound) {
     sessionVolume: Math.max(0, Math.min(5, baseVolume * profileVolume)),
     playbackSpeed: Math.max(0.25, Math.min(4, snap.clipSpeed / 100)),
     playbackPitch: Math.max(0.25, Math.min(4, snap.clipPitch / 100)),
+    fx: {
+      filterHz: snap.fxFilterHz,
+      distortion: snap.fxDistortion,
+      delayWet: snap.fxDelayWet,
+      delayTimeMs: snap.fxDelayTimeMs,
+      reverbWet: snap.fxReverbWet,
+      reverbDecayMs: snap.fxReverbDecayMs,
+      eqLowDb: snap.eqLowDb,
+      eqMidDb: snap.eqMidDb,
+      eqHighDb: snap.eqHighDb,
+    },
     reverse: snap.reverse && (!snap.pendulum || snap.gate),
     pendulum: snap.pendulum,
   };
@@ -591,26 +962,22 @@ watch(sounds, (list) => {
     popoverOpen.value = false;
     selectedSoundId.value = null;
     persistAll();
+    playbackStateReady.value = true;
     return;
   }
   ensureDefaultSoundSelection(list);
   hydrateRefsForSelection();
+  playbackStateReady.value = true;
 });
 
 watch(
   () => props.orgId,
   () => {
+    playbackStateReady.value = false;
     loadPersisted();
-    const list = sounds.value;
-    if (list.length === 0) {
-      popoverOpen.value = false;
-      selectedSoundId.value = null;
-      persistAll();
-      return;
-    }
-    ensureDefaultSoundSelection(list);
-    hydrateRefsForSelection();
+    hydratePlaybackStateFromCurrentSources();
   },
+  { immediate: true },
 );
 
 function attachWindowHotkeys(): void {
@@ -624,16 +991,6 @@ function detachWindowHotkeys(): void {
 }
 
 onMounted(() => {
-  loadPersisted();
-  const list = sounds.value;
-  if (list.length === 0) {
-    popoverOpen.value = false;
-    selectedSoundId.value = null;
-    persistAll();
-  } else {
-    ensureDefaultSoundSelection(list);
-    hydrateRefsForSelection();
-  }
   if (!previewMode.value) attachWindowHotkeys();
 });
 
@@ -651,9 +1008,18 @@ watch(
     clipVolumePct,
     clipSpeedPct,
     clipPitchPct,
+    fxFilterHz,
+    fxDistortion,
+    fxDelayWet,
+    fxDelayTimeMs,
+    fxReverbWet,
+    fxReverbDecayMs,
+    eqLowDb,
+    eqMidDb,
+    eqHighDb,
   ],
   () => {
-  commitActiveSnapshot();
+    commitActiveSnapshot();
   },
 );
 
@@ -705,7 +1071,9 @@ function tileTitle(s: OrganizationSound): string {
   if (f.reverse) letters.push("R");
   if (f.pendulum) letters.push("P");
   if (letters.length) bits.push(letters.join(""));
-  bits.push("ЛКМ — выбор и звук · ПКМ — только выбор · метка «·» слева снизу — горячая клавиша");
+  bits.push(
+    "ЛКМ — выбор и звук · ПКМ — только выбор · метка «·» слева снизу — горячая клавиша",
+  );
   return bits.join(" · ");
 }
 
@@ -723,9 +1091,16 @@ function isKeyboardFormTarget(target: EventTarget | null): boolean {
 function gatePressStart(sound: OrganizationSound): void {
   if (previewMode.value) return;
   if (!sound.audioUrl) return;
-  const cfg = broadcastPlaybackForSound(sound);
-  if (!cfg.gateEnabled) return;
+  ensurePlaybackStateReady();
   selectProfile(sound);
+  const cfg = broadcastPlaybackForSound(sound);
+  debugLog("gatePressStart:cfg", {
+    soundId: sound.id,
+    emoji: sound.emoji,
+    cfg,
+    selectedSoundId: selectedSoundId.value,
+  });
+  if (!cfg.gateEnabled) return;
   const existing = sessionByEmoji.value[sound.emoji];
   if (existing) {
     void stopAndBroadcast({ sessionId: existing });
@@ -743,6 +1118,11 @@ function gatePressStart(sound: OrganizationSound): void {
 
 function gatePressEnd(sound: OrganizationSound): void {
   if (previewMode.value) return;
+  for (const [code, emoji] of gateEmojiByKeyCode.entries()) {
+    if (emoji === sound.emoji) {
+      gateEmojiByKeyCode.delete(code);
+    }
+  }
   gateKeydownFromKeyboard.delete(sound.emoji);
   const cfg = broadcastPlaybackForSound(sound);
   if (!cfg.gateEnabled) return;
@@ -803,8 +1183,20 @@ function assignHotkey(soundId: string, code: string): void {
   persistAll();
 }
 
+function stopAllActivePlayback(): void {
+  const activeSessionIds = Object.values(sessionByEmoji.value);
+  for (const sessionId of activeSessionIds) {
+    void stopAndBroadcast({ sessionId });
+  }
+  sessionByEmoji.value = {};
+  pressedEmoji.value = null;
+  gateKeydownFromKeyboard.clear();
+  gateEmojiByKeyCode.clear();
+}
+
 function handleWindowKeydown(e: KeyboardEvent): void {
   if (previewMode.value) return;
+  ensurePlaybackStateReady();
 
   if (bindingCaptureSoundId.value) {
     if (isKeyboardFormTarget(e.target)) return;
@@ -835,16 +1227,32 @@ function handleWindowKeydown(e: KeyboardEvent): void {
   }
 
   if (isKeyboardFormTarget(e.target)) return;
+  if (e.code === "Escape") {
+    e.preventDefault();
+    stopAllActivePlayback();
+    return;
+  }
 
-  const hit = Object.entries(hotkeysBySoundId.value).find(([, c]) => c === e.code);
+  const hit = Object.entries(hotkeysBySoundId.value).find(
+    ([, c]) => c === e.code,
+  );
   if (!hit) return;
   const sound = sounds.value.find((s) => s.id === hit[0]);
   if (!sound?.audioUrl) return;
 
+  selectProfile(sound);
   const cfg = broadcastPlaybackForSound(sound);
+  debugLog("hotkey:keydown:cfg", {
+    code: e.code,
+    soundId: sound.id,
+    emoji: sound.emoji,
+    cfg,
+    selectedSoundId: selectedSoundId.value,
+  });
   if (cfg.gateEnabled) {
     if (gateKeydownFromKeyboard.has(sound.emoji)) return;
     gateKeydownFromKeyboard.add(sound.emoji);
+    gateEmojiByKeyCode.set(e.code, sound.emoji);
     e.preventDefault();
     gatePressStart(sound);
     return;
@@ -857,22 +1265,34 @@ function handleWindowKeydown(e: KeyboardEvent): void {
 function handleWindowKeyup(e: KeyboardEvent): void {
   if (previewMode.value) return;
   if (isKeyboardFormTarget(e.target)) return;
-  const hit = Object.entries(hotkeysBySoundId.value).find(([, c]) => c === e.code);
-  if (!hit) return;
-  const sound = sounds.value.find((s) => s.id === hit[0]);
-  if (!sound) return;
-  const cfg = broadcastPlaybackForSound(sound);
-  if (!cfg.gateEnabled) return;
-  if (!gateKeydownFromKeyboard.has(sound.emoji)) return;
-  gateKeydownFromKeyboard.delete(sound.emoji);
+  const emoji = gateEmojiByKeyCode.get(e.code);
+  if (!emoji) return;
+  gateEmojiByKeyCode.delete(e.code);
+  if (!gateKeydownFromKeyboard.has(emoji)) return;
+  gateKeydownFromKeyboard.delete(emoji);
   e.preventDefault();
-  gatePressEnd(sound);
+  const sound = sounds.value.find((s) => s.emoji === emoji);
+  if (sound) {
+    gatePressEnd(sound);
+    return;
+  }
+  const sessionId = sessionByEmoji.value[emoji];
+  if (!sessionId) return;
+  void stopAndBroadcast({ sessionId });
 }
 
 function handlePointerDown(sound: OrganizationSound, ev: PointerEvent) {
   if (previewMode.value) return;
   if (!sound.audioUrl) return;
+  ensurePlaybackStateReady();
+  selectProfile(sound);
   const cfg = broadcastPlaybackForSound(sound);
+  debugLog("pointerDown:cfg", {
+    soundId: sound.id,
+    emoji: sound.emoji,
+    cfg,
+    selectedSoundId: selectedSoundId.value,
+  });
   if (!cfg.gateEnabled) return;
   if (ev.button !== 0) return;
   ev.preventDefault();
@@ -886,8 +1306,15 @@ function handlePointerUp(sound: OrganizationSound) {
 function handleRowClick(sound: OrganizationSound) {
   if (previewMode.value) return;
   if (!sound.audioUrl) return;
+  ensurePlaybackStateReady();
   selectProfile(sound);
   const cfg = broadcastPlaybackForSound(sound);
+  debugLog("rowClick:cfg", {
+    soundId: sound.id,
+    emoji: sound.emoji,
+    cfg,
+    selectedSoundId: selectedSoundId.value,
+  });
   if (cfg.gateEnabled) return;
 
   const existing = sessionByEmoji.value[sound.emoji];
@@ -1048,12 +1475,54 @@ function handleRowClick(sound: OrganizationSound) {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.sound-bar__playback-tabs {
+  display: flex;
+  gap: 0;
+  border: 2px solid #333;
+  border-top-color: #444;
+  border-left-color: #444;
+  background: #101010;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.sound-bar__playback-tab {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid #2b2b2b;
+  padding: 4px 10px 5px;
+  background: #1a1a1a;
+  color: rgba(186, 177, 168, 0.82);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sound-bar__playback-tab:last-child {
+  border-right: 0;
+}
+
+.sound-bar__playback-tab:hover {
+  background: #242424;
+}
+
+.sound-bar__playback-tab--active {
+  background: #2f4f73;
+  color: #eaf4ff;
+  box-shadow: inset 0 -2px 0 #8fc4ff;
+}
+
 .sound-bar__playback-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   min-width: 0;
+}
+
+.sound-bar__playback-main--fx {
+  justify-content: center;
 }
 
 @container sound-bar-playback (max-width: 210px) {
@@ -1105,6 +1574,10 @@ function handleRowClick(sound: OrganizationSound) {
   align-items: flex-end;
   gap: 6px;
   min-width: 72px;
+}
+
+.sound-bar__knobs-row--fx {
+  margin-left: 0;
 }
 
 .sound-bar__knobs-row :deep(.knob-control__label),

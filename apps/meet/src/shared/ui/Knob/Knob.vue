@@ -45,7 +45,7 @@ const props = withDefaults(
     bufferSize?: number;
     label?: string;
     formatValue?: (value: number) => string;
-    color?: "blue" | "orange" | "red";
+    color?: "blue" | "orange" | "red" | "purple";
     /** Smaller diameter, thinner rim and handle */
     compact?: boolean;
   }>(),
@@ -238,6 +238,11 @@ function startDrag(e: PointerEvent) {
 .knob-control__wrap--red {
   --knob-bg: #c7463d;
   --knob-bg-active: #df5f55;
+}
+
+.knob-control__wrap--purple {
+  --knob-bg: #7a52c5;
+  --knob-bg-active: #9468e1;
 }
 
 .knob-control__body {
