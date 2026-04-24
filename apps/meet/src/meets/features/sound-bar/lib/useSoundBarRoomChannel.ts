@@ -121,7 +121,11 @@ function parseFx(raw: unknown): SoundBarFxSettings {
 
 async function handleAction(
   payload: SoundBarActionMessage["payload"],
-  opts?: { onPlaybackEnded?: () => void },
+  opts?: {
+    onPlaybackEnded?: () => void;
+    syncOrigin?: "local" | "remote";
+    receivedAtMs?: number;
+  },
 ) {
   if (payload.action === "start") {
     debugLog("handleAction:start", {
@@ -153,6 +157,7 @@ async function handleAction(
     await startSoundBarSession({
       sessionId,
       audioUrl,
+      audioVersion: payload.audioVersion,
       loopEnabled,
       gateEnabled,
       sessionVolume,
@@ -161,6 +166,9 @@ async function handleAction(
       fx,
       reverse,
       pendulum,
+      syncOrigin: opts?.syncOrigin ?? "local",
+      senderTsMs: payload.ts,
+      receivedAtMs: opts?.receivedAtMs ?? payload.ts,
       onEnded: opts?.onPlaybackEnded,
       onGateNonLoopClipEnded:
         gateEnabled && !loopEnabled && !pendulum
@@ -256,6 +264,11 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
       };
     }
 
+    const receivedAtMs = Date.now();
+    const audioVersionParsed =
+      typeof p.audioVersion === "number" && Number.isFinite(p.audioVersion)
+        ? Math.floor(p.audioVersion)
+        : 0;
     const startPayload: SoundBarActionStartPayload | null =
       p.action === "start"
         ? {
@@ -264,6 +277,7 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
             senderIdentity: p.senderIdentity as string,
             emoji,
             audioUrl,
+            audioVersion: audioVersionParsed,
             loopEnabled,
             gateEnabled,
             sessionVolume,
@@ -297,6 +311,8 @@ function attachRoomDataListener(room: LiveKitRoom): () => void {
               delete next[emoji];
               sharedSessionByEmoji.value = next;
             },
+            syncOrigin: "remote",
+            receivedAtMs,
           }
         : undefined,
     ).catch(() => {});
@@ -337,6 +353,7 @@ export type SoundBarStartBroadcastParams = {
   sessionId: string;
   emoji: string;
   audioUrl: string;
+  audioVersion: number;
   loopEnabled: boolean;
   gateEnabled: boolean;
   sessionVolume: number;
@@ -408,12 +425,14 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
     const loopEnabled = params.loopEnabled;
     const pendulum = params.pendulum;
 
+    const ts = Date.now();
     const payload: SoundBarActionStartPayload = {
       action: "start",
       sessionId: params.sessionId,
       senderIdentity: local.identity,
       emoji: params.emoji,
       audioUrl: params.audioUrl,
+      audioVersion: params.audioVersion,
       loopEnabled,
       gateEnabled: params.gateEnabled,
       sessionVolume: params.sessionVolume,
@@ -422,12 +441,14 @@ export function useSoundBarRoomChannel(livekitRoom: () => LiveKitRoom | null) {
       fx: params.fx,
       reverse: params.reverse,
       pendulum,
-      ts: Date.now(),
+      ts,
     };
     debugLog("startAndBroadcast:payload", payload);
 
     void handleAction(payload, {
       onPlaybackEnded: params.onLocalPlaybackEnded,
+      syncOrigin: "local",
+      receivedAtMs: ts,
     }).catch(() => {});
     void publishAction(payload).catch(() => {});
   }

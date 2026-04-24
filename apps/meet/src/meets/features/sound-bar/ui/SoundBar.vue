@@ -33,6 +33,15 @@
         aria-label="Звуки"
         @click.stop
       >
+        <div
+          v-if="soundBarSurfaceBlocked"
+          class="sound-bar__decode-blocker"
+          role="status"
+          aria-busy="true"
+          aria-label="Загрузка звуков"
+        >
+          <span class="sound-bar__decode-spinner" aria-hidden="true" />
+        </div>
         <div class="sound-bar__volume">
           <button
             class="sound-bar__mute-btn"
@@ -373,6 +382,7 @@ import {
   setSoundBarVolume,
   toggleSoundBarMuted,
   getSoundBarLocalUserId,
+  preloadSoundBarAudioEntries,
 } from "@shared/lib";
 
 const soundBarVolumeRef = soundBarVolume;
@@ -399,7 +409,62 @@ const isPanel = computed(() => props.layout === "panel");
 
 const { startAndBroadcast, stopAndBroadcast, sessionByEmoji } =
   useSoundBarRoomChannel(() => props.livekitRoom);
-const { sounds } = useOrganizationSounds(() => props.orgId);
+const { sounds, isLoading: orgSoundsLoading } = useOrganizationSounds(
+  () => props.orgId,
+);
+
+const soundBarDecodeReady = ref(true);
+let soundBarPreloadGen = 0;
+
+const soundBarSurfaceBlocked = computed(
+  () =>
+    Boolean(props.orgId?.trim()) &&
+    sounds.value.length > 0 &&
+    (isPanel.value || popoverOpen.value) &&
+    (orgSoundsLoading.value || !soundBarDecodeReady.value),
+);
+
+watch(
+  [
+    () => props.orgId,
+    sounds,
+    () => orgSoundsLoading.value,
+    popoverOpen,
+    isPanel,
+  ],
+  async () => {
+    const gen = ++soundBarPreloadGen;
+    if (!props.orgId?.trim()) {
+      soundBarDecodeReady.value = true;
+      return;
+    }
+    if (!(isPanel.value || popoverOpen.value)) {
+      return;
+    }
+    if (orgSoundsLoading.value) {
+      if (gen === soundBarPreloadGen) soundBarDecodeReady.value = false;
+      return;
+    }
+    const list = sounds.value;
+    if (list.length === 0) {
+      if (gen === soundBarPreloadGen) soundBarDecodeReady.value = true;
+      return;
+    }
+    if (gen === soundBarPreloadGen) soundBarDecodeReady.value = false;
+    try {
+      await preloadSoundBarAudioEntries(
+        list
+          .filter((s) => Boolean(s.audioUrl?.trim()))
+          .map((s) => ({ url: s.audioUrl!, version: s.version })),
+      );
+    } catch {
+      /* разблокируем UI даже при ошибке decode */
+    } finally {
+      if (gen === soundBarPreloadGen) soundBarDecodeReady.value = true;
+    }
+  },
+  { flush: "post" },
+);
 
 const previewMode = computed(() => props.previewMode ?? false);
 
@@ -1112,6 +1177,7 @@ function gatePressStart(sound: OrganizationSound): void {
     sessionId,
     emoji: sound.emoji,
     audioUrl: sound.audioUrl,
+    audioVersion: sound.version,
     ...cfg,
   });
 }
@@ -1334,6 +1400,7 @@ function handleRowClick(sound: OrganizationSound) {
       sessionId,
       emoji: sound.emoji,
       audioUrl: sound.audioUrl,
+      audioVersion: sound.version,
       ...cfg,
     });
     return;
@@ -1345,6 +1412,7 @@ function handleRowClick(sound: OrganizationSound) {
     sessionId,
     emoji: sound.emoji,
     audioUrl: sound.audioUrl,
+    audioVersion: sound.version,
     ...cfg,
     onLocalPlaybackEnded: () => {
       if (sessionByEmoji.value[sound.emoji] !== sessionId) return;
@@ -1388,6 +1456,32 @@ function handleRowClick(sound: OrganizationSound) {
   min-height: 0;
 }
 
+.sound-bar__decode-blocker {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.72);
+  pointer-events: all;
+}
+
+.sound-bar__decode-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.85);
+  animation: sound-bar-spin 0.7s linear infinite;
+}
+
+@keyframes sound-bar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .sound-bar__surface--popover {
   position: absolute;
   bottom: calc(100% + 10px);
@@ -1415,7 +1509,7 @@ function handleRowClick(sound: OrganizationSound) {
 }
 
 .sound-bar__surface--panel {
-  position: static;
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
