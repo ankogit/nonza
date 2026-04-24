@@ -7,6 +7,25 @@ type CreateWorkletParams = {
 };
 
 const DEFAULT_MODULE_PATH = "/audio-worklets/phase-vocoder-processor.js";
+
+/** Один fetch на приложение; addModule по URL каждый раз бил dev-сервер. */
+let defaultWorkletBlobUrlPromise: Promise<string> | null = null;
+
+function getDefaultWorkletModuleUrl(): Promise<string> {
+  if (!defaultWorkletBlobUrlPromise) {
+    defaultWorkletBlobUrlPromise = fetch(DEFAULT_MODULE_PATH)
+      .then((r) => {
+        if (!r.ok) throw new Error(`worklet fetch ${r.status}`);
+        return r.text();
+      })
+      .then((code) => {
+        const blob = new Blob([code], { type: "application/javascript" });
+        return URL.createObjectURL(blob);
+      });
+  }
+  return defaultWorkletBlobUrlPromise;
+}
+
 const loadedByContext = new WeakMap<AudioContext, Promise<void>>();
 const readyByContext = new WeakSet<AudioContext>();
 
@@ -54,7 +73,11 @@ export class TimestretchWorklet {
     if (readyByContext.has(ctx)) return;
     let modulePromise = loadedByContext.get(ctx);
     if (!modulePromise) {
-      modulePromise = ctx.audioWorklet.addModule(modulePath || DEFAULT_MODULE_PATH);
+      const url =
+        modulePath && modulePath !== DEFAULT_MODULE_PATH
+          ? modulePath
+          : await getDefaultWorkletModuleUrl();
+      modulePromise = ctx.audioWorklet.addModule(url);
       loadedByContext.set(ctx, modulePromise);
     }
     await modulePromise;
