@@ -323,7 +323,9 @@
             v-else-if="activeEditorTab === 'compressor'"
             class="sound-bar__playback-main sound-bar__playback-main--fx sound-bar__playback-main--comp"
           >
-            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
+            <div
+              class="sound-bar__knobs-row sound-bar__knobs-row--fx sound-bar__knobs-row--compressor"
+            >
               <Knob
                 :model-value="fxCompressorThresholdDb"
                 :min="-48"
@@ -368,8 +370,6 @@
                 :format-value="formatMs"
                 @update:model-value="fxCompressorReleaseMs = $event"
               />
-            </div>
-            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
               <Knob
                 :model-value="fxEnvelopeAttackMs"
                 :min="0"
@@ -1850,9 +1850,15 @@ function handleRowClick(sound: OrganizationSound) {
 }
 
 .sound-bar__playback-main--comp {
-  flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+}
+
+.sound-bar__knobs-row--compressor {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: 100%;
+  gap: 1px;
+  justify-items: center;
 }
 
 @container sound-bar-playback (max-width: 210px) {
