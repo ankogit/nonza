@@ -107,6 +107,36 @@ function clampEqDb(n: unknown): number {
   return Math.max(-24, Math.min(24, Math.round(n)));
 }
 
+function clampCompressorAttackMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 10;
+  return Math.max(1, Math.min(200, Math.round(n)));
+}
+
+function clampCompressorThresholdDb(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return -24;
+  return Math.max(-48, Math.min(0, Math.round(n)));
+}
+
+function clampCompressorRatio(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(20, Math.round(n * 2) / 2));
+}
+
+function clampCompressorReleaseMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 250;
+  return Math.max(50, Math.min(800, Math.round(n)));
+}
+
+function clampEnvelopeAttackMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(500, Math.round(n)));
+}
+
+function clampEnvelopeReleaseMs(n: unknown): number {
+  if (typeof n !== "number" || !Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(800, Math.round(n)));
+}
+
 function parseFx(raw: unknown): SoundBarFxSettings {
   const fx = raw as Record<string, unknown> | null;
   return {
@@ -119,6 +149,32 @@ function parseFx(raw: unknown): SoundBarFxSettings {
     eqLowDb: clampEqDb(fx?.eqLowDb),
     eqMidDb: clampEqDb(fx?.eqMidDb),
     eqHighDb: clampEqDb(fx?.eqHighDb),
+    compressorThresholdDb: (() => {
+      if (typeof fx?.compressorThresholdDb === "number") {
+        return clampCompressorThresholdDb(fx.compressorThresholdDb);
+      }
+      const amt = fx?.compressorAmount;
+      if (typeof amt === "number" && Number.isFinite(amt) && amt > 0) {
+        const a = Math.max(0, Math.min(100, Math.round(amt)));
+        return clampCompressorThresholdDb(-18 - (a / 100) * 24);
+      }
+      return clampCompressorThresholdDb(undefined);
+    })(),
+    compressorRatio: (() => {
+      if (typeof fx?.compressorRatio === "number") {
+        return clampCompressorRatio(fx.compressorRatio);
+      }
+      const amt = fx?.compressorAmount;
+      if (typeof amt === "number" && Number.isFinite(amt) && amt > 0) {
+        const a = Math.max(0, Math.min(100, Math.round(amt)));
+        return clampCompressorRatio(2 + (a / 100) * 10);
+      }
+      return clampCompressorRatio(undefined);
+    })(),
+    compressorAttackMs: clampCompressorAttackMs(fx?.compressorAttackMs),
+    compressorReleaseMs: clampCompressorReleaseMs(fx?.compressorReleaseMs),
+    envelopeAttackMs: clampEnvelopeAttackMs(fx?.envelopeAttackMs),
+    envelopeReleaseMs: clampEnvelopeReleaseMs(fx?.envelopeReleaseMs),
   };
 }
 

@@ -108,6 +108,19 @@
               EQ
             </button>
             <button
+              type="button"
+              role="tab"
+              class="sound-bar__playback-tab"
+              :class="{
+                'sound-bar__playback-tab--active':
+                  activeEditorTab === 'compressor',
+              }"
+              :aria-selected="activeEditorTab === 'compressor'"
+              @click="activeEditorTab = 'compressor'"
+            >
+              Comp
+            </button>
+            <button
               v-if="hasOrg"
               type="button"
               role="tab"
@@ -303,6 +316,81 @@
                 color="orange"
                 :format-value="formatDb"
                 @update:model-value="eqHighDb = $event"
+              />
+            </div>
+          </div>
+          <div
+            v-else-if="activeEditorTab === 'compressor'"
+            class="sound-bar__playback-main sound-bar__playback-main--fx sound-bar__playback-main--comp"
+          >
+            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
+              <Knob
+                :model-value="fxCompressorThresholdDb"
+                :min="-48"
+                :max="0"
+                :step="1"
+                compact
+                label="Thr"
+                color="purple"
+                :format-value="formatDb"
+                @update:model-value="fxCompressorThresholdDb = $event"
+              />
+              <Knob
+                :model-value="fxCompressorRatio"
+                :min="1"
+                :max="20"
+                :step="0.5"
+                compact
+                label="Ratio"
+                color="purple"
+                :format-value="formatCompressorRatio"
+                @update:model-value="fxCompressorRatio = $event"
+              />
+              <Knob
+                :model-value="fxCompressorAttackMs"
+                :min="1"
+                :max="200"
+                :step="1"
+                compact
+                label="C.Atk"
+                color="purple"
+                :format-value="formatMs"
+                @update:model-value="fxCompressorAttackMs = $event"
+              />
+              <Knob
+                :model-value="fxCompressorReleaseMs"
+                :min="50"
+                :max="800"
+                :step="10"
+                compact
+                label="C.Rel"
+                color="purple"
+                :format-value="formatMs"
+                @update:model-value="fxCompressorReleaseMs = $event"
+              />
+            </div>
+            <div class="sound-bar__knobs-row sound-bar__knobs-row--fx">
+              <Knob
+                :model-value="fxEnvelopeAttackMs"
+                :min="0"
+                :max="500"
+                :step="5"
+                compact
+                label="Env A"
+                color="orange"
+                :format-value="formatMs"
+                @update:model-value="fxEnvelopeAttackMs = $event"
+              />
+              <Knob
+                :model-value="fxEnvelopeReleaseMs"
+                :min="0"
+                :max="800"
+                :step="10"
+                compact
+                label="Env R"
+                color="orange"
+                :format-value="formatMs"
+                @update:model-value="fxEnvelopeReleaseMs = $event"
               />
             </div>
           </div>
@@ -529,6 +617,12 @@ type StoredPlayback = {
   eqLowDb: number;
   eqMidDb: number;
   eqHighDb: number;
+  fxCompressorThresholdDb: number;
+  fxCompressorRatio: number;
+  fxCompressorAttackMs: number;
+  fxCompressorReleaseMs: number;
+  fxEnvelopeAttackMs: number;
+  fxEnvelopeReleaseMs: number;
 };
 
 const DEFAULT_PLAYBACK: StoredPlayback = {
@@ -548,6 +642,12 @@ const DEFAULT_PLAYBACK: StoredPlayback = {
   eqLowDb: 0,
   eqMidDb: 0,
   eqHighDb: 0,
+  fxCompressorThresholdDb: -24,
+  fxCompressorRatio: 1,
+  fxCompressorAttackMs: 10,
+  fxCompressorReleaseMs: 250,
+  fxEnvelopeAttackMs: 0,
+  fxEnvelopeReleaseMs: 0,
 };
 
 const storePerSound = ref<Record<string, StoredPlayback>>({});
@@ -574,9 +674,15 @@ const fxReverbDecayMs = ref(1200);
 const eqLowDb = ref(0);
 const eqMidDb = ref(0);
 const eqHighDb = ref(0);
-const activeEditorTab = ref<"playback" | "fx" | "eq" | "upload">(
-  "playback",
-);
+const fxCompressorThresholdDb = ref(-24);
+const fxCompressorRatio = ref(1);
+const fxCompressorAttackMs = ref(10);
+const fxCompressorReleaseMs = ref(250);
+const fxEnvelopeAttackMs = ref(0);
+const fxEnvelopeReleaseMs = ref(0);
+const activeEditorTab = ref<
+  "playback" | "fx" | "eq" | "compressor" | "upload"
+>("playback");
 const playbackStateReady = ref(false);
 const DEBUG_KEY = "nonza_soundbar_debug";
 
@@ -619,6 +725,11 @@ function formatMs(v: number): string {
 
 function formatDb(v: number): string {
   return `${Math.round(v)}dB`;
+}
+
+function formatCompressorRatio(v: number): string {
+  const x = Math.round(v * 10) / 10;
+  return `${x}:1`;
 }
 
 function setPanelLoop(v: boolean) {
@@ -705,6 +816,44 @@ function normalizePlaybackRow(raw: Record<string, unknown>): StoredPlayback {
       typeof raw.eqHighDb === "number"
         ? Math.max(-24, Math.min(24, Math.round(raw.eqHighDb)))
         : DEFAULT_PLAYBACK.eqHighDb,
+    fxCompressorThresholdDb: (() => {
+      if (typeof raw.fxCompressorThresholdDb === "number") {
+        return Math.max(-48, Math.min(0, Math.round(raw.fxCompressorThresholdDb)));
+      }
+      if (typeof raw.fxCompressorAmount === "number") {
+        const amt = Math.max(0, Math.min(100, Math.round(raw.fxCompressorAmount)));
+        if (amt <= 0) return DEFAULT_PLAYBACK.fxCompressorThresholdDb;
+        return Math.max(-48, Math.min(0, Math.round(-18 - (amt / 100) * 24)));
+      }
+      return DEFAULT_PLAYBACK.fxCompressorThresholdDb;
+    })(),
+    fxCompressorRatio: (() => {
+      if (typeof raw.fxCompressorRatio === "number") {
+        return Math.max(1, Math.min(20, Math.round(raw.fxCompressorRatio * 2) / 2));
+      }
+      if (typeof raw.fxCompressorAmount === "number") {
+        const amt = Math.max(0, Math.min(100, Math.round(raw.fxCompressorAmount)));
+        if (amt <= 0) return 1;
+        return Math.max(1, Math.min(20, Math.round((2 + (amt / 100) * 10) * 10) / 10));
+      }
+      return DEFAULT_PLAYBACK.fxCompressorRatio;
+    })(),
+    fxCompressorAttackMs:
+      typeof raw.fxCompressorAttackMs === "number"
+        ? Math.max(1, Math.min(200, Math.round(raw.fxCompressorAttackMs)))
+        : DEFAULT_PLAYBACK.fxCompressorAttackMs,
+    fxCompressorReleaseMs:
+      typeof raw.fxCompressorReleaseMs === "number"
+        ? Math.max(50, Math.min(800, Math.round(raw.fxCompressorReleaseMs)))
+        : DEFAULT_PLAYBACK.fxCompressorReleaseMs,
+    fxEnvelopeAttackMs:
+      typeof raw.fxEnvelopeAttackMs === "number"
+        ? Math.max(0, Math.min(500, Math.round(raw.fxEnvelopeAttackMs)))
+        : DEFAULT_PLAYBACK.fxEnvelopeAttackMs,
+    fxEnvelopeReleaseMs:
+      typeof raw.fxEnvelopeReleaseMs === "number"
+        ? Math.max(0, Math.min(800, Math.round(raw.fxEnvelopeReleaseMs)))
+        : DEFAULT_PLAYBACK.fxEnvelopeReleaseMs,
   };
 }
 
@@ -792,6 +941,12 @@ function refsFromStored(s: StoredPlayback) {
   eqLowDb.value = s.eqLowDb;
   eqMidDb.value = s.eqMidDb;
   eqHighDb.value = s.eqHighDb;
+  fxCompressorThresholdDb.value = s.fxCompressorThresholdDb;
+  fxCompressorRatio.value = s.fxCompressorRatio;
+  fxCompressorAttackMs.value = s.fxCompressorAttackMs;
+  fxCompressorReleaseMs.value = s.fxCompressorReleaseMs;
+  fxEnvelopeAttackMs.value = s.fxEnvelopeAttackMs;
+  fxEnvelopeReleaseMs.value = s.fxEnvelopeReleaseMs;
 }
 
 function storedFromRefs(): StoredPlayback {
@@ -812,6 +967,12 @@ function storedFromRefs(): StoredPlayback {
     eqLowDb: eqLowDb.value,
     eqMidDb: eqMidDb.value,
     eqHighDb: eqHighDb.value,
+    fxCompressorThresholdDb: fxCompressorThresholdDb.value,
+    fxCompressorRatio: fxCompressorRatio.value,
+    fxCompressorAttackMs: fxCompressorAttackMs.value,
+    fxCompressorReleaseMs: fxCompressorReleaseMs.value,
+    fxEnvelopeAttackMs: fxEnvelopeAttackMs.value,
+    fxEnvelopeReleaseMs: fxEnvelopeReleaseMs.value,
   });
 }
 
@@ -832,7 +993,13 @@ function playbackRowEquals(a: StoredPlayback, b: StoredPlayback): boolean {
     a.fxReverbDecayMs === b.fxReverbDecayMs &&
     a.eqLowDb === b.eqLowDb &&
     a.eqMidDb === b.eqMidDb &&
-    a.eqHighDb === b.eqHighDb
+    a.eqHighDb === b.eqHighDb &&
+    a.fxCompressorThresholdDb === b.fxCompressorThresholdDb &&
+    a.fxCompressorRatio === b.fxCompressorRatio &&
+    a.fxCompressorAttackMs === b.fxCompressorAttackMs &&
+    a.fxCompressorReleaseMs === b.fxCompressorReleaseMs &&
+    a.fxEnvelopeAttackMs === b.fxEnvelopeAttackMs &&
+    a.fxEnvelopeReleaseMs === b.fxEnvelopeReleaseMs
   );
 }
 
@@ -992,7 +1159,6 @@ function selectProfile(sound: OrganizationSound): void {
   };
 
   if (selectedSoundId.value === null) {
-    createProfileFromCurrentRefsIfMissing();
     selectedSoundId.value = sound.id;
     refsFromStored(effectivePlaybackForSound(sound));
     persistAll();
@@ -1004,7 +1170,6 @@ function selectProfile(sound: OrganizationSound): void {
     persistAll();
     return;
   }
-  createProfileFromCurrentRefsIfMissing();
   selectedSoundId.value = sound.id;
   refsFromStored(effectivePlaybackForSound(sound));
   persistAll();
@@ -1038,6 +1203,12 @@ function broadcastPlaybackForSound(sound: OrganizationSound) {
       eqLowDb: snap.eqLowDb,
       eqMidDb: snap.eqMidDb,
       eqHighDb: snap.eqHighDb,
+      compressorThresholdDb: snap.fxCompressorThresholdDb,
+      compressorRatio: snap.fxCompressorRatio,
+      compressorAttackMs: snap.fxCompressorAttackMs,
+      compressorReleaseMs: snap.fxCompressorReleaseMs,
+      envelopeAttackMs: snap.fxEnvelopeAttackMs,
+      envelopeReleaseMs: snap.fxEnvelopeReleaseMs,
     },
     reverse: snap.reverse && (!snap.pendulum || snap.gate),
     pendulum: snap.pendulum,
@@ -1118,6 +1289,12 @@ watch(
     eqLowDb,
     eqMidDb,
     eqHighDb,
+    fxCompressorThresholdDb,
+    fxCompressorRatio,
+    fxCompressorAttackMs,
+    fxCompressorReleaseMs,
+    fxEnvelopeAttackMs,
+    fxEnvelopeReleaseMs,
   ],
   () => {
     commitActiveSnapshot();
@@ -1670,6 +1847,12 @@ function handleRowClick(sound: OrganizationSound) {
 
 .sound-bar__playback-main--fx {
   justify-content: center;
+}
+
+.sound-bar__playback-main--comp {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
 
 @container sound-bar-playback (max-width: 210px) {

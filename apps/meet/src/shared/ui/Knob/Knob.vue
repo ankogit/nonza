@@ -219,6 +219,9 @@ function startDrag(e: PointerEvent) {
   place-items: center;
   border-radius: 999px;
   overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .knob-control__wrap--active {

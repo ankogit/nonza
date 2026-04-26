@@ -20,6 +20,17 @@ export type SoundBarFxSettings = {
   eqLowDb: number;
   eqMidDb: number;
   eqHighDb: number;
+  /** dB, типично −48…0; ниже — сильнее сжатие. */
+  compressorThresholdDb: number;
+  /** 1 = выкл.; до 20:1. */
+  compressorRatio: number;
+  compressorAttackMs: number;
+  /** Время отпускания (sustain / release). */
+  compressorReleaseMs: number;
+  /** 0 = дефолтный короткий fade; иначе атака в начале сегмента, мс. */
+  envelopeAttackMs: number;
+  /** 0 = без затухания по огибающей; спад в конце сегмента, мс. */
+  envelopeReleaseMs: number;
 };
 
 export type SoundBarActionStartPayload = {

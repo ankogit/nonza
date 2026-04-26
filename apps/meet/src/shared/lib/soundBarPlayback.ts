@@ -3,6 +3,7 @@ import {
   getStoredAudioOutputDevice,
 } from "./audio-devices";
 import {
+  Compressor as ToneCompressor,
   Context as ToneContext,
   Distortion as ToneDistortion,
   EQ3 as ToneEQ3,
@@ -52,6 +53,92 @@ let decodeCtx: AudioContext | null = null;
 const bufferCache = new Map<string, AudioBuffer>();
 const inFlightDecodes = new Map<string, Promise<AudioBuffer>>();
 
+const MAX_PARALLEL_SOUNDBAR_DECODE = 10;
+let soundBarDecodeSlots = 0;
+const soundBarDecodeWaiters: Array<() => void> = [];
+
+function acquireSoundBarDecodeSlot(): Promise<void> {
+  if (soundBarDecodeSlots < MAX_PARALLEL_SOUNDBAR_DECODE) {
+    soundBarDecodeSlots++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    soundBarDecodeWaiters.push(() => {
+      soundBarDecodeSlots++;
+      resolve();
+    });
+  });
+}
+
+function releaseSoundBarDecodeSlot(): void {
+  soundBarDecodeSlots = Math.max(0, soundBarDecodeSlots - 1);
+  const next = soundBarDecodeWaiters.shift();
+  if (next) next();
+}
+
+/** Один выходной AudioContext на все WA-сессии саундбара — меньше лагов при множестве голосов. */
+let pooledPlaybackCtx: AudioContext | null = null;
+let pooledToneCtx: ToneContext | null = null;
+let pooledPlaybackRefCount = 0;
+let pooledSuspendTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPooledPlaybackSuspendTimer(): void {
+  if (pooledSuspendTimer != null) {
+    clearTimeout(pooledSuspendTimer);
+    pooledSuspendTimer = null;
+  }
+}
+
+async function acquirePooledPlaybackAudio(): Promise<{
+  ctx: AudioContext;
+  toneCtx: ToneContext;
+}> {
+  clearPooledPlaybackSuspendTimer();
+  if (!pooledPlaybackCtx || pooledPlaybackCtx.state === "closed") {
+    try {
+      pooledToneCtx?.dispose();
+    } catch {
+      /* ignore */
+    }
+    pooledToneCtx = null;
+    pooledPlaybackCtx = null;
+    try {
+      pooledPlaybackCtx = new AudioContext();
+    } catch {
+      pooledPlaybackCtx = new AudioContext();
+    }
+    await pooledPlaybackCtx.resume();
+    await applySinkToAudioContext(pooledPlaybackCtx);
+    pooledToneCtx = new ToneContext({
+      context: pooledPlaybackCtx,
+      lookAhead: 0,
+    });
+  } else if (pooledPlaybackCtx.state === "suspended") {
+    await pooledPlaybackCtx.resume();
+  }
+  pooledPlaybackRefCount++;
+  return { ctx: pooledPlaybackCtx, toneCtx: pooledToneCtx! };
+}
+
+function releasePooledPlaybackAudio(): void {
+  pooledPlaybackRefCount = Math.max(0, pooledPlaybackRefCount - 1);
+  if (pooledPlaybackRefCount > 0) return;
+  clearPooledPlaybackSuspendTimer();
+  pooledSuspendTimer = window.setTimeout(() => {
+    pooledSuspendTimer = null;
+    if (pooledPlaybackRefCount > 0) return;
+    try {
+      void pooledPlaybackCtx?.suspend();
+    } catch {
+      /* ignore */
+    }
+  }, 3500);
+}
+
+function isPooledPlaybackContext(ctx: AudioContext): boolean {
+  return pooledPlaybackCtx !== null && ctx === pooledPlaybackCtx;
+}
+
 function getDecodeContext(): AudioContext {
   if (!decodeCtx) decodeCtx = new AudioContext();
   return decodeCtx;
@@ -75,6 +162,7 @@ async function decodeSoundBarUrl(
   if (existing) return existing;
 
   const promise = (async () => {
+    await acquireSoundBarDecodeSlot();
     try {
       const response = await fetch(url.trim());
       if (!response.ok) throw new Error(`soundbar fetch ${response.status}`);
@@ -85,6 +173,7 @@ async function decodeSoundBarUrl(
       bufferCache.set(key, buffer);
       return buffer;
     } finally {
+      releaseSoundBarDecodeSlot();
       inFlightDecodes.delete(key);
     }
   })();
@@ -188,8 +277,8 @@ function cleanupSession(sessionId: SessionId): void {
   }
 }
 
-/** Одношоты без gate/loop при спаме создают по AudioContext на звук — ограничиваем хвост. */
-const MAX_EVICTABLE_SOUND_BAR_SESSIONS = 28;
+/** Одношоты без gate/loop; при общем output context меньше сессий = стабильнее UI. */
+const MAX_EVICTABLE_SOUND_BAR_SESSIONS = 14;
 
 function countEvictableSoundBarSessions(): number {
   let n = 0;
@@ -289,7 +378,11 @@ function abortIfSessionCancelled(
   ctx: AudioContext,
 ): boolean {
   if (!isSessionCancelled(sessionId)) return false;
-  closeAudioContextQuietly(ctx);
+  if (isPooledPlaybackContext(ctx)) {
+    releasePooledPlaybackAudio();
+  } else {
+    closeAudioContextQuietly(ctx);
+  }
   return true;
 }
 
@@ -338,6 +431,45 @@ function clampEqDb(v: number): number {
   return Math.max(-24, Math.min(24, v));
 }
 
+function clampCompressorAttackMs(v: number): number {
+  if (!Number.isFinite(v)) return 10;
+  return Math.max(1, Math.min(200, Math.round(v)));
+}
+
+function clampCompressorThresholdDb(v: number): number {
+  if (!Number.isFinite(v)) return -24;
+  return Math.max(-48, Math.min(0, Math.round(v)));
+}
+
+function clampCompressorRatio(v: number): number {
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(1, Math.min(20, Math.round(v * 2) / 2));
+}
+
+function clampCompressorReleaseMs(v: number): number {
+  if (!Number.isFinite(v)) return 250;
+  return Math.max(50, Math.min(800, Math.round(v)));
+}
+
+/** 50–800 ms → сек; логарифмическая кривая, чтобы разница по release была заметнее. */
+function mapCompressorReleaseMsToSec(ms: number): number {
+  const m = clampCompressorReleaseMs(ms);
+  const u = (m - 50) / (800 - 50);
+  const minS = 0.01;
+  const maxS = 1;
+  return Math.min(1, minS * Math.pow(maxS / minS, u));
+}
+
+function clampEnvelopeAttackMs(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(500, Math.round(v)));
+}
+
+function clampEnvelopeReleaseMs(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(800, Math.round(v)));
+}
+
 function hasActiveFx(fx: SoundBarFxSettings): boolean {
   return (
     clampFxPercent(fx.distortion) > 0 ||
@@ -348,7 +480,10 @@ function hasActiveFx(fx: SoundBarFxSettings): boolean {
     clampEqDb(fx.eqLowDb) !== 0 ||
     clampEqDb(fx.eqMidDb) !== 0 ||
     clampEqDb(fx.eqHighDb) !== 0 ||
-    clampFxFilterHz(fx.filterHz) < 19950
+    clampFxFilterHz(fx.filterHz) < 19950 ||
+    clampCompressorRatio(fx.compressorRatio) > 1.0001 ||
+    clampEnvelopeAttackMs(fx.envelopeAttackMs) > 0 ||
+    clampEnvelopeReleaseMs(fx.envelopeReleaseMs) > 0
   );
 }
 
@@ -416,6 +551,12 @@ export type SoundBarFxSettings = {
   eqLowDb: number;
   eqMidDb: number;
   eqHighDb: number;
+  compressorThresholdDb: number;
+  compressorRatio: number;
+  compressorAttackMs: number;
+  compressorReleaseMs: number;
+  envelopeAttackMs: number;
+  envelopeReleaseMs: number;
 };
 
 function heardTiming(
@@ -637,6 +778,17 @@ async function startWebAudioSoundBarSession(
   const eqLowDb = clampEqDb(fx.eqLowDb);
   const eqMidDb = clampEqDb(fx.eqMidDb);
   const eqHighDb = clampEqDb(fx.eqHighDb);
+  const fxCompressorThresholdDb = clampCompressorThresholdDb(
+    fx.compressorThresholdDb ?? -24,
+  );
+  const fxCompressorRatio = clampCompressorRatio(fx.compressorRatio ?? 1);
+  const fxCompressorAttackSec =
+    clampCompressorAttackMs(fx.compressorAttackMs) / 1000;
+  const fxCompressorReleaseSec = mapCompressorReleaseMsToSec(
+    fx.compressorReleaseMs,
+  );
+  const fxEnvelopeAttackMs = clampEnvelopeAttackMs(fx.envelopeAttackMs ?? 0);
+  const fxEnvelopeReleaseMs = clampEnvelopeReleaseMs(fx.envelopeReleaseMs ?? 0);
   const effectiveRate = speed;
   const baseSec = clampClipDurationSec(forward.duration);
   const fullDurationSec = forward.duration;
@@ -655,23 +807,18 @@ async function startWebAudioSoundBarSession(
     return Math.min(ms, MAX_FX_TAIL_MS);
   })();
 
-  let ctx: AudioContext;
-  try {
-    ctx = new AudioContext({ sampleRate: forward.sampleRate });
-  } catch {
-    ctx = new AudioContext();
-  }
-  if (abortIfSessionCancelled(sessionId, ctx)) return;
-  await ctx.resume();
-  if (abortIfSessionCancelled(sessionId, ctx)) return;
-  await applySinkToAudioContext(ctx);
+  const { ctx, toneCtx } = await acquirePooledPlaybackAudio();
   if (abortIfSessionCancelled(sessionId, ctx)) return;
   if (Math.abs(speed - 1) > 0.0001) {
-    await TimestretchWorklet.ensureModuleLoaded(ctx);
+    try {
+      await TimestretchWorklet.ensureModuleLoaded(ctx);
+    } catch (e) {
+      releasePooledPlaybackAudio();
+      throw e;
+    }
     if (abortIfSessionCancelled(sessionId, ctx)) return;
   }
 
-  const toneCtx = new ToneContext({ context: ctx, lookAhead: 0 });
   const gainNode = ctx.createGain();
   gainNode.connect(ctx.destination);
 
@@ -732,16 +879,28 @@ async function startWebAudioSoundBarSession(
     } catch {
       /* ignore */
     }
+    releasePooledPlaybackAudio();
+  };
+
+  let reverseBuf: AudioBuffer | null;
+  let playBuf: AudioBuffer;
+  try {
+    reverseBuf = reverse ? reverseAudioBuffer(ctx, forward) : null;
+    playBuf = reverse && !pendulum && reverseBuf ? reverseBuf : forward;
+  } catch (e) {
+    const unsub = unsubscribeMasterBySessionId.get(sessionId);
+    if (unsub) {
+      unsub();
+      unsubscribeMasterBySessionId.delete(sessionId);
+    }
     try {
-      toneCtx.dispose();
+      gainNode.disconnect();
     } catch {
       /* ignore */
     }
-    closeAudioContextQuietly(ctx);
-  };
-
-  const reverseBuf = reverse ? reverseAudioBuffer(ctx, forward) : null;
-  const playBuf = reverse && !pendulum && reverseBuf ? reverseBuf : forward;
+    releasePooledPlaybackAudio();
+    throw e;
+  }
 
   const remoteTrimSourceSec = computeInitialRemoteTrimSourceSec(
     params,
@@ -849,14 +1008,46 @@ async function startWebAudioSoundBarSession(
     const audibleDurationSec = playBuffer.duration / Math.max(0.001, speed);
 
     const voiceGain = ctx.createGain();
+    voiceGain.gain.value = 0;
     voiceGain.connect(gainNode);
-    const now = ctx.currentTime;
-    const fadeInSec =
-      seg?.seamlessFromHold || seg?.seamlessChain
+    const seamlessSeg = Boolean(seg?.seamlessFromHold || seg?.seamlessChain);
+
+    function scheduleVoiceGainEnvelope(tPlay: number): void {
+      let attackSec = seamlessSeg
         ? SEAMLESS_RELEASE_FADE_SEC
-        : VOICE_FADE_SEC;
-    voiceGain.gain.setValueAtTime(0, now);
-    voiceGain.gain.linearRampToValueAtTime(1, now + fadeInSec);
+        : fxEnvelopeAttackMs > 0
+          ? Math.max(0.0001, Math.min(0.5, fxEnvelopeAttackMs / 1000))
+          : VOICE_FADE_SEC;
+      let releaseSec =
+        !seamlessSeg && !loopThis && fxEnvelopeReleaseMs > 0
+          ? Math.max(0.001, Math.min(0.8, fxEnvelopeReleaseMs / 1000))
+          : 0;
+      if (releaseSec > 0) {
+        const maxEnv = Math.max(0.02, audibleDurationSec * 0.95);
+        const sum = attackSec + releaseSec;
+        if (sum > maxEnv) {
+          const s = maxEnv / sum;
+          attackSec *= s;
+          releaseSec *= s;
+        }
+      }
+      try {
+        voiceGain.gain.cancelScheduledValues(tPlay);
+        voiceGain.gain.setValueAtTime(0, tPlay);
+        voiceGain.gain.linearRampToValueAtTime(1, tPlay + attackSec);
+        if (releaseSec > 0) {
+          const holdEnd = tPlay + audibleDurationSec;
+          const releaseStart = Math.max(
+            tPlay + attackSec + 0.0005,
+            holdEnd - releaseSec,
+          );
+          voiceGain.gain.setValueAtTime(1, releaseStart);
+          voiceGain.gain.linearRampToValueAtTime(0, holdEnd);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
 
     const pitchRatio = clampPlaybackPitch(pitch);
     const compensatedPitchRatio = pitchRatio / Math.max(0.0001, speed);
@@ -910,7 +1101,12 @@ async function startWebAudioSoundBarSession(
     let worklet: TimestretchWorklet | null = null;
     let pitchShiftNodes: TonePitchShift[] = [];
     let fxNodes: Array<
-      ToneEQ3 | ToneFilter | ToneDistortion | ToneFeedbackDelay | ToneReverb
+      | ToneEQ3
+      | ToneFilter
+      | ToneDistortion
+      | ToneCompressor
+      | ToneFeedbackDelay
+      | ToneReverb
     > = [];
     let fxTailBonusMs = 0;
     let disposed = false;
@@ -942,6 +1138,24 @@ async function startWebAudioSoundBarSession(
             wet: 1,
           }),
         );
+      }
+      if (fxCompressorRatio > 1.0001) {
+        const thresholdDb = Math.max(-100, Math.min(0, fxCompressorThresholdDb));
+        const ratio = Math.max(1.001, Math.min(20, fxCompressorRatio));
+        const kneeDb = Math.min(30, 4 + ratio * 1.1);
+        const attackSec = Math.max(0.0001, Math.min(1, fxCompressorAttackSec));
+        const releaseSec = Math.max(0.01, Math.min(1, fxCompressorReleaseSec));
+        const comp = new ToneCompressor({
+          context: toneCtx,
+          threshold: thresholdDb,
+          ratio,
+          attack: attackSec,
+          release: releaseSec,
+          knee: kneeDb,
+        });
+        comp.attack.value = attackSec;
+        comp.release.value = releaseSec;
+        fxNodes.push(comp);
       }
       if (fxDelayWet > 0.001) {
         fxNodes.push(
@@ -1008,6 +1222,7 @@ async function startWebAudioSoundBarSession(
       connectPitchAndFxFrom(source);
       setCurrentSegmentClock(offsetSec);
       source.start();
+      scheduleVoiceGainEnvelope(ctx.currentTime);
       started = true;
     } else {
       try {
@@ -1040,6 +1255,7 @@ async function startWebAudioSoundBarSession(
       connectPitchAndFxFrom(worklet.workletNode as unknown as AudioNode);
       setCurrentSegmentClock(offsetSec);
       source.start();
+      scheduleVoiceGainEnvelope(ctx.currentTime);
       started = true;
     }
 
@@ -1492,6 +1708,16 @@ export async function startSoundBarSession(
       eqLowDb: clampEqDb(fx?.eqLowDb ?? 0),
       eqMidDb: clampEqDb(fx?.eqMidDb ?? 0),
       eqHighDb: clampEqDb(fx?.eqHighDb ?? 0),
+      compressorThresholdDb: clampCompressorThresholdDb(
+        fx?.compressorThresholdDb ?? -24,
+      ),
+      compressorRatio: clampCompressorRatio(fx?.compressorRatio ?? 1),
+      compressorAttackMs: clampCompressorAttackMs(fx?.compressorAttackMs ?? 10),
+      compressorReleaseMs: clampCompressorReleaseMs(
+        fx?.compressorReleaseMs ?? 250,
+      ),
+      envelopeAttackMs: clampEnvelopeAttackMs(fx?.envelopeAttackMs ?? 0),
+      envelopeReleaseMs: clampEnvelopeReleaseMs(fx?.envelopeReleaseMs ?? 0),
     },
     reverse: reverseEff,
   };
