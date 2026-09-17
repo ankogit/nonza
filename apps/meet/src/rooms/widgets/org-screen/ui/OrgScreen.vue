@@ -618,14 +618,11 @@
             </Button>
             -->
             <Button
-              v-if="joinedRoomShortCode"
+              v-if="isMobile && joinedRoomShortCode"
               type="text"
               variant="default"
               size="small"
-              class="menu-back"
-              :class="{
-                'org-screen__back--mobile': isMobile && joinedRoomShortCode,
-              }"
+              class="menu-back org-screen__back--mobile"
               @click="handleBackClick"
             >
               ← Назад
@@ -677,17 +674,29 @@
         />
       </Modal>
       <Modal v-model="showInviteModal" title="Ссылка для приглашения">
+        <Switch
+          v-model="inviteReusable"
+          aria-label="Многоразовая ссылка"
+        >
+          Многоразовая ссылка
+        </Switch>
+        <p class="org-screen__invite-hint">
+          {{
+            inviteReusable
+              ? "Ссылкой смогут воспользоваться несколько человек — действует всегда."
+              : "Ссылка сгорит после первого принятия."
+          }}
+        </p>
         <p v-if="inviteError" class="org-screen__invite-error">
           {{ inviteError }}
         </p>
-        <template v-else-if="inviteLink">
-          <input
-            :value="inviteLink"
-            readonly
-            class="org-screen__invite-input"
-          />
-        </template>
-        <p v-else-if="inviteLoading" class="org-screen__invite-loading">
+        <input
+          v-else-if="inviteLink"
+          :value="inviteLink"
+          readonly
+          class="org-screen__invite-input"
+        />
+        <p v-else class="org-screen__invite-loading">
           Создание ссылки…
         </p>
 
@@ -1285,6 +1294,7 @@ const roomSettingsSaving = ref(false);
 const showRoomDeleteConfirm = ref(false);
 const roomDeleteDeleting = ref(false);
 const inviteLink = ref<string | null>(null);
+const inviteReusable = ref(false);
 const inviteLoading = ref(false);
 const inviteError = ref<string | null>(null);
 const joinedRoomShortCode = ref<string | null>(null);
@@ -1850,11 +1860,7 @@ async function leaveRoomOrCancelJoin() {
 }
 
 function handleBackClick() {
-  if (isMobile.value) {
-    mobileView.value = "list";
-  } else {
-    leaveRoomOrCancelJoin();
-  }
+  mobileView.value = "list";
 }
 
 function openCallSettings() {
@@ -2370,13 +2376,15 @@ async function moveRoomToGroup(roomId: string, groupId: string | null) {
   }
 }
 
-async function openInviteModal() {
-  showInviteModal.value = true;
+async function createInviteLink() {
+  if (inviteLoading.value) return;
   inviteLink.value = null;
   inviteError.value = null;
   inviteLoading.value = true;
   try {
-    const inv = await inviteApi.create(props.orgId);
+    const inv = await inviteApi.create(props.orgId, {
+      reusable: inviteReusable.value,
+    });
     inviteLink.value = `${window.location.origin}${window.location.pathname}?page=invite&token=${encodeURIComponent(inv.token)}`;
   } catch (e) {
     inviteError.value =
@@ -2385,6 +2393,21 @@ async function openInviteModal() {
     inviteLoading.value = false;
   }
 }
+
+function openInviteModal() {
+  showInviteModal.value = true;
+  inviteError.value = null;
+  if (inviteReusable.value) {
+    inviteReusable.value = false;
+  } else {
+    void createInviteLink();
+  }
+}
+
+watch(inviteReusable, () => {
+  if (!showInviteModal.value) return;
+  void createInviteLink();
+});
 
 async function copyInviteLink() {
   if (!inviteLink.value) return;
@@ -2596,13 +2619,13 @@ onUnmounted(() => {
 }
 
 .org-screen__invite-error {
-  margin: 0 0 16px 0;
+  margin: 16px 0 0 0;
   color: #e2534b;
   font-size: 14px;
 }
 
 .org-screen__invite-loading {
-  margin: 0 0 16px 0;
+  margin: 16px 0 0 0;
   color: #999;
   font-size: 14px;
 }
@@ -2610,12 +2633,20 @@ onUnmounted(() => {
 .org-screen__invite-input {
   width: 100%;
   padding: 10px 12px;
-  margin-bottom: 12px;
+  margin-top: 16px;
+  margin-bottom: 8px;
   border: 2px solid #444;
   background: #1a1a1a;
   color: #fff;
   font-size: 14px;
   box-sizing: border-box;
+}
+
+.org-screen__invite-hint {
+  margin: 10px 0 0 0;
+  color: #999;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .room-settings-danger {

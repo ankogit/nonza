@@ -19,5 +19,8 @@ func RunMigrations(db *gorm.DB) error {
 		&models.MeetingDocument{},
 		&models.Participant{},
 		&models.DocumentOperation{},
+		&models.OAuthClient{},
+		&models.OAuthAuthorizationCode{},
+		&models.OAuthRefreshToken{},
 	)
 }

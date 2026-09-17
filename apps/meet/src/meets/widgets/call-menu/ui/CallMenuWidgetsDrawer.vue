@@ -138,8 +138,8 @@ const emit = defineEmits<{
   margin: 0;
   padding: 14px;
   padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
-  background: rgba(22, 22, 22, 0.98);
-  border: 2px solid #3d3d3d;
+  background: #141414f5;
+  border: 3px solid #444;
   box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.4);
   box-sizing: border-box;
   max-height: min(70vh, 420px);
@@ -271,12 +271,13 @@ const emit = defineEmits<{
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border: 2px solid #444;
-  background: #1e1e1e;
+  border: 3px solid #444;
+  background: #2a2a2a;
   color: #bab1a8;
   font-size: 11px;
   white-space: nowrap;
   max-width: 140px;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
 }
 
 .call-menu-chip__label {

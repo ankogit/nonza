@@ -35,6 +35,22 @@ func (r *UsersRepository) GetByEmail(email string) (*models.User, error) {
 	return &u, nil
 }
 
+func (r *UsersRepository) GetByGoogleID(googleID string) (*models.User, error) {
+	var u models.User
+	if err := r.db.Where("google_id = ?", googleID).First(&u).Error; err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UsersRepository) GetByMandarinshowUserID(msUserID string) (*models.User, error) {
+	var u models.User
+	if err := r.db.Where("mandarinshow_user_id = ?", msUserID).First(&u).Error; err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 func (r *UsersRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }

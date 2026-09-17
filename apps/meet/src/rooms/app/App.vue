@@ -58,6 +58,15 @@
       -->
     </div>
     <div
+      v-else-if="appStore.page === 'oauth-authorize' && appStore.oauthAuthorizeParams"
+      class="rooms-app__content rooms-app__content--auth-form"
+    >
+      <OAuthAuthorizeScreen
+        :params="appStore.oauthAuthorizeParams!"
+        @go-register="goToRegisterFromOAuth"
+      />
+    </div>
+    <div
       v-else-if="appStore.page === 'login'"
       class="rooms-app__content rooms-app__content--auth-form"
     >
@@ -242,7 +251,7 @@ import {
   useTemplateRef,
 } from "vue";
 import { storeToRefs } from "pinia";
-import { OrganizationApi } from "@shared/entities";
+import { OrganizationApi, parseOAuthAuthorizeParams, AuthApi } from "@shared/entities";
 import { ApiClient } from "@shared/api";
 import type { Organization } from "@shared/entities";
 import {
@@ -261,6 +270,7 @@ import {
   isAuthenticated,
   refreshAccessToken,
   startProactiveRefreshScheduler,
+  setAuth,
   useMeetingShortcutListener,
   getApiBaseURL,
   getLivekitURL,
@@ -276,6 +286,10 @@ import { useAppStore, useOrganizationsStore } from "@rooms/app/stores";
 
 const LoginScreen = defineAsyncComponent(
   () => import("@rooms/widgets/login-screen/ui/LoginScreen.vue"),
+);
+const OAuthAuthorizeScreen = defineAsyncComponent(
+  () =>
+    import("@rooms/widgets/oauth-authorize-screen/ui/OAuthAuthorizeScreen.vue"),
 );
 const RegisterScreen = defineAsyncComponent(
   () => import("@rooms/widgets/register-screen/ui/RegisterScreen.vue"),
@@ -349,6 +363,7 @@ const unlistenAppMenuLogout = ref<(() => void) | null>(null);
 const shouldPlayOst = computed(() => {
   if (appStore.showReconnectScreen || appStore.roomCode) return false;
   if (appStore.page === "login" || appStore.page === "register") return true;
+  if (appStore.page === "oauth-authorize") return false;
   if (isAuthenticated() && appStore.page === "organizations") return true;
   if (
     !isAuthenticated() &&
@@ -377,7 +392,7 @@ const isMainView = computed(
     isAuthenticated() &&
     !appStore.showReconnectScreen &&
     !appStore.roomCode &&
-    !["login", "register", "invite", "create-org", "settings"].includes(
+    !["login", "register", "invite", "create-org", "settings", "oauth-authorize"].includes(
       appStore.page,
     ) &&
     true,
@@ -393,13 +408,29 @@ const isScrollRootPage = computed(
     appStore.page === "login" ||
     appStore.page === "register" ||
     appStore.page === "invite" ||
+    appStore.page === "oauth-authorize" ||
     appStore.page === "create-org" ||
     appStore.page === "settings" ||
     (!isAuthenticated() && !appStore.roomCode),
 );
 
 function parseRoute() {
-  const params = new URLSearchParams(window.location.search);
+  const search = window.location.search;
+  const oauthParams = parseOAuthAuthorizeParams(search);
+  if (oauthParams) {
+    appStore.setOAuthAuthorizeParams(oauthParams);
+    appStore.setRoomCode(null);
+    appStore.setPage("oauth-authorize");
+    appStore.setInviteToken(null);
+    orgStore.clearSelected();
+    showSettingsModal.value = false;
+    showOrgSettingsModal.value = false;
+    showOrgSoundbarModal.value = false;
+    return;
+  }
+  appStore.setOAuthAuthorizeParams(null);
+
+  const params = new URLSearchParams(search);
   const code = params.get("code");
   appStore.setRoomCode(code || null);
   if (appStore.roomCode) {
@@ -461,7 +492,23 @@ function replaceState() {
     return;
   }
   let query = "";
-  if (appStore.page === "login") {
+  if (appStore.page === "oauth-authorize" && appStore.oauthAuthorizeParams) {
+    const p = appStore.oauthAuthorizeParams;
+    const q = new URLSearchParams({
+      page: "oauth-authorize",
+      client_id: p.clientId,
+      redirect_uri: p.redirectUri,
+      state: p.state,
+    });
+    if (p.scope) {
+      q.set("scope", p.scope);
+    }
+    if (p.codeChallenge) {
+      q.set("code_challenge", p.codeChallenge);
+      q.set("code_challenge_method", p.codeChallengeMethod || "S256");
+    }
+    query = `?${q.toString()}`;
+  } else if (appStore.page === "login") {
     query = "?page=login";
   } else if (appStore.page === "register") {
     query = "?page=register";
@@ -479,6 +526,11 @@ function replaceState() {
     query = "?page=organizations";
   }
   window.history.replaceState(null, "", `${window.location.pathname}${query}`);
+}
+
+function goToRegisterFromOAuth() {
+  appStore.setPage("register");
+  replaceState();
 }
 
 function goToOrganizations() {
@@ -529,6 +581,13 @@ function handleInviteOpenOrg(orgId: string) {
 }
 
 function handleAuthSuccess() {
+  if (appStore.page === "oauth-authorize" || appStore.oauthAuthorizeParams) {
+    if (appStore.oauthAuthorizeParams) {
+      appStore.setPage("oauth-authorize");
+      replaceState();
+    }
+    return;
+  }
   if (appStore.pendingInviteAfterLogin) {
     appStore.setInviteToken(appStore.pendingInviteAfterLogin);
     appStore.setPendingInviteAfterLogin(null);
@@ -641,15 +700,56 @@ function loadOrganizations() {
   orgStore.loadOrganizations(organizationApi);
 }
 
-onMounted(() => {
+async function completeSocialLoginFromQuery(): Promise<boolean> {
+  const params = new URLSearchParams(window.location.search);
+  const ticket = params.get("social_ticket")?.trim();
+  if (!ticket) return false;
+  params.delete("social_ticket");
+  const qs = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+  );
+  try {
+    const authApi = new AuthApi(new ApiClient({ baseURL: apiBaseURL }));
+    const res = await authApi.exchangeSocialTicket(ticket);
+    setAuth(
+      res.access_token,
+      res.expires_at,
+      {
+        id: res.user.id,
+        email: res.user.email,
+        name: res.user.name,
+        color: res.user.color,
+      },
+      res.refresh_token,
+      res.refresh_expires_at,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+onMounted(async () => {
   startProactiveRefreshScheduler(apiBaseURL);
   window.addEventListener("keydown", onKeydown);
+  const socialLoggedIn = await completeSocialLoginFromQuery();
   parseRoute();
+  if (socialLoggedIn) {
+    appStore.setPage("organizations");
+    appStore.setInviteToken(null);
+    orgStore.clearSelected();
+    replaceState();
+    loadOrganizations();
+    return;
+  }
   if (isTauriDesktop()) {
     document.documentElement.classList.add("nonza-desktop");
     syncAppMenu();
   }
-  const publicPages = ["login", "register", "invite"];
+  const publicPages = ["login", "register", "invite", "oauth-authorize"];
   if (!isAuthenticated() && !publicPages.includes(appStore.page)) {
     appStore.setRoomCode(null);
     appStore.setPage("login");
@@ -905,7 +1005,9 @@ onUnmounted(() => {
 
 .vert-container--list {
   overflow: auto;
-  padding: 24px 28px;
+  padding: 28px 32px 40px;
+  background: #14141490;
+  backdrop-filter: blur(2.5px);
 }
 
 .reconnect-screen__card {

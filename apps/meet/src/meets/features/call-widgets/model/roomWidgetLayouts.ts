@@ -17,17 +17,17 @@ export const ROOM_CALL_WIDGET_LAYOUTS: Record<
 > = {
   round_table: {
     maxSlots: 3,
-    defaultPinned: [],
+    defaultPinned: ["table_chat", "whiteboard"],
     paletteOrder: [...STANDARD_CALL_WIDGET_PALETTE_ORDER],
   },
   conference_hall: {
     maxSlots: 3,
-    defaultPinned: [],
+    defaultPinned: ["table_chat", "whiteboard"],
     paletteOrder: [...STANDARD_CALL_WIDGET_PALETTE_ORDER],
   },
   table_circle: {
     maxSlots: 3,
-    defaultPinned: [],
+    defaultPinned: ["table_chat", "whiteboard"],
     paletteOrder: [...STANDARD_CALL_WIDGET_PALETTE_ORDER],
   },
 };

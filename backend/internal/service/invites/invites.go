@@ -54,7 +54,7 @@ func token() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (s *invitesService) Create(orgID uuid.UUID, inviterID string, role string, expiresIn time.Duration) (*models.Invite, error) {
+func (s *invitesService) Create(orgID uuid.UUID, inviterID string, role string, expiresIn time.Duration, reusable bool) (*models.Invite, error) {
 	if _, err := s.orgsRepo.GetByID(orgID); err != nil {
 		return nil, fmt.Errorf("organization: %w", err)
 	}
@@ -62,15 +62,20 @@ func (s *invitesService) Create(orgID uuid.UUID, inviterID string, role string, 
 	if err != nil {
 		return nil, err
 	}
-	expiresAt := time.Now().Add(expiresIn)
-	if expiresIn <= 0 {
-		expiresAt = time.Now().Add(7 * 24 * time.Hour)
+	var expiresAt *time.Time
+	if !reusable {
+		exp := time.Now().Add(expiresIn)
+		if expiresIn <= 0 {
+			exp = time.Now().Add(7 * 24 * time.Hour)
+		}
+		expiresAt = &exp
 	}
 	inv := &models.Invite{
 		Token:          tok,
 		OrganizationID: orgID,
 		InviterID:      inviterID,
 		Role:           role,
+		Reusable:       reusable,
 		ExpiresAt:      expiresAt,
 	}
 	if err := s.invitesRepo.Create(inv); err != nil {
@@ -96,7 +101,7 @@ func (s *invitesService) Accept(token string, userID string, color *string) erro
 	if err != nil {
 		return err
 	}
-	if time.Now().After(inv.ExpiresAt) {
+	if inv.ExpiresAt != nil && time.Now().After(*inv.ExpiresAt) {
 		return ErrInviteExpired
 	}
 	exists, err := s.orgMembersRepo.Exists(inv.OrganizationID, userID)
@@ -108,6 +113,9 @@ func (s *invitesService) Accept(token string, userID string, color *string) erro
 	}
 	if err := s.orgMembersRepo.Add(inv.OrganizationID, userID, inv.Role, color); err != nil {
 		return err
+	}
+	if inv.Reusable {
+		return nil
 	}
 	return s.invitesRepo.Delete(inv.ID)
 }

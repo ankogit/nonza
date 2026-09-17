@@ -17,6 +17,9 @@ type Repositories struct {
 	RoomGroups          RoomGroups
 	MeetingDocuments    MeetingDocuments
 	Participants        Participants
+	OAuthClients        OAuthClients
+	OAuthCodes          OAuthCodes
+	OAuthRefreshTokens  OAuthRefreshTokens
 }
 
 func NewRepositories(db *gorm.DB) *Repositories {
@@ -30,6 +33,9 @@ func NewRepositories(db *gorm.DB) *Repositories {
 	roomGroupsRepo := postgresDB.NewRoomGroupsRepository(db)
 	docRepo := postgresDB.NewMeetingDocumentsRepository(db)
 	partRepo := postgresDB.NewParticipantsRepository(db)
+	oauthClientsRepo := postgresDB.NewOAuthClientsRepository(db)
+	oauthCodesRepo := postgresDB.NewOAuthCodesRepository(db)
+	oauthRefreshRepo := postgresDB.NewOAuthRefreshTokensRepository(db)
 
 	return &Repositories{
 		Users:               usersRepo,
@@ -42,5 +48,8 @@ func NewRepositories(db *gorm.DB) *Repositories {
 		RoomGroups:          roomGroupsRepo,
 		MeetingDocuments:    docRepo,
 		Participants:        partRepo,
+		OAuthClients:        oauthClientsRepo,
+		OAuthCodes:          oauthCodesRepo,
+		OAuthRefreshTokens:  oauthRefreshRepo,
 	}
 }

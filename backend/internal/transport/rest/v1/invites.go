@@ -54,7 +54,7 @@ func (h *InvitesHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to invite"})
 		return
 	}
-	inv, err := h.Services.Invites.Create(orgID, inviterID, role, expiresIn)
+	inv, err := h.Services.Invites.Create(orgID, inviterID, role, expiresIn, req.Reusable)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -77,7 +77,7 @@ func (h *InvitesHandler) GetByToken(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
 		return
 	}
-	if time.Now().After(inv.ExpiresAt) {
+	if inv.ExpiresAt != nil && time.Now().After(*inv.ExpiresAt) {
 		c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
 		return
 	}
@@ -104,7 +104,7 @@ func (h *InvitesHandler) Accept(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "invite not found"})
 		return
 	}
-	if time.Now().After(inv.ExpiresAt) {
+	if inv.ExpiresAt != nil && time.Now().After(*inv.ExpiresAt) {
 		c.JSON(http.StatusGone, gin.H{"error": "invite expired"})
 		return
 	}

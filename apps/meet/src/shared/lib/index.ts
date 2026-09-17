@@ -2,6 +2,7 @@ export * from "./config";
 export * from "./constants";
 export * from "./room-type";
 export * from "./auth";
+export * from "./socialAuth";
 export * from "./livekit-helpers";
 export * from "./participant-preferences";
 export * from "./participant-color";

@@ -165,39 +165,39 @@ const emit = defineEmits<{
 
 @media (max-width: 768px) {
   .call-menu-slot--arrange {
-    min-height: calc(40px + 4px);
+    min-height: calc(44px + 4px);
   }
 
   .call-menu-slot--empty {
-    min-width: 40px;
+    min-width: 44px;
   }
 
   .call-menu-slot__placeholder {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 
   .call-menu-slot__grip {
-    height: 40px;
+    height: 44px;
   }
 }
 
 @media (max-width: 480px) {
   .call-menu-slot--arrange {
-    min-height: calc(36px + 4px);
+    min-height: calc(42px + 4px);
   }
 
   .call-menu-slot--empty {
-    min-width: 36px;
+    min-width: 42px;
   }
 
   .call-menu-slot__placeholder {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
   }
 
   .call-menu-slot__grip {
-    height: 36px;
+    height: 42px;
   }
 }
 </style>

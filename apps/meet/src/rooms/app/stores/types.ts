@@ -6,4 +6,5 @@ export type AppPage =
   | "invite"
   | "login"
   | "register"
-  | "settings";
+  | "settings"
+  | "oauth-authorize";

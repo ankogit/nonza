@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import type { OAuthAuthorizeParams } from "@shared/entities";
 import type { AppPage } from "./types";
 
 export const useAppStore = defineStore("app", () => {
@@ -8,9 +9,14 @@ export const useAppStore = defineStore("app", () => {
   const pendingInviteAfterLogin = ref<string | null>(null);
   const roomCode = ref<string | null>(null);
   const showReconnectScreen = ref(false);
+  const oauthAuthorizeParams = ref<OAuthAuthorizeParams | null>(null);
 
   function setPage(p: AppPage) {
     page.value = p;
+  }
+
+  function setOAuthAuthorizeParams(params: OAuthAuthorizeParams | null) {
+    oauthAuthorizeParams.value = params;
   }
 
   function setInviteToken(token: string | null) {
@@ -40,7 +46,9 @@ export const useAppStore = defineStore("app", () => {
     pendingInviteAfterLogin,
     roomCode,
     showReconnectScreen,
+    oauthAuthorizeParams,
     setPage,
+    setOAuthAuthorizeParams,
     setInviteToken,
     setPendingInviteAfterLogin,
     setRoomCode,

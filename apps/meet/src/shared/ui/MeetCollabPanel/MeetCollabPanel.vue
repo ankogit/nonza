@@ -23,8 +23,9 @@ defineProps<{
   width: 100%;
   min-height: 0;
   max-height: 100%;
-  background: #1f1f1f;
-  border: 2px solid #444;
+  background: #141414;
+  border: 3px solid #444;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -40,11 +41,12 @@ defineProps<{
 
 .meet-collab-panel__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: normal;
   color: #bab1a8;
   font-family: "Bebas Neue", sans-serif;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .meet-collab-panel__body {

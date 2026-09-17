@@ -7,6 +7,7 @@ import (
 	"nonza/backend/internal/service/auth"
 	"nonza/backend/internal/service/files"
 	"nonza/backend/internal/service/invites"
+	"nonza/backend/internal/service/oauth"
 	"nonza/backend/internal/service/organization_sounds"
 	"nonza/backend/internal/service/meeting_documents"
 	"nonza/backend/internal/service/organizations"
@@ -16,6 +17,7 @@ import (
 
 type Services struct {
 	Auth             auth.Auth
+	OAuth            oauth.OAuth
 	Organizations    organizations.Organizations
 	Rooms            rooms.Rooms
 	RoomGroups       room_groups.RoomGroups
@@ -40,9 +42,18 @@ func NewServices(deps Deps) *Services {
 		deps.TransactionRunner,
 	)
 	filesSvc := files.NewFilesService(deps.Repositories.Files, deps.ObjectStorage)
+	authSvc := auth.NewAuthService(deps.Repositories.Users, deps.Config)
 
 	return &Services{
-		Auth:             auth.NewAuthService(deps.Repositories.Users, deps.Config),
+		Auth: authSvc,
+		OAuth: oauth.NewOAuthService(
+			deps.Repositories.OAuthClients,
+			deps.Repositories.OAuthCodes,
+			deps.Repositories.OAuthRefreshTokens,
+			deps.Repositories.Users,
+			authSvc,
+			deps.Config,
+		),
 		Organizations:    orgsSvc,
 		Rooms:            rooms.NewRoomsService(deps.Repositories.Rooms, deps.Repositories.Organizations),
 		RoomGroups:       room_groups.NewRoomGroupsService(deps.Repositories.RoomGroups, deps.Repositories.Rooms, deps.Repositories.Organizations),

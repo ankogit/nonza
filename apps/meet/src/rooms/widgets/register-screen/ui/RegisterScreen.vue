@@ -1,72 +1,84 @@
 <template>
-  <ScreenLayout narrow>
-    <div class="register-screen__wrap">
-      <div class="register-screen__logo-circle">
-        <AppLogo variant="withBackground" size="medium" circle />
-      </div>
-      <div class="register-screen__card">
-        <PageHeader title="Регистрация" />
-      <form @submit.prevent="submit" class="register-screen__form">
-        <FormSection label="Имя">
-          <div class="register-screen__name-row">
+  <ScreenLayout>
+    <div class="register-screen auth-stage">
+      <MetroTile
+        variant="purple"
+        size="wide"
+        mark="N"
+        class="register-screen__tile"
+      >
+        <template #kicker>
+          <span class="register-screen__brand">Nonza</span>
+        </template>
+        <template #title>Регистрация</template>
+        <p class="register-screen__lead">
+          Создайте аккаунт, чтобы присоединяться к организациям.
+        </p>
+        <form class="register-screen__form" @submit.prevent="submit">
+          <label class="register-screen__label">
+            Имя
+            <div class="register-screen__name-row">
+              <Input
+                v-model="name"
+                type="text"
+                placeholder="Введите имя"
+                autocomplete="name"
+              />
+              <Button
+                type="icon"
+                variant="default"
+                size="medium"
+                class="register-screen__randomize-btn"
+                title="Сгенерировать случайное имя"
+                aria-label="Сгенерировать случайное имя"
+                @click="randomizeName"
+              >
+                <PixelIcon name="reload" variant="large" />
+              </Button>
+            </div>
+          </label>
+          <label class="register-screen__label">
+            Email
             <Input
-              v-model="name"
-              type="text"
-              placeholder="Введите имя"
-              autocomplete="name"
+              v-model="email"
+              type="email"
+              placeholder="email@example.com"
+              autocomplete="email"
             />
+          </label>
+          <label class="register-screen__label">
+            Пароль
+            <Input
+              v-model="password"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="new-password"
+            />
+          </label>
+          <span class="register-screen__hint">Не менее 6 символов</span>
+          <Alert v-if="error" variant="danger">{{ error }}</Alert>
+          <div class="register-screen__actions">
             <Button
-              type="icon"
+              type="text"
               variant="default"
-              size="small"
-              class="register-screen__randomize-btn"
-              title="Сгенерировать случайное имя"
-              aria-label="Сгенерировать случайное имя"
-              @click="randomizeName"
+              size="large"
+              native-type="button"
+              @click="$emit('goLogin')"
             >
-              <PixelIcon name="reload" variant="large" />
+              Вход
+            </Button>
+            <Button
+              type="text"
+              variant="secondary"
+              size="large"
+              native-type="submit"
+              :disabled="submitting || password.length < 6 || !name.trim()"
+            >
+              {{ submitting ? "Регистрация..." : "Регистрация" }}
             </Button>
           </div>
-        </FormSection>
-        <FormSection label="Email">
-          <Input
-            v-model="email"
-            type="email"
-            placeholder="email@example.com"
-            autocomplete="email"
-          />
-        </FormSection>
-        <FormSection label="Пароль" hint="Не менее 6 символов">
-          <Input
-            v-model="password"
-            type="password"
-            placeholder="Пароль"
-            autocomplete="new-password"
-          />
-        </FormSection>
-        <Alert v-if="error" variant="danger">{{ error }}</Alert>
-        <div class="register-screen__actions">
-          <Button
-            type="text"
-            variant="default"
-            size="medium"
-            native-type="button"
-            @click="$emit('goLogin')"
-          >
-            Вход
-          </Button>
-          <Button
-            type="text"
-            variant="secondary"
-            size="medium"
-            native-type="submit"
-            :disabled="submitting || password.length < 6 || !name.trim()"
-          >
-            {{ submitting ? "Регистрация..." : "Зарегистрироваться" }}
-          </Button>
-        </div>
-      </form>
-      </div>
+        </form>
+      </MetroTile>
     </div>
   </ScreenLayout>
 </template>
@@ -75,13 +87,11 @@
 import { ref } from "vue";
 import {
   ScreenLayout,
-  PageHeader,
-  FormSection,
   Input,
   Button,
   Alert,
   PixelIcon,
-  AppLogo,
+  MetroTile,
 } from "@shared/ui";
 import { AuthApi } from "@shared/entities";
 import { useApiClient } from "@shared/api";
@@ -138,71 +148,172 @@ async function submit() {
 </script>
 
 <style scoped>
-.register-screen__wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+.auth-stage {
+  min-height: min(78vh, 760px);
+  display: grid;
+  place-items: center;
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
+  padding: 12px 0 28px;
 }
 
-.register-screen__logo-circle {
-  flex-shrink: 0;
-  width: 120px;
-  height: 120px;
+.register-screen__tile {
+  width: min(620px, 100%);
+  min-height: 480px;
+  overflow: hidden;
 }
 
-.register-screen__logo-circle :deep(.app-logo) {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
+.register-screen__tile :deep(.metro-tile__inner) {
+  gap: 18px;
+  padding: 28px 32px 24px;
 }
 
-.register-screen__card {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  background: #2a2a2a;
-  border: 2px solid #444;
-  padding: 24px;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.3);
+.register-screen__tile :deep(.metro-tile__title) {
+  font-size: clamp(2.6rem, 5.5vw, 3.5rem);
+  letter-spacing: 0.03em;
+  line-height: 0.9;
+  max-width: 90%;
+}
+
+.register-screen__tile :deep(.metro-tile__mark) {
+  font-size: clamp(6rem, 16vw, 10rem);
+  right: 0.02em;
+  bottom: 0.02em;
+  max-width: 60%;
+  max-height: 55%;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.08);
+  transform-origin: bottom right;
+}
+
+.register-screen__tile :deep(.metro-tile__body) {
+  margin-top: 8px;
+  gap: 18px;
+}
+
+.register-screen__brand {
+  font-family: "Bebas Neue", sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 1.35rem;
+  color: #81b538;
+  opacity: 1;
+}
+
+.register-screen__lead {
+  margin: 0;
+  max-width: 30rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .register-screen__form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: grid;
+  gap: 1.1rem;
+  width: 100%;
+}
+
+.register-screen__label {
+  display: grid;
+  gap: 0.45rem;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
   min-width: 0;
+}
+
+.register-screen__hint {
+  font-family: "Open Sans", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: -0.45rem;
+}
+
+.register-screen__label :deep(.pixel-input) {
+  width: 100%;
+  height: 56px;
+  min-height: 56px;
+  font-size: 17px;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.28);
+  border-color: #ffffff22;
+  border-top-color: #ffffff38;
+  border-left-color: #ffffff38;
+  color: #fff;
+}
+
+.register-screen__label :deep(.pixel-input:hover) {
+  background: rgba(0, 0, 0, 0.36);
+}
+
+.register-screen__label :deep(.pixel-input:focus) {
+  background: rgba(0, 0, 0, 0.42);
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.register-screen__name-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.register-screen__name-row :deep(.pixel-input) {
+  flex: 1;
+  min-width: 0;
+}
+
+.register-screen__randomize-btn {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
 }
 
 .register-screen__actions {
   display: flex;
   flex-flow: row wrap;
-  gap: 12px;
+  gap: 14px;
   justify-content: flex-end;
   align-items: center;
   min-width: 0;
-  padding-top: 16px;
-  border-top: 2px solid #444;
+  padding-top: 10px;
+  margin-top: 4px;
 }
 
 .register-screen__actions :deep(.button--text) {
   max-width: 100%;
   flex: 0 1 auto;
   min-width: 0;
+  min-height: 56px;
   text-align: center;
-  white-space: normal;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: normal;
+  font-size: 1.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 16px 28px;
 }
 
-@media (max-width: 480px) {
-  .register-screen__card {
-    padding: 16px;
+@media (max-width: 640px) {
+  .auth-stage {
+    min-height: auto;
+    place-items: stretch;
+    padding: 0;
+  }
+
+  .register-screen__tile {
+    min-height: 0;
+  }
+
+  .register-screen__tile :deep(.metro-tile__inner) {
+    padding: 22px 18px 18px;
   }
 
   .register-screen__actions {
@@ -214,22 +325,5 @@ async function submit() {
     width: 100%;
     justify-content: center;
   }
-}
-
-.register-screen__name-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.register-screen__name-row :deep(.pixel-input) {
-  flex: 1;
-  min-width: 0;
-}
-
-.register-screen__randomize-btn {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
 }
 </style>

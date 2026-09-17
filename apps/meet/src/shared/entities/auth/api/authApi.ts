@@ -12,6 +12,12 @@ export class AuthApi {
     return this.client.post<AuthResponse>("/api/v1/auth/register", data);
   }
 
+  async exchangeSocialTicket(ticket: string): Promise<AuthResponse> {
+    return this.client.post<AuthResponse>("/api/v1/auth/social/exchange", {
+      ticket,
+    });
+  }
+
   async updateMe(data: {
     name: string;
     color?: string | null;

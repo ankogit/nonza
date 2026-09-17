@@ -1,28 +1,24 @@
 <template>
   <div
     class="app__view grain-overlay"
-    :class="{ 'app__view--scroll': needsScroll }"
+    :class="{
+      'app__view--scroll': needsScroll,
+      'app__view--entry': isEntrySurface,
+    }"
   >
     <UiKitPage v-if="showUiKit" />
     <PreviewMode v-else-if="isPreviewMode" />
-    <Modal
+    <RoomCreated
       v-else-if="createdRoom"
-      :model-value="true"
-      :close-on-overlay-click="true"
-      @close="createdRoom = null"
-    >
-      <RoomCreated
-        :key="createdRoom.id"
-        :room="createdRoom"
-        embedded
-        @close="createdRoom = null"
-        @join="handleJoinRoom"
-      />
-    </Modal>
+      :key="createdRoom.id"
+      :room="createdRoom"
+      @close="handleCreatedClose"
+      @join="handleJoinRoom"
+    />
     <CreateRoomScreen
       v-else-if="showCreateRoom"
       @created="handleRoomCreated"
-      @cancel="showCreateRoom = false"
+      @cancel="handleCancelCreate"
     />
     <NonzaWidget
       v-else
@@ -48,7 +44,7 @@ import {
 import { useApiClient } from "@shared/api";
 import PreviewMode from "./PreviewMode.vue";
 import UiKitPage from "./UiKitPage.vue";
-import { Modal, ToastContainer } from "@shared/ui";
+import { ToastContainer } from "@shared/ui";
 import { CreateRoomScreen } from "@widgets/create-room-screen";
 import { RoomCreated } from "@widgets/room-created";
 import type { Room } from "@shared/entities";
@@ -59,14 +55,29 @@ const showCreateRoom = ref(false);
 const createdRoom = ref<Room | null>(null);
 useMeetingShortcutListener();
 
+const isEntrySurface = computed(
+  () => showCreateRoom.value || !!createdRoom.value,
+);
 const needsScroll = computed(
-  () => showUiKit.value || isPreviewMode.value || showCreateRoom.value,
+  () =>
+    showUiKit.value ||
+    isPreviewMode.value ||
+    showCreateRoom.value ||
+    !!createdRoom.value,
 );
 const apiBaseURL = getApiBaseURL();
 const livekitURL = getLivekitURL();
 provide(API_BASE_URL_INJECT_KEY, apiBaseURL);
 provide(LIVEKIT_URL_INJECT_KEY, livekitURL);
 const apiClient = useApiClient();
+
+function clearCreateQuery() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("create");
+  url.searchParams.delete("action");
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, "", next);
+}
 
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -79,7 +90,6 @@ onMounted(() => {
     !showUiKit.value &&
     (urlParams.get("create") === "true" || urlParams.get("action") === "create");
 
-  // Auto-fill room code from URL if provided
   const code = urlParams.get("code");
   if (code && !showCreateRoom.value && !isPreviewMode.value) {
     // Will be handled by NonzaWidget component
@@ -89,10 +99,19 @@ onMounted(() => {
 const handleRoomCreated = (room: Room) => {
   createdRoom.value = room;
   showCreateRoom.value = false;
+  clearCreateQuery();
+};
+
+const handleCancelCreate = () => {
+  showCreateRoom.value = false;
+  clearCreateQuery();
+};
+
+const handleCreatedClose = () => {
+  createdRoom.value = null;
 };
 
 const handleJoinRoom = (room: Room) => {
-  // Navigate to join room with the code
   if (room.short_code) {
     window.location.href = `/?code=${room.short_code}`;
   }
@@ -134,5 +153,10 @@ body {
 .app__view--scroll {
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.app__view--entry {
+  background: #14141490;
+  backdrop-filter: blur(2.5px);
 }
 </style>

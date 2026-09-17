@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -24,13 +25,19 @@ import (
 const userIDContextKey = "user_id"
 
 type RoomsHandler struct {
-	Services *service.Services
-	LiveKit  *livekit.Client
-	WsHub    *websocket.Hub
+	Services           *service.Services
+	LiveKit            *livekit.Client
+	WsHub              *websocket.Hub
+	MeetsPublicBaseURL string
 }
 
-func NewRoomsHandler(services *service.Services, lk *livekit.Client, wsHub *websocket.Hub) *RoomsHandler {
-	return &RoomsHandler{Services: services, LiveKit: lk, WsHub: wsHub}
+func NewRoomsHandler(services *service.Services, lk *livekit.Client, wsHub *websocket.Hub, meetsPublicBaseURL string) *RoomsHandler {
+	return &RoomsHandler{
+		Services:           services,
+		LiveKit:            lk,
+		WsHub:              wsHub,
+		MeetsPublicBaseURL: meetsPublicBaseURL,
+	}
 }
 
 func (h *RoomsHandler) Create(c *gin.Context) {
@@ -115,7 +122,134 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusCreated, roomDto.ToRoomResponse(room, nil))
+	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+}
+
+func (h *RoomsHandler) CreateTemporary(c *gin.Context) {
+	userID, _ := c.Get(userIDContextKey)
+	uid, _ := userID.(string)
+	if uid == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req roomDto.CreateTemporaryRoomRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(req.OrganizationID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "organization_id required"})
+		return
+	}
+	orgID, err := uuid.Parse(strings.TrimSpace(req.OrganizationID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid organization_id"})
+		return
+	}
+
+	ok, err := h.Services.Organizations.UserCanAccess(orgID, uid)
+	if err != nil || !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+		return
+	}
+	ok, err = h.Services.Organizations.UserHasPermission(orgID, uid, orgroles.PermissionCreateRoom)
+	if err != nil || !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to create room"})
+		return
+	}
+
+	room, err := h.createTemporaryRoom(orgID, &uid, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid room_type") || strings.Contains(err.Error(), "invalid duration") || strings.Contains(err.Error(), "time: ") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
+	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+}
+
+func (h *RoomsHandler) PartnerCreateTemporary(c *gin.Context) {
+	clientID, clientSecret, ok := c.Request.BasicAuth()
+	if !ok || clientID == "" {
+		c.Header("WWW-Authenticate", `Basic realm="nonza-partner"`)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	client, err := h.Services.OAuth.AuthenticateConfidentialClient(clientID, clientSecret)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_client"})
+		return
+	}
+	if client.OrganizationID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "client has no organization_id; re-create with --organization-id"})
+		return
+	}
+
+	var req roomDto.CreateTemporaryRoomRequest
+	_ = c.ShouldBindJSON(&req)
+	if req.OrganizationID != "" && req.OrganizationID != client.OrganizationID.String() {
+		c.JSON(http.StatusForbidden, gin.H{"error": "organization_id does not match client binding"})
+		return
+	}
+
+	room, err := h.createTemporaryRoom(*client.OrganizationID, nil, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid room_type") || strings.Contains(err.Error(), "time: ") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.WsHub != nil {
+		_ = h.WsHub.BroadcastToRoom("org:"+client.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
+	}
+	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+}
+
+func (h *RoomsHandler) createTemporaryRoom(orgID uuid.UUID, createdByUserID *string, req roomDto.CreateTemporaryRoomRequest) (*models.Room, error) {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = "Временная комната"
+	}
+	roomType := models.RoomType(req.RoomType)
+	if roomType == "" {
+		roomType = models.RoomTypeRoundTable
+	}
+	switch roomType {
+	case models.RoomTypeRoundTable, models.RoomTypeConferenceHall, models.RoomTypeTableCircle:
+	default:
+		return nil, fmt.Errorf("invalid room_type")
+	}
+
+	expiresRaw := strings.TrimSpace(req.ExpiresIn)
+	if expiresRaw == "" {
+		expiresRaw = "24h"
+	}
+	dur, err := time.ParseDuration(expiresRaw)
+	if err != nil {
+		return nil, err
+	}
+	expiresIn := &dur
+
+	return h.Services.Rooms.Create(
+		orgID,
+		name,
+		roomType,
+		true,
+		expiresIn,
+		req.E2EEEnabled,
+		nil,
+		true,
+		req.Password,
+		createdByUserID,
+	)
 }
 
 func (h *RoomsHandler) GetByShortCode(c *gin.Context) {

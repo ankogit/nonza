@@ -426,7 +426,10 @@ watch(
 
 <style scoped>
 .player--speaking {
-  box-shadow: 0 0 0 2px #415526;
+  outline: 3px solid #81b538;
+  outline-offset: 2px;
+  border-color: #81b538;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.4);
 }
 
 /* List mode: no fixed size, no avatar, menu is the full row */
@@ -479,7 +482,8 @@ watch(
   flex-shrink: 0;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -504,8 +508,8 @@ watch(
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 2px solid #444;
-  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5);
+  border: 3px solid #444;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.5);
   background: #1a1a1a;
   min-width: 160px;
   min-height: 90px;

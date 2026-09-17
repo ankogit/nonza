@@ -47,7 +47,9 @@ function submit() {
 <style scoped>
 .replica-input {
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .replica-input__field {
@@ -65,7 +67,7 @@ function submit() {
   outline: none;
   box-sizing: border-box;
   font-family: "Bebas Neue", sans-serif;
-  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.25));
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.25);
 }
 
 .replica-input__field::placeholder {
@@ -75,27 +77,48 @@ function submit() {
 
 .replica-input__field:focus {
   border-color: #2980b9;
+  z-index: 1;
 }
 
 .replica-input__btn {
   flex-shrink: 0;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
   .replica-input__field {
-    width: 100px;
-    height: 40px;
+    width: 88px;
+    height: 44px;
     padding: 4px 8px;
     font-size: 12px;
+    box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .replica-input__btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
   }
 }
 
 @media (max-width: 480px) {
   .replica-input__field {
-    width: 84px;
-    height: 36px;
+    width: 72px;
+    height: 42px;
     padding: 4px 6px;
     font-size: 11px;
+  }
+
+  .replica-input__btn {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
   }
 }
 </style>

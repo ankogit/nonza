@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,27 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const (
+	defaultAccessTTL  = 30 * time.Minute
+	defaultRefreshTTL = 90 * 24 * time.Hour
+)
+
+// parseFlexibleDuration accepts Go durations plus day units ("90d").
+func parseFlexibleDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, errors.New("empty duration")
+	}
+	if strings.HasSuffix(s, "d") {
+		days, err := strconv.ParseFloat(strings.TrimSuffix(s, "d"), 64)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(days * 24 * float64(time.Hour)), nil
+	}
+	return time.ParseDuration(s)
+}
 
 var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
@@ -36,8 +58,10 @@ type authService struct {
 }
 
 type claims struct {
-	UserID string `json:"user_id"`
-	Type   string `json:"type,omitempty"`
+	UserID   string `json:"user_id"`
+	Type     string `json:"type,omitempty"`
+	ClientID string `json:"client_id,omitempty"`
+	Scope    string `json:"scope,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -82,6 +106,10 @@ func (s *authService) Login(email, password string) (*AuthResult, error) {
 		return nil, ErrInvalidCredentials
 	}
 
+	if user.PasswordHash == "" {
+		return nil, ErrInvalidCredentials
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -90,13 +118,7 @@ func (s *authService) Login(email, password string) (*AuthResult, error) {
 }
 
 func (s *authService) issueToken(user *models.User) (*AuthResult, error) {
-	accessTTL := 30 * time.Minute
-	if s.cfg.JWTAccessTokenTTL != "" {
-		if d, err := time.ParseDuration(s.cfg.JWTAccessTokenTTL); err == nil {
-			accessTTL = d
-		}
-	}
-	accessExp := time.Now().Add(accessTTL)
+	accessExp := time.Now().Add(s.accessTTL())
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
 		UserID: user.ID.String(),
 		Type:   "access",
@@ -106,13 +128,7 @@ func (s *authService) issueToken(user *models.User) (*AuthResult, error) {
 		},
 	})
 
-	refreshTTL := 7 * 24 * time.Hour
-	if s.cfg.JWTRefreshTokenTTL != "" {
-		if d, err := time.ParseDuration(s.cfg.JWTRefreshTokenTTL); err == nil {
-			refreshTTL = d
-		}
-	}
-	refreshExp := time.Now().Add(refreshTTL)
+	refreshExp := time.Now().Add(s.refreshTTL())
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
 		UserID: user.ID.String(),
 		Type:   "refresh",
@@ -122,10 +138,7 @@ func (s *authService) issueToken(user *models.User) (*AuthResult, error) {
 		},
 	})
 
-	secret := []byte(s.cfg.JWTSecret)
-	if len(secret) == 0 {
-		secret = []byte("dev-secret-change-in-production")
-	}
+	secret := s.jwtSecret()
 
 	signedAccess, err := accessToken.SignedString(secret)
 	if err != nil {
@@ -229,4 +242,101 @@ func (s *authService) UpdateProfile(userID string, name string, color *string) (
 		return nil, err
 	}
 	return user, nil
+}
+
+func (s *authService) jwtSecret() []byte {
+	secret := []byte(s.cfg.JWTSecret)
+	if len(secret) == 0 {
+		secret = []byte("dev-secret-change-in-production")
+	}
+	return secret
+}
+
+func (s *authService) accessTTL() time.Duration {
+	if s.cfg.JWTAccessTokenTTL != "" {
+		if d, err := parseFlexibleDuration(s.cfg.JWTAccessTokenTTL); err == nil && d > 0 {
+			return d
+		}
+	}
+	return defaultAccessTTL
+}
+
+func (s *authService) refreshTTL() time.Duration {
+	if s.cfg.JWTRefreshTokenTTL != "" {
+		if d, err := parseFlexibleDuration(s.cfg.JWTRefreshTokenTTL); err == nil && d > 0 {
+			return d
+		}
+	}
+	return defaultRefreshTTL
+}
+
+func (s *authService) IssueOAuthTokens(userID, clientID, scope string) (*OAuthTokenPair, error) {
+	accessExp := time.Now().Add(s.accessTTL())
+	refreshExp := time.Now().Add(s.refreshTTL())
+	refreshJTI := uuid.New().String()
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
+		UserID:   userID,
+		Type:     "access",
+		ClientID: clientID,
+		Scope:    scope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessExp),
+			Audience:  jwt.ClaimStrings{clientID},
+			ID:        uuid.New().String(),
+		},
+	})
+
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
+		UserID:   userID,
+		Type:     "refresh",
+		ClientID: clientID,
+		Scope:    scope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshExp),
+			Audience:  jwt.ClaimStrings{clientID},
+			ID:        refreshJTI,
+		},
+	})
+
+	secret := s.jwtSecret()
+	signedAccess, err := accessToken.SignedString(secret)
+	if err != nil {
+		return nil, err
+	}
+	signedRefresh, err := refreshToken.SignedString(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OAuthTokenPair{
+		AccessToken:      signedAccess,
+		AccessExpiresAt:  accessExp,
+		RefreshToken:     signedRefresh,
+		RefreshExpiresAt: refreshExp,
+		RefreshJTI:       refreshJTI,
+	}, nil
+}
+
+func (s *authService) ParseOAuthRefreshToken(refreshToken string) (*RefreshTokenClaims, error) {
+	tok, err := jwt.ParseWithClaims(refreshToken, &claims{}, func(*jwt.Token) (interface{}, error) {
+		return s.jwtSecret(), nil
+	})
+	if err != nil || !tok.Valid {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	c, ok := tok.Claims.(*claims)
+	if !ok || c.UserID == "" || c.Type != "refresh" || c.ClientID == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+	if c.ID == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	return &RefreshTokenClaims{
+		UserID:   c.UserID,
+		ClientID: c.ClientID,
+		JTI:      c.ID,
+	}, nil
 }

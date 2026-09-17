@@ -185,6 +185,7 @@ async function decodeSoundBarUrl(
 /** Параллельный decode всех уникальных (url, version) для саундбара. */
 export async function preloadSoundBarAudioEntries(
   entries: { url: string; version: number }[],
+  onProgress?: (completed: number, total: number) => void,
 ): Promise<void> {
   const seen = new Set<string>();
   const tasks: Promise<AudioBuffer>[] = [];
@@ -196,7 +197,21 @@ export async function preloadSoundBarAudioEntries(
     seen.add(key);
     tasks.push(decodeSoundBarUrl(u, e.version));
   }
-  await Promise.all(tasks);
+  const total = tasks.length;
+  if (total === 0) {
+    onProgress?.(0, 0);
+    return;
+  }
+  let completed = 0;
+  onProgress?.(0, total);
+  await Promise.all(
+    tasks.map((task) =>
+      task.finally(() => {
+        completed += 1;
+        onProgress?.(completed, total);
+      }),
+    ),
+  );
 }
 
 function reverseAudioBuffer(

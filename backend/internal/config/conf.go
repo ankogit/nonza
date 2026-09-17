@@ -45,9 +45,9 @@ type Config struct {
 	AudioUseInbandFEC bool   `envconfig:"AUDIO_USE_INBAND_FEC" default:"true"`
 	AudioChannels     int    `envconfig:"AUDIO_CHANNELS" default:"1"`
 
-	JWTSecret            string `envconfig:"JWT_SECRET"`
-	JWTAccessTokenTTL    string `envconfig:"JWT_ACCESS_TOKEN_TTL" default:"30m"`
-	JWTRefreshTokenTTL    string `envconfig:"JWT_REFRESH_TOKEN_TTL" default:"7d"`
+	JWTSecret          string `envconfig:"JWT_SECRET"`
+	JWTAccessTokenTTL  string `envconfig:"JWT_ACCESS_TOKEN_TTL" default:"30m"`
+	JWTRefreshTokenTTL string `envconfig:"JWT_REFRESH_TOKEN_TTL" default:"90d"`
 	E2EEEnabled          bool   `envconfig:"E2EE_ENABLED" default:"true"`
 	E2EERequire          bool   `envconfig:"E2EE_REQUIRE" default:"true"`
 	E2EEKeyRotationInterval string `envconfig:"E2EE_KEY_ROTATION_INTERVAL" default:"1h"`
@@ -105,6 +105,24 @@ type Config struct {
 
 	// CORS: через запятую, например https://meet.nonza.ru,https://www.nonza.ru
 	CORSAllowedOrigins string `envconfig:"CORS_ALLOWED_ORIGINS"`
+
+	// Базовый URL rooms SPA для редиректа на экран OAuth authorize.
+	OAuthUIBaseURL string `envconfig:"OAUTH_UI_BASE_URL" default:"http://localhost:3001"`
+
+	// Публичный URL meets-виджета (ссылки вида {MEETS_PUBLIC_BASE_URL}/?code=...).
+	MeetsPublicBaseURL string `envconfig:"MEETS_PUBLIC_BASE_URL" default:"http://localhost:3002"`
+
+	GoogleClientID     string `envconfig:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret string `envconfig:"GOOGLE_CLIENT_SECRET"`
+	GoogleRedirectURI  string `envconfig:"GOOGLE_REDIRECT_URI"`
+
+	MandarinshowClientID     string `envconfig:"MANDARINSHOW_CLIENT_ID"`
+	MandarinshowClientSecret string `envconfig:"MANDARINSHOW_CLIENT_SECRET"`
+	MandarinshowAuthorizeURL string `envconfig:"MANDARINSHOW_AUTHORIZE_URL"`
+	MandarinshowTokenURL     string `envconfig:"MANDARINSHOW_TOKEN_URL"`
+	MandarinshowRedirectURI  string `envconfig:"MANDARINSHOW_REDIRECT_URI"`
+	// Публичный URL API (Google OAuth callback, fallback для MANDARINSHOW_REDIRECT_URI).
+	AuthPublicBaseURL string `envconfig:"AUTH_PUBLIC_BASE_URL" default:"http://localhost:8000"`
 
 	// Десктоп-приложение: актуальная версия и артефакты для обновления.
 	// Если пусто — эндпоинт обновления отдаёт 204 (обновления нет).

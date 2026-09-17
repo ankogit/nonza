@@ -1,7 +1,9 @@
 package dto
 
 import (
+	"net/url"
 	"nonza/backend/internal/models"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,12 +29,23 @@ type CreateRoomRequest struct {
 	Password           *string `json:"password"`
 }
 
+// CreateTemporaryRoomRequest creates a temporary anonymously-joinable room and returns a join link.
+type CreateTemporaryRoomRequest struct {
+	OrganizationID string  `json:"organization_id"`
+	Name           string  `json:"name"`
+	RoomType       string  `json:"room_type" binding:"omitempty,oneof=conference_hall round_table table_circle"`
+	ExpiresIn      string  `json:"expires_in"`
+	E2EEEnabled    bool    `json:"e2ee_enabled"`
+	Password       *string `json:"password"`
+}
+
 type RoomResponse struct {
 	ID                     string     `json:"id"`
 	OrganizationID         string     `json:"organization_id"`
 	RoomGroupID            *string    `json:"room_group_id,omitempty"`
 	Name                   string     `json:"name"`
 	ShortCode              *string    `json:"short_code"`
+	JoinURL                string     `json:"join_url,omitempty"`
 	RoomType               string     `json:"room_type"`
 	IsTemporary            bool       `json:"is_temporary"`
 	ExpiresAt              *time.Time `json:"expires_at,omitempty"`
@@ -50,7 +63,20 @@ type RoomResponse struct {
 	CurrentUserOrgColor    *string    `json:"current_user_org_color,omitempty"`
 }
 
+func BuildJoinURL(meetsBaseURL, shortCode string) string {
+	base := strings.TrimRight(strings.TrimSpace(meetsBaseURL), "/")
+	code := strings.TrimSpace(shortCode)
+	if base == "" || code == "" {
+		return ""
+	}
+	return base + "/?code=" + url.QueryEscape(code)
+}
+
 func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse {
+	return ToRoomResponseWithJoinURL(room, currentUserOrgColor, "")
+}
+
+func ToRoomResponseWithJoinURL(room *models.Room, currentUserOrgColor *string, meetsBaseURL string) RoomResponse {
 	e2ee := false
 	var conferenceHallLeaderID *string
 	var createdByUserID *string
@@ -85,12 +111,17 @@ func ToRoomResponse(room *models.Room, currentUserOrgColor *string) RoomResponse
 			passwordProtected = true
 		}
 	}
+	joinURL := ""
+	if room.ShortCode != nil {
+		joinURL = BuildJoinURL(meetsBaseURL, *room.ShortCode)
+	}
 	return RoomResponse{
 		ID:                     room.ID.String(),
 		OrganizationID:         room.OrganizationID.String(),
 		RoomGroupID:            roomGroupIDPtr(room.RoomGroupID),
 		Name:                   room.Name,
 		ShortCode:              room.ShortCode,
+		JoinURL:                joinURL,
 		RoomType:               string(room.RoomType),
 		IsTemporary:            room.IsTemporary,
 		ExpiresAt:              room.ExpiresAt,

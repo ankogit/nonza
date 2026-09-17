@@ -6,6 +6,7 @@ export interface Room {
   room_group_id?: string | null;
   name: string;
   short_code: string | null;
+  join_url?: string;
   room_type: RoomType;
   is_temporary: boolean;
   expires_at: string | null;

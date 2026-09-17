@@ -223,8 +223,9 @@ watch(
 
 .public-chat__composer {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .public-chat__field {
@@ -243,7 +244,7 @@ watch(
   outline: none;
   box-sizing: border-box;
   font-family: "Bebas Neue", sans-serif;
-  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.25));
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.25);
 }
 
 .public-chat__field::placeholder {
@@ -253,6 +254,7 @@ watch(
 
 .public-chat__field:focus {
   border-color: #2980b9;
+  z-index: 1;
 }
 
 .public-chat__field:disabled {
@@ -262,21 +264,40 @@ watch(
 
 .public-chat__send {
   flex-shrink: 0;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
   .public-chat__field {
-    height: 40px;
+    height: 44px;
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: 16px;
+  }
+
+  .public-chat__send {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
   }
 }
 
 @media (max-width: 480px) {
   .public-chat__field {
-    height: 36px;
-    padding: 4px 6px;
-    font-size: 11px;
+    height: 42px;
+    padding: 4px 8px;
+    font-size: 16px;
+  }
+
+  .public-chat__send {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
   }
 }
 </style>

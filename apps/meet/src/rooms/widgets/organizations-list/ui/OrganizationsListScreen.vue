@@ -1,61 +1,114 @@
 <template>
   <div class="organizations-list">
-    <div class="organizations-list__main">
-      <div class="organizations-list__mobile-bar">
-        <button
-          type="button"
-          class="organizations-list__menu-btn"
-          aria-label="Меню"
-          title="Меню"
-          @click="openSidebarDrawer?.()"
-        >
-          <PixelIcon name="burger" variant="small" />
-        </button>
-        <span class="organizations-list__mobile-title">Организации</span>
-      </div>
-      <PageHeader title="Организации" class="organizations-list__header" />
-      <div v-if="loading" class="organizations-list__skeleton">
+    <div class="organizations-list__shell">
+      <header class="organizations-list__topbar">
+        <div class="organizations-list__brand-block">
+          <button
+            type="button"
+            class="organizations-list__menu-btn"
+            aria-label="Меню"
+            title="Меню"
+            @click="openSidebarDrawer?.()"
+          >
+            <PixelIcon name="burger" variant="small" />
+          </button>
+          <div>
+            <p class="organizations-list__brand">Nonza</p>
+            <h1 class="organizations-list__heading">Организации</h1>
+          </div>
+        </div>
+      </header>
+
+      <div v-if="loading" class="organizations-list__grid">
         <div
           v-for="i in 6"
           :key="i"
-          class="organizations-list__skeleton-card"
+          class="organizations-list__skeleton-tile"
+          :class="`organizations-list__skeleton-tile--${tileVariants[(i - 1) % tileVariants.length]}`"
         >
-          <Skeleton variant="circle" :width="44" :height="44" class="organizations-list__skeleton-letter" />
-          <div class="organizations-list__skeleton-lines">
-            <Skeleton variant="text" width="80%" :height="16" />
-            <Skeleton variant="text" width="55%" :height="13" />
-          </div>
+          <Skeleton variant="text" width="36%" :height="10" />
+          <div class="organizations-list__skeleton-spacer" />
+          <Skeleton variant="text" width="72%" :height="22" />
+          <Skeleton variant="text" width="48%" :height="12" />
         </div>
       </div>
-      <ListEmpty v-else-if="!organizations.length" message="Нет организаций" />
+      <div v-else-if="!organizations.length" class="organizations-list__empty">
+        <MetroTile
+          variant="dark"
+          size="wide"
+          kicker="пусто"
+          title="Нет организаций"
+          mark="?"
+        >
+          <p class="organizations-list__empty-text">
+            Создайте первую организацию или дождитесь приглашения.
+          </p>
+        </MetroTile>
+      </div>
       <div v-else class="organizations-list__grid">
-        <CardTile
-          v-for="org in organizations"
+        <MetroTile
+          v-for="(org, index) in organizations"
           :key="org.id"
           clickable
+          size="rect"
+          :variant="tileVariants[index % tileVariants.length]"
+          kicker="организация"
+          :title="org.name"
+          :subtitle="org.description || undefined"
+          :mark="orgLetter(org.name)"
+          foot="открыть →"
           @click="$emit('select', org)"
-        >
-          <template #prefix>
-            <span class="organizations-list__letter">{{
-              orgLetter(org.name)
-            }}</span>
-          </template>
-          <span class="organizations-list__name">{{ org.name }}</span>
-          <span v-if="org.description" class="organizations-list__desc">{{
-            org.description
-          }}</span>
-        </CardTile>
+        />
       </div>
-      <div class="organizations-list__actions">
-        <Button
-          type="text"
-          variant="primary"
-          size="medium"
+
+      <p class="organizations-list__row-label">Действия</p>
+      <div class="organizations-list__grid organizations-list__grid--actions">
+        <MetroTile
+          clickable
+          size="rect"
+          variant="blue"
+          kicker="новая"
+          title="Создать организацию"
+          foot="старт →"
+          class="organizations-list__action-tile"
           @click="$emit('create')"
-        >
-          + Создать организацию
-        </Button>
+        />
+        <MetroTile
+          clickable
+          size="rect"
+          variant="red"
+          kicker="репорт"
+          title="Сообщить о баге"
+          foot="написать →"
+          class="organizations-list__action-tile"
+          @click="showReportBug = true"
+        />
       </div>
+
+      <ReportBugModal v-model="showReportBug" />
+
+      <p class="organizations-list__row-label">Партнёры</p>
+      <div class="organizations-list__grid organizations-list__grid--partners">
+        <a
+          v-for="partner in partners"
+          :key="partner.url"
+          :href="partner.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="organizations-list__partner"
+        >
+          <span class="organizations-list__partner-kicker">партнёр</span>
+          <span class="organizations-list__partner-title">{{ partner.name }}</span>
+          <span class="organizations-list__partner-foot">сайт →</span>
+          <img
+            v-if="partner.logo"
+            :src="partner.logo"
+            :alt="partner.name"
+            class="organizations-list__partner-logo"
+          />
+        </a>
+      </div>
+
       <section class="organizations-list__download">
         <span class="organizations-list__download-label">Приложение для ПК</span>
         <div class="organizations-list__download-row">
@@ -77,49 +130,29 @@
           </a>
         </div>
       </section>
-      <section class="organizations-list__partners">
-        <span class="organizations-list__partners-label">Партнёры</span>
-        <div class="organizations-list__partners-row">
-          <a
-            v-for="partner in partners"
-            :key="partner.url"
-            :href="partner.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="organizations-list__partner-tile"
-          >
-            <CardTile clickable>
-              <div
-                v-if="partner.logo"
-                class="organizations-list__partner-content"
-              >
-                <img
-                  :src="partner.logo"
-                  :alt="partner.name"
-                  class="organizations-list__partner-logo"
-                />
-                <span class="organizations-list__partner-name">{{
-                  partner.name
-                }}</span>
-              </div>
-              <span v-else class="organizations-list__partner-name">{{
-                partner.name
-              }}</span>
-            </CardTile>
-          </a>
-        </div>
-      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { inject } from "vue";
-import { PageHeader, CardTile, ListEmpty, Button, Skeleton, PixelIcon } from "@shared/ui";
+import { inject, ref } from "vue";
+import { MetroTile, Skeleton, PixelIcon } from "@shared/ui";
+import type { MetroTileVariant } from "@shared/ui";
 import type { Organization } from "@shared/entities";
 import { getApiBaseURL } from "@shared/lib";
+import { ReportBugModal } from "@rooms/features/report-bug";
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
+const showReportBug = ref(false);
+
+const tileVariants: MetroTileVariant[] = [
+  "blue",
+  "green",
+  "gold",
+  "purple",
+  "dark",
+  "red",
+];
 
 function downloadUrl(platform: "windows" | "macos"): string {
   const base = getApiBaseURL().replace(/\/$/, "");
@@ -138,7 +171,7 @@ defineEmits<{
 
 const partners = [
   {
-    name: "mandarinshow.ru",
+    name: "MandarinShow",
     url: "https://mandarinshow.ru",
     logo: "https://mandarinshow.ru/assets/img/main_iconv2_op.png",
   },
@@ -152,176 +185,307 @@ function orgLetter(name: string): string {
 
 <style scoped>
 .organizations-list {
-  max-width: 420px;
+  width: 100%;
+  max-width: min(1100px, 100%);
   min-height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.organizations-list__main {
+.organizations-list__shell {
   flex: 1;
   min-height: 0;
+  padding-bottom: 24px;
 }
 
-.organizations-list__mobile-bar {
-  display: none;
-  align-items: center;
+.organizations-list__topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.organizations-list__brand-block {
+  display: flex;
+  align-items: end;
   gap: 12px;
-  padding: 12px 0 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 8px;
+  min-width: 0;
 }
 
 .organizations-list__menu-btn {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 2px solid #444;
+  border: 3px solid #444;
+  border-top-color: #666;
+  border-left-color: #666;
   border-radius: 0;
-  background: rgba(255, 255, 255, 0.06);
+  background: #1a1a1a;
   color: #bab1a8;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.organizations-list__menu-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: #555;
-}
-
-.organizations-list__mobile-title {
-  font-family: "Bebas Neue", sans-serif;
-  font-size: 1.25rem;
-  letter-spacing: 0.02em;
-  color: #bab1a8;
-}
-
-@media (max-width: 480px) {
-  .organizations-list__mobile-bar {
-    display: flex;
-  }
-
-  .organizations-list__header {
-    display: none;
-  }
-}
-
-.organizations-list__loading {
-  padding: 48px 0;
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: 15px;
-}
-
-.organizations-list__skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.organizations-list__skeleton-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.organizations-list__skeleton-letter {
-  flex-shrink: 0;
-}
-
-.organizations-list__skeleton-lines {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.organizations-list__grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.organizations-list__letter {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2a2a2a;
-  border-radius: 50%;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #bab1a8;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.35));
   transition:
-    background-color 0.2s ease,
-    border-radius 0.2s ease,
-    color 0.2s ease;
+    background-color 0.15s ease,
+    outline-color 0.12s ease;
+  outline: 3px solid transparent;
+  outline-offset: 2px;
 }
 
-:deep(.card-tile--clickable:hover) .organizations-list__letter,
-:deep(.card-tile--clickable:focus-within) .organizations-list__letter {
-  border-radius: 12px;
-  background: var(--color-primary);
+.organizations-list__menu-btn:hover,
+.organizations-list__menu-btn:focus-visible {
+  background: #222;
+  outline-color: #fff;
+}
+
+.organizations-list__brand {
+  font-family: "Bebas Neue", sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 1.35rem;
+  color: #81b538;
+  margin: 0;
+}
+
+.organizations-list__heading {
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  line-height: 0.92;
+  margin: 0.15rem 0 0;
   color: #fff;
 }
 
-.organizations-list__name {
-  display: block;
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 2px;
-  color: #bab1a8;
+.organizations-list__row-label {
+  position: relative;
+  z-index: 2;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2980b9;
+  margin: 1.6rem 0 0.75rem;
+  line-height: 1.5;
 }
 
-.organizations-list__desc {
-  display: block;
-  font-size: 13px;
-  color: #999;
+.organizations-list__row-label:first-of-type {
+  margin-top: 2.75rem;
+}
+
+.organizations-list__grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, 248px);
+  align-items: stretch;
+  justify-content: start;
+}
+
+.organizations-list__grid--actions,
+.organizations-list__grid--partners {
+  grid-template-columns: repeat(auto-fill, 248px);
+}
+
+.organizations-list__action-tile {
+  isolation: isolate;
+}
+
+.organizations-list__action-tile :deep(.metro-tile__inner) {
+  padding-right: 14px;
+}
+
+.organizations-list__action-tile :deep(.metro-tile__title) {
+  max-width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.organizations-list__action-tile :deep(.metro-tile__kicker),
+.organizations-list__action-tile :deep(.metro-tile__foot) {
+  max-width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.organizations-list__skeleton-tile {
+  width: 248px;
+  height: 108px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.3));
+  box-sizing: border-box;
+}
+
+.organizations-list__skeleton-spacer {
+  flex: 1;
+}
+
+.organizations-list__skeleton-tile--blue {
+  background: #2980b9;
+}
+
+.organizations-list__skeleton-tile--green {
+  background: #1f6b4a;
+}
+
+.organizations-list__skeleton-tile--gold {
+  background: #8a5a12;
+}
+
+.organizations-list__skeleton-tile--purple {
+  background: #3d2a5c;
+}
+
+.organizations-list__skeleton-tile--dark {
+  background: #222;
+}
+
+.organizations-list__skeleton-tile--red {
+  background: #6b2f2f;
+}
+
+.organizations-list__empty {
+  display: grid;
+  max-width: 520px;
+}
+
+.organizations-list__empty-text {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+}
+
+.organizations-list__partner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 248px;
+  height: 108px;
+  padding: 12px 14px 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-decoration: none;
+  color: #fff7e8;
+  background: #8a5a12;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.3));
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease,
+    outline-color 0.12s ease;
+}
+
+.organizations-list__partner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.08) 100%
+  );
+  pointer-events: none;
+}
+
+.organizations-list__partner:hover,
+.organizations-list__partner:focus-visible {
+  transform: scale(1.015);
+  outline-color: #fff;
+  z-index: 2;
+  filter: drop-shadow(4px 4px 0 rgba(0, 0, 0, 0.4));
+}
+
+.organizations-list__partner-kicker {
+  position: relative;
+  z-index: 1;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
   line-height: 1.35;
 }
 
-.organizations-list__actions {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.organizations-list__partner-title {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  max-width: calc(100% - 64px);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.organizations-list__partner-foot {
+  position: relative;
+  z-index: 1;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 7px;
+  opacity: 0.72;
+  line-height: 1.35;
+}
+
+.organizations-list__partner-logo {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 .organizations-list__download {
-  margin-top: 16px;
+  margin-top: 28px;
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .organizations-list__download-label {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.35);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .organizations-list__download-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 
 .organizations-list__download-link {
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-primary);
+  color: var(--color-primary, #2980b9);
   text-decoration: none;
 }
 
@@ -329,77 +493,37 @@ function orgLetter(name: string): string {
   text-decoration: underline;
 }
 
-.organizations-list__partners {
-  margin-top: 32px;
-  padding-top: 24px;
-  padding-bottom: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+@media (max-width: 640px) {
+  .organizations-list__grid,
+  .organizations-list__grid--actions,
+  .organizations-list__grid--partners {
+    grid-template-columns: 1fr;
+  }
+
+  .organizations-list__skeleton-tile,
+  .organizations-list__grid :deep(.metro-tile--rect),
+  .organizations-list__grid :deep(.metro-tile--default),
+  .organizations-list__partner {
+    width: 100%;
+    max-width: none;
+  }
+
+  .organizations-list__skeleton-tile {
+    height: 100px;
+  }
 }
 
-.organizations-list__partners-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
-  margin-bottom: 12px;
-}
+@media (max-width: 480px) {
+  .organizations-list__menu-btn {
+    display: flex;
+  }
 
-.organizations-list__partners-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
+  .organizations-list__topbar {
+    align-items: center;
+  }
 
-.organizations-list__partner-tile {
-  width: 130px;
-  aspect-ratio: 1;
-  text-decoration: none;
-  color: inherit;
-}
-
-.organizations-list__partner-tile :deep(.card-tile) {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 14px;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-.organizations-list__partner-tile:hover :deep(.card-tile) {
-  opacity: 1;
-}
-
-.organizations-list__partner-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 0;
-}
-
-.organizations-list__partner-logo {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  flex-shrink: 1;
-  border: 3px solid #fff;
-  border-radius: 50%;
-}
-
-.organizations-list__partner-name {
-  font-size: 10px;
-  font-weight: 500;
-  color: #bab1a8;
-  text-align: center;
-  word-break: break-all;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
+  .organizations-list__brand-block {
+    align-items: center;
+  }
 }
 </style>

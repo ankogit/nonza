@@ -40,7 +40,17 @@
           aria-busy="true"
           aria-label="Загрузка звуков"
         >
-          <PixelIcon name="loading" variant="large" />
+          <div class="sound-bar__decode-status">
+            <PixelIcon name="loading" variant="large" />
+            <PixelProgressBar
+              class="sound-bar__decode-progress"
+              :value="soundBarLoadProgress"
+              :done="soundBarLoadDone"
+              :total="soundBarLoadTotal"
+              :indeterminate="soundBarLoadIndeterminate"
+              :status-text="soundBarLoadStatusText"
+            />
+          </div>
         </div>
         <div class="sound-bar__volume">
           <button
@@ -492,7 +502,7 @@ import type { Room as LiveKitRoom } from "livekit-client";
 import { useOrganizationSounds, useSoundBarRoomChannel } from "../lib";
 import type { OrganizationSound } from "../model/types";
 import SoundBarUploadPanel from "./SoundBarUploadPanel.vue";
-import { Button, Knob, PixelIcon, Switch } from "@shared/ui";
+import { Button, Knob, PixelIcon, PixelProgressBar, Switch } from "@shared/ui";
 import {
   soundBarVolume,
   soundBarMuted,
@@ -537,6 +547,23 @@ const { sounds, isLoading: orgSoundsLoading } = useOrganizationSounds(
 
 const soundBarDecodeReady = ref(true);
 let soundBarPreloadGen = 0;
+const soundBarLoadDone = ref(0);
+const soundBarLoadTotal = ref(0);
+
+const soundBarLoadProgress = computed(() => {
+  if (soundBarLoadTotal.value <= 0) return 0;
+  return Math.round((soundBarLoadDone.value / soundBarLoadTotal.value) * 100);
+});
+
+const soundBarLoadIndeterminate = computed(
+  () => orgSoundsLoading.value || soundBarLoadTotal.value <= 0,
+);
+
+const soundBarLoadStatusText = computed(() => {
+  if (orgSoundsLoading.value) return "Список звуков";
+  if (soundBarLoadTotal.value > 0) return "Подготовка";
+  return "Загрузка";
+});
 
 const soundBarSurfaceBlocked = computed(
   () =>
@@ -558,26 +585,45 @@ watch(
     const gen = ++soundBarPreloadGen;
     if (!props.orgId?.trim()) {
       soundBarDecodeReady.value = true;
+      soundBarLoadDone.value = 0;
+      soundBarLoadTotal.value = 0;
       return;
     }
     if (!(isPanel.value || popoverOpen.value)) {
       return;
     }
     if (orgSoundsLoading.value) {
-      if (gen === soundBarPreloadGen) soundBarDecodeReady.value = false;
+      if (gen === soundBarPreloadGen) {
+        soundBarDecodeReady.value = false;
+        soundBarLoadDone.value = 0;
+        soundBarLoadTotal.value = 0;
+      }
       return;
     }
     const list = sounds.value;
     if (list.length === 0) {
-      if (gen === soundBarPreloadGen) soundBarDecodeReady.value = true;
+      if (gen === soundBarPreloadGen) {
+        soundBarDecodeReady.value = true;
+        soundBarLoadDone.value = 0;
+        soundBarLoadTotal.value = 0;
+      }
       return;
     }
-    if (gen === soundBarPreloadGen) soundBarDecodeReady.value = false;
+    if (gen === soundBarPreloadGen) {
+      soundBarDecodeReady.value = false;
+      soundBarLoadDone.value = 0;
+      soundBarLoadTotal.value = 0;
+    }
     try {
       await preloadSoundBarAudioEntries(
         list
           .filter((s) => Boolean(s.audioUrl?.trim()))
           .map((s) => ({ url: s.audioUrl!, version: s.version })),
+        (completed, total) => {
+          if (gen !== soundBarPreloadGen) return;
+          soundBarLoadDone.value = completed;
+          soundBarLoadTotal.value = total;
+        },
       );
     } catch {
       /* разблокируем UI даже при ошибке decode */
@@ -1693,6 +1739,18 @@ function handleRowClick(sound: OrganizationSound) {
   justify-content: center;
   background: rgba(10, 10, 10, 0.72);
   pointer-events: all;
+}
+
+.sound-bar__decode-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+}
+
+.sound-bar__decode-progress {
+  width: min(200px, 72vw);
 }
 
 .sound-bar__surface--popover {

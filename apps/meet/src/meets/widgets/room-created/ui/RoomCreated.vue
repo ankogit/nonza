@@ -1,61 +1,59 @@
 <template>
-  <div class="room-created" :class="{ 'full-page': !embedded }">
-    <div class="room-created__container">
-      <div class="room-created__icon" aria-hidden="true">
-        <PixelIcon name="check" :size="36" />
-      </div>
-      <h2 class="room-created__title">Комната создана!</h2>
-      <p class="room-created__subtitle">{{ room.name }}</p>
+  <div class="room-created">
+    <div class="room-created__shell">
+      <header class="room-created__header">
+        <h1 class="room-created__heading">Готово</h1>
+        <p class="room-created__lead">{{ room.name }}</p>
+      </header>
 
-      <section
-        class="room-created__link-section"
-        aria-labelledby="room-created-link-label"
+      <MetroTile
+        size="wide"
+        variant="green"
+        class="room-created__tile"
+        title="Ссылка"
+        kicker="поделиться"
       >
-        <label id="room-created-link-label" class="room-created__label">
-          Ссылка для подключения
-        </label>
-        <div class="room-created__link-row">
+        <label class="room-created__label" for="roomCreatedLink">
+          Для участников
           <Input
+            id="roomCreatedLink"
             :model-value="joinLink || ''"
             readonly
             class="room-created__input"
             aria-label="Ссылка для подключения"
           />
-          <Button
-            type="text"
-            variant="secondary"
-            size="small"
-            :aria-label="copied ? 'Скопировано' : 'Копировать ссылку'"
-            @click="copyLink"
-          >
-            <template v-if="copied">
-              <PixelIcon name="check" :size="14" />
-              Скопировано
-            </template>
-            <template v-else>Копировать ссылку</template>
-          </Button>
-        </div>
-        <p class="room-created__hint">
-          Поделитесь ссылкой с участниками для присоединения к комнате
-        </p>
-      </section>
+        </label>
+        <Button
+          type="text"
+          variant="secondary"
+          size="large"
+          class="room-created__copy"
+          :aria-label="copied ? 'Скопировано' : 'Копировать ссылку'"
+          @click="copyLink"
+        >
+          <template v-if="copied">Скопировано</template>
+          <template v-else>Копировать</template>
+        </Button>
+      </MetroTile>
 
       <div class="room-created__actions">
         <Button
           type="text"
           variant="default"
-          size="medium"
+          size="large"
+          class="room-created__btn"
           @click="$emit('close')"
         >
-          Закрыть
+          Назад
         </Button>
         <Button
           type="text"
           variant="primary"
-          size="medium"
+          size="large"
+          class="room-created__btn"
           @click="$emit('join', room)"
         >
-          Присоединиться
+          Войти
         </Button>
       </div>
     </div>
@@ -64,7 +62,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { PixelIcon, Button, Input } from "@shared/ui";
+import { Button, Input, MetroTile } from "@shared/ui";
 import { showToast } from "@shared/lib";
 import type { Room } from "@shared/entities";
 
@@ -109,114 +107,140 @@ async function copyLink() {
 
 <style scoped>
 .room-created {
-  align-items: center;
-}
-
-.room-created:not(.full-page) {
-  display: flex;
-  justify-content: center;
-}
-
-.room-created__container {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  max-width: 500px;
-  flex-shrink: 0;
-  background: #2a2a2a;
-  border: 2px solid #444;
-  padding: 32px;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.3);
-  text-align: center;
-}
-
-.room-created__icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
-  border-radius: 0;
-  background: #4caf50;
-  color: white;
-  font-size: 32px;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
-  border: 2px solid #45a049;
-  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+  padding: 20px 16px 28px;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
-.room-created__icon .pi {
-  filter: brightness(0) invert(1);
+.room-created__shell {
+  width: min(920px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.room-created__title {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  font-weight: 600;
-  color: white;
+.room-created__heading {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  line-height: 0.92;
+  color: #fff;
 }
 
-.room-created__subtitle {
-  margin: 0 0 32px 0;
-  font-size: 16px;
-  color: #999;
+.room-created__lead {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
-.room-created__link-section {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: #1a1a1a;
-  border: 2px solid #444;
+.room-created__tile {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0;
+}
+
+.room-created__tile :deep(.metro-tile__inner) {
+  gap: 12px;
+  padding: 18px 18px 16px;
+}
+
+.room-created__tile :deep(.metro-tile__title) {
+  margin-top: 0;
+  max-width: 100%;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+}
+
+.room-created__tile :deep(.metro-tile__body) {
+  margin-top: 0;
+  gap: 12px;
+  max-width: 100%;
 }
 
 .room-created__label {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #ccc;
-}
-
-.room-created__link-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .room-created__input {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
-.room-created__hint {
-  margin: 0;
-  font-size: 12px;
-  color: #999;
+.room-created__label :deep(.pixel-input) {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  font-size: 15px;
+  background: rgba(0, 0, 0, 0.28);
+  border-color: #ffffff22;
+  border-top-color: #ffffff38;
+  border-left-color: #ffffff38;
+  color: #fff;
+}
+
+.room-created__copy {
+  align-self: flex-start;
+  min-height: 48px;
+  font-family: "Bebas Neue", sans-serif !important;
+  font-size: 1.35rem !important;
+  font-weight: normal !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 20px !important;
 }
 
 .room-created__actions {
   display: flex;
-  gap: 12px;
-  justify-content: center;
   flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
-@media (max-width: 480px) {
-  .room-created__container {
-    padding: 20px;
-  }
+.room-created__btn {
+  min-height: 52px;
+  font-family: "Bebas Neue", sans-serif !important;
+  font-size: 1.45rem !important;
+  font-weight: normal !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 14px 24px !important;
+}
 
-  .room-created__title {
-    font-size: 22px;
-  }
-
-  .room-created__link-row {
-    flex-direction: column;
+@media (max-width: 720px) {
+  .room-created {
     align-items: stretch;
+    padding: 16px 12px 24px;
+  }
+
+  .room-created__shell {
+    width: 100%;
   }
 
   .room-created__actions {
-    flex-direction: column;
+    flex-direction: column-reverse;
+  }
+
+  .room-created__btn,
+  .room-created__copy {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

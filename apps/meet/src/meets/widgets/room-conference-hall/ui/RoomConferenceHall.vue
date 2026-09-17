@@ -410,7 +410,7 @@
     </div>
 
     <div
-      v-show="isSoundBarPanelOpen"
+      v-show="isSoundBarPanelOpen && soundBarAvailable"
       class="conference-hall__sound-collab"
       aria-label="Звуки организации"
     >
@@ -489,7 +489,9 @@
             variant="large"
           />
         </Button>
-        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+      </template>
+      <template v-if="!previewMode" #replica>
+        <ReplicaInput @submit="handleReplicaSubmit" />
       </template>
       <template #right>
         <ParticipantsTrigger
@@ -762,7 +764,9 @@
                 variant="large"
               />
             </Button>
-            <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+          </template>
+          <template v-if="!previewMode" #replica>
+            <ReplicaInput @submit="handleReplicaSubmit" />
           </template>
           <template #right>
             <ParticipantsTrigger
@@ -887,7 +891,7 @@ import { useMediaControl } from "@features/media-control";
 import { useConferenceHall } from "@features/conference-hall";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
-import { SoundBar } from "@features/sound-bar";
+import { SoundBar, isOrganizationSoundBarAvailable } from "@features/sound-bar";
 import {
   MEET_ROOM_COLLABORATION_KEY,
   useMeetRoomYCollaboration,
@@ -978,6 +982,10 @@ const emit = defineEmits<{
   "update:participants": [RoomParticipantListItem[]];
 }>();
 
+const soundBarAvailable = computed(() =>
+  isOrganizationSoundBarAvailable(props.room),
+);
+
 const enabledConferenceCallWidgets = computed<CallWidgetId[]>(() => {
   const ids: CallWidgetId[] = [
     "document",
@@ -985,8 +993,8 @@ const enabledConferenceCallWidgets = computed<CallWidgetId[]>(() => {
     "table_chat",
     "table_dice",
     "table_stream",
-    "soundbar",
   ];
+  if (soundBarAvailable.value) ids.push("soundbar");
   if (props.settingsInCallMenu) ids.push("settings");
   return ids;
 });
@@ -1620,9 +1628,9 @@ const showParticipantsPanel = ref(false);
 const isSoundBarPanelOpen = ref(false);
 
 watch(
-  () => props.room?.id,
-  (id) => {
-    if (!id) {
+  () => [props.room?.id, soundBarAvailable.value] as const,
+  ([id, available]) => {
+    if (!id || !available) {
       isSoundBarPanelOpen.value = false;
       return;
     }
@@ -1635,14 +1643,11 @@ watch(
 );
 
 watch(
-  () => [props.room?.id, isSoundBarPanelOpen.value] as const,
-  ([id]) => {
-    if (!id) return;
-    writeSoundBarPanelOpenForRoom(
-      "conference_hall",
-      id,
-      isSoundBarPanelOpen.value,
-    );
+  () =>
+    [props.room?.id, isSoundBarPanelOpen.value, soundBarAvailable.value] as const,
+  ([id, open, available]) => {
+    if (!id || !available) return;
+    writeSoundBarPanelOpenForRoom("conference_hall", id, open);
   },
 );
 
@@ -1711,7 +1716,7 @@ const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
   if (isTableChatOpen.value) ids.push("table_chat");
   if (isTableDiceOpen.value) ids.push("table_dice");
   if (isTableStreamOpen.value) ids.push("table_stream");
-  if (isSoundBarPanelOpen.value) ids.push("soundbar");
+  if (isSoundBarPanelOpen.value && soundBarAvailable.value) ids.push("soundbar");
   return ids;
 });
 
@@ -1733,7 +1738,9 @@ function activateCallWidgetFromMenu(id: CallWidgetId): void {
       toggleTableStream();
       break;
     case "soundbar":
-      isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      if (soundBarAvailable.value) {
+        isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      }
       break;
     case "settings":
       handleSettings();
@@ -1932,6 +1939,9 @@ function handleModalClose() {
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 12px;
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
   }
 
   .conference-hall__main,
@@ -1942,6 +1952,20 @@ function handleModalClose() {
   .conference-hall__sidebar {
     width: 100%;
     min-width: 0;
+  }
+
+  .conference-hall__leader {
+    max-width: none;
+    border: 3px solid #444;
+    box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .conference-hall__raised {
+    border-width: 3px;
+  }
+
+  .conference-hall__sidebar-title {
+    font-size: 1.15rem;
   }
 }
 
@@ -2003,15 +2027,18 @@ function handleModalClose() {
 
 .conference-hall__sidebar-title {
   margin: 0 0 8px 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #bab1a8;
 }
 
 .conference-hall__raised {
   padding: 12px;
-  background: #00000020;
-  border: 2px solid #333;
+  background: #14141490;
+  border: 3px solid #444;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
 }
 
 .conference-hall__raised-item {
@@ -2073,9 +2100,9 @@ function handleModalClose() {
   width: 340px;
   max-width: 100vw;
   height: 100%;
-  background: var(--color-surface, #1f1f1f);
-  border-left: 2px solid #444;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  background: #141414f2;
+  border-left: 3px solid #444;
+  box-shadow: -4px 0 0 0 rgba(0, 0, 0, 0.35);
   padding: 16px;
   overflow-y: auto;
 }

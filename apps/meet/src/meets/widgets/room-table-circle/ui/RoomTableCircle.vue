@@ -81,7 +81,7 @@
           </div>
 
           <div
-            v-show="isSoundBarPanelOpen"
+            v-show="isSoundBarPanelOpen && soundBarAvailable"
             class="table-circle__sound-panel"
             aria-label="Звуки организации"
           >
@@ -263,7 +263,10 @@
         >
           <PixelIcon :name="mediaState.isScreenSharing ? 'screen-on' : 'screen-off'" variant="large" />
         </Button>
-        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+      </template>
+
+      <template v-if="!previewMode" #replica>
+        <ReplicaInput @submit="handleReplicaSubmit" />
       </template>
 
       <template #right>
@@ -427,7 +430,7 @@ import {
 } from "@features/participant-replica";
 import { useConferenceHall } from "@features/conference-hall";
 import { useTableCircle } from "@features/table-circle";
-import { SoundBar } from "@features/sound-bar";
+import { SoundBar, isOrganizationSoundBarAvailable } from "@features/sound-bar";
 import {
   MEET_ROOM_COLLABORATION_KEY,
   useMeetRoomYCollaboration,
@@ -473,6 +476,10 @@ const emit = defineEmits<{
   "update:participantName": [name: string];
 }>();
 
+const soundBarAvailable = computed(() =>
+  isOrganizationSoundBarAvailable(props.room),
+);
+
 const enabledTableCircleCallWidgets = computed<CallWidgetId[]>(() => {
   const ids: CallWidgetId[] = [
     "document",
@@ -480,8 +487,8 @@ const enabledTableCircleCallWidgets = computed<CallWidgetId[]>(() => {
     "table_chat",
     "table_dice",
     "table_stream",
-    "soundbar",
   ];
+  if (soundBarAvailable.value) ids.push("soundbar");
   if (props.settingsInCallMenu) ids.push("settings");
   return ids;
 });
@@ -511,9 +518,9 @@ const remoteParticipants = computed<RemoteParticipant[]>(() => {
 const isSoundBarPanelOpen = ref(false);
 
 watch(
-  () => props.room?.id,
-  (id) => {
-    if (!id) {
+  () => [props.room?.id, soundBarAvailable.value] as const,
+  ([id, available]) => {
+    if (!id || !available) {
       isSoundBarPanelOpen.value = false;
       return;
     }
@@ -526,14 +533,11 @@ watch(
 );
 
 watch(
-  () => [props.room?.id, isSoundBarPanelOpen.value] as const,
-  ([id]) => {
-    if (!id) return;
-    writeSoundBarPanelOpenForRoom(
-      "table_circle",
-      id,
-      isSoundBarPanelOpen.value,
-    );
+  () =>
+    [props.room?.id, isSoundBarPanelOpen.value, soundBarAvailable.value] as const,
+  ([id, open, available]) => {
+    if (!id || !available) return;
+    writeSoundBarPanelOpenForRoom("table_circle", id, open);
   },
 );
 
@@ -920,7 +924,7 @@ const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
   const ids: CallWidgetId[] = [];
   if (isDocumentOpen.value) ids.push("document");
   if (isWhiteboardOpen.value) ids.push("whiteboard");
-  if (isSoundBarPanelOpen.value) ids.push("soundbar");
+  if (isSoundBarPanelOpen.value && soundBarAvailable.value) ids.push("soundbar");
   if (centerContent.value === "chat") ids.push("table_chat");
   if (centerContent.value === "dice") ids.push("table_dice");
   if (centerContent.value === "stream") ids.push("table_stream");
@@ -945,7 +949,9 @@ function activateCallWidgetFromMenu(id: CallWidgetId): void {
       centerContent.value = "stream";
       break;
     case "soundbar":
-      isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      if (soundBarAvailable.value) {
+        isSoundBarPanelOpen.value = !isSoundBarPanelOpen.value;
+      }
       break;
     case "settings":
       handleSettings();

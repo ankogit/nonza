@@ -79,7 +79,7 @@
             (isDocumentOpen || (isWhiteboardOpen && !whiteboardFullscreen))) ||
           isTableChatOpen ||
           isTableDiceOpen ||
-          isSoundBarOpen
+          isSoundBarOpen && soundBarAvailable
         "
         class="round-table-collab"
         aria-label="Совместная работа"
@@ -136,7 +136,7 @@
           </MeetCollabPanel>
         </div>
         <div
-          v-show="isSoundBarOpen"
+          v-show="isSoundBarOpen && soundBarAvailable"
           class="round-table-soundbar"
           aria-label="Звуки организации"
         >
@@ -207,7 +207,9 @@
             variant="large"
           />
         </Button>
-        <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+      </template>
+      <template v-if="!previewMode" #replica>
+        <ReplicaInput @submit="handleReplicaSubmit" />
       </template>
       <template #right>
         <Button
@@ -359,7 +361,9 @@
                   variant="large"
                 />
               </Button>
-              <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+            </template>
+            <template v-if="!previewMode" #replica>
+              <ReplicaInput @submit="handleReplicaSubmit" />
             </template>
             <template #right>
               <Button
@@ -632,7 +636,9 @@
                   variant="large"
                 />
               </Button>
-              <ReplicaInput v-if="!previewMode" @submit="handleReplicaSubmit" />
+            </template>
+            <template v-if="!previewMode" #replica>
+              <ReplicaInput @submit="handleReplicaSubmit" />
             </template>
             <template #widget-document>
               <Button
@@ -810,7 +816,7 @@ import { ref, computed, watch, nextTick, provide, toRef } from "vue";
 import { useMediaControl } from "@features/media-control";
 import { useE2EE } from "@features/e2ee";
 import { useConnectionIndicator } from "@features/room-connection";
-import { SoundBar } from "@features/sound-bar";
+import { SoundBar, isOrganizationSoundBarAvailable } from "@features/sound-bar";
 import {
   useParticipantReplica,
   ReplicaInput,
@@ -890,21 +896,31 @@ const props = defineProps<{
   updateParticipantName?: (name: string) => void;
 }>();
 
-const enabledRoundTableCallWidgets = computed<CallWidgetId[]>(() => [
-  "document",
-  "whiteboard",
-  "table_chat",
-  "table_dice",
-  "soundbar",
-]);
+const soundBarAvailable = computed(() =>
+  isOrganizationSoundBarAvailable(props.room),
+);
 
-const enabledFullscreenVideoCallWidgets = computed<CallWidgetId[]>(() => [
-  "document",
-  "whiteboard",
-  "table_chat",
-  "table_dice",
-  "soundbar",
-]);
+const enabledRoundTableCallWidgets = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [
+    "document",
+    "whiteboard",
+    "table_chat",
+    "table_dice",
+  ];
+  if (soundBarAvailable.value) ids.push("soundbar");
+  return ids;
+});
+
+const enabledFullscreenVideoCallWidgets = computed<CallWidgetId[]>(() => {
+  const ids: CallWidgetId[] = [
+    "document",
+    "whiteboard",
+    "table_chat",
+    "table_dice",
+  ];
+  if (soundBarAvailable.value) ids.push("soundbar");
+  return ids;
+});
 
 const emit = defineEmits<{
   disconnect: [];
@@ -1069,9 +1085,9 @@ watch(
 const isSoundBarOpen = ref(false);
 
 watch(
-  () => props.room?.id,
-  (id) => {
-    if (!id) {
+  () => [props.room?.id, soundBarAvailable.value] as const,
+  ([id, available]) => {
+    if (!id || !available) {
       isSoundBarOpen.value = false;
       return;
     }
@@ -1081,14 +1097,15 @@ watch(
 );
 
 watch(
-  () => [props.room?.id, isSoundBarOpen.value] as const,
-  ([id]) => {
-    if (!id) return;
-    writeSoundBarPanelOpenForRoom("round_table", id, isSoundBarOpen.value);
+  () => [props.room?.id, isSoundBarOpen.value, soundBarAvailable.value] as const,
+  ([id, open, available]) => {
+    if (!id || !available) return;
+    writeSoundBarPanelOpenForRoom("round_table", id, open);
   },
 );
 
 function toggleSoundBar() {
+  if (!soundBarAvailable.value) return;
   isSoundBarOpen.value = !isSoundBarOpen.value;
 }
 
@@ -1098,7 +1115,7 @@ const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
   if (isWhiteboardOpen.value) ids.push("whiteboard");
   if (isTableChatOpen.value) ids.push("table_chat");
   if (isTableDiceOpen.value) ids.push("table_dice");
-  if (isSoundBarOpen.value) ids.push("soundbar");
+  if (isSoundBarOpen.value && soundBarAvailable.value) ids.push("soundbar");
   return ids;
 });
 
@@ -1651,6 +1668,8 @@ function handleModalClose() {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
 
 .round-table-document {
@@ -1742,7 +1761,7 @@ function handleModalClose() {
 @media (max-width: 767px) {
   .round-table-content {
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
     padding-left: max(0px, env(safe-area-inset-left, 0px));
     padding-right: max(0px, env(safe-area-inset-right, 0px));
   }
@@ -1753,25 +1772,22 @@ function handleModalClose() {
     max-height: none;
     overflow: visible;
     overflow-y: visible;
-    padding-bottom: 12px;
-    padding-top: 12px;
+    padding: 10px 12px 16px;
     gap: 12px;
   }
 
   .round-table-collab {
-    padding-bottom: 0;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     max-height: none;
     overflow-y: visible;
-    gap: 8px;
+    gap: 10px;
   }
 
-  .round-table-document {
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-top: 10px;
-  }
-
-  .round-table-whiteboard {
+  .round-table-document,
+  .round-table-whiteboard,
+  .round-table-table-chat,
+  .round-table-table-dice,
+  .round-table-soundbar {
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
     padding-top: 10px;
@@ -1779,17 +1795,20 @@ function handleModalClose() {
 
   .round-table-table-chat,
   .round-table-table-dice {
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-top: 10px;
     max-height: none;
-    min-height: 220px;
+    min-height: 240px;
   }
 
-  .round-table-soundbar {
-    padding-left: max(12px, env(safe-area-inset-left, 0px));
-    padding-right: max(12px, env(safe-area-inset-right, 0px));
-    padding-top: 10px;
+  .round-table-document :deep(.meet-collab-panel),
+  .round-table-whiteboard :deep(.meet-collab-panel),
+  .round-table-table-chat :deep(.meet-collab-panel),
+  .round-table-table-dice :deep(.meet-collab-panel) {
+    border-width: 3px;
+  }
+
+  .room-info h2 {
+    font-size: clamp(1.35rem, 6vw, 1.7rem);
+    letter-spacing: 0.05em;
   }
 }
 </style>

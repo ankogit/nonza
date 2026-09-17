@@ -129,9 +129,21 @@ export function getRefreshToken(): string | null {
   return s?.refreshToken ?? null;
 }
 
+function isRefreshExpired(s: AuthState): boolean {
+  if (!s.refreshExpiresAt) return false;
+  const ms = new Date(s.refreshExpiresAt).getTime();
+  if (Number.isNaN(ms)) return false;
+  return ms <= Date.now();
+}
+
 export async function refreshAccessToken(baseURL: string): Promise<boolean> {
-  const refresh = getRefreshToken();
+  const s = getAuthState();
+  const refresh = s?.refreshToken;
   if (!refresh) return false;
+  if (s && isRefreshExpired(s)) {
+    clearAuth();
+    return false;
+  }
   const url = `${baseURL.replace(/\/$/, "")}/api/v1/auth/refresh`;
   try {
     const res = await fetch(url, {
@@ -140,7 +152,9 @@ export async function refreshAccessToken(baseURL: string): Promise<boolean> {
       body: JSON.stringify({ refresh_token: refresh }),
     });
     if (!res.ok) {
-      clearAuth();
+      if (res.status === 401 || res.status === 403) {
+        clearAuth();
+      }
       return false;
     }
     const data = (await res.json()) as {
@@ -164,13 +178,18 @@ export async function refreshAccessToken(baseURL: string): Promise<boolean> {
     );
     return true;
   } catch {
-    clearAuth();
     return false;
   }
 }
 
 export function isAuthenticated(): boolean {
-  return getAuthState() != null;
+  const s = getAuthState();
+  if (!s) return false;
+  if (isRefreshExpired(s)) {
+    clearAuth();
+    return false;
+  }
+  return true;
 }
 
 export interface ParticipantInfo {

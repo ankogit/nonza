@@ -79,10 +79,17 @@ func (h *Handler) InitRoutes(cfg *config.Config) *gin.Engine {
 	router.GET("/api/v1/desktop-update/:target/:arch/:current_version", v1.DesktopUpdate(cfg))
 	router.GET("/api/v1/desktop-download/:platform", v1.DesktopDownload(cfg))
 
+	oauthHandler := v1.NewOAuthHandler(h.services)
+	router.GET("/oauth/authorize", oauthHandler.AuthorizeRedirect)
+	router.POST("/oauth/token", oauthHandler.Token)
+	router.POST("/oauth/revoke", oauthHandler.Revoke)
+	router.GET("/oauth/userinfo", oauthHandler.UserInfo)
+
 	api := router.Group("/api/v1")
 	api.Use(AuthMiddleware(h.services))
 	{
 		h.initAuthRoutes(api)
+		h.initOAuthRoutes(api)
 		h.initOrganizationRoomsRoutes(api, cfg)
 		h.initOrgRoomGroupsRoutes(api)
 		h.initOrgInvitesRoutes(api)
@@ -111,7 +118,7 @@ func (h *Handler) GetWSHandler() *websocket.Handler {
 }
 
 func (h *Handler) initOrganizationRoomsRoutes(api *gin.RouterGroup, cfg *config.Config) {
-	roomHandler := v1.NewRoomsHandler(h.services, livekit.NewClient(cfg), h.wsHub)
+	roomHandler := v1.NewRoomsHandler(h.services, livekit.NewClient(cfg), h.wsHub, cfg.MeetsPublicBaseURL)
 
 	// Use /org/:id/rooms to completely avoid conflict with /organizations/:id
 	// This is cleaner and avoids any route ambiguity
@@ -184,10 +191,11 @@ func (h *Handler) initOrganizationsRoutes(api *gin.RouterGroup) {
 }
 
 func (h *Handler) initRoomsRoutes(api *gin.RouterGroup, cfg *config.Config) {
-	roomHandler := v1.NewRoomsHandler(h.services, livekit.NewClient(cfg), h.wsHub)
+	roomHandler := v1.NewRoomsHandler(h.services, livekit.NewClient(cfg), h.wsHub, cfg.MeetsPublicBaseURL)
 
 	rooms := api.Group("/rooms")
 	{
+		rooms.POST("/temporary", roomHandler.CreateTemporary)
 		rooms.GET("/:shortCode", roomHandler.GetByShortCode)
 		rooms.GET("/id/:id", roomHandler.GetByID)
 		rooms.GET("/id/:id/participants", roomHandler.GetRoomParticipants)
@@ -195,6 +203,11 @@ func (h *Handler) initRoomsRoutes(api *gin.RouterGroup, cfg *config.Config) {
 		rooms.PATCH("/:shortCode/settings", roomHandler.UpdateRoomSettings)
 		rooms.DELETE("/:shortCode", roomHandler.Delete)
 		rooms.POST("/:shortCode/notify-participant-left", roomHandler.NotifyParticipantLeft)
+	}
+
+	partner := api.Group("/partner")
+	{
+		partner.POST("/temporary-rooms", roomHandler.PartnerCreateTemporary)
 	}
 }
 
@@ -209,11 +222,26 @@ func (h *Handler) initTokensRoutes(api *gin.RouterGroup, cfg *config.Config) {
 
 func (h *Handler) initAuthRoutes(api *gin.RouterGroup) {
 	authHandler := v1.NewAuthHandler(h.services)
+	socialHandler := v1.NewAuthSocialHandler(h.services)
 	auth := api.Group("/auth")
 	{
+		auth.GET("/google/start", socialHandler.GoogleStart)
+		auth.GET("/google/callback", socialHandler.GoogleCallback)
+		auth.GET("/mandarinshow/start", socialHandler.MandarinshowStart)
+		auth.GET("/mandarinshow/callback", socialHandler.MandarinshowCallback)
+		auth.POST("/social/exchange", socialHandler.SocialExchange)
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.Refresh)
 		auth.PATCH("/me", authHandler.UpdateMe)
+	}
+}
+
+func (h *Handler) initOAuthRoutes(api *gin.RouterGroup) {
+	oauthHandler := v1.NewOAuthHandler(h.services)
+	oauth := api.Group("/oauth")
+	{
+		oauth.GET("/authorize-info", oauthHandler.AuthorizeInfo)
+		oauth.POST("/approve", oauthHandler.Approve)
 	}
 }

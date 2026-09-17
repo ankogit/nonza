@@ -1,29 +1,26 @@
 <template>
-  <Modal
-    :model-value="true"
-    title="Создать комнату"
-    :close-on-overlay-click="true"
-    @close="$emit('cancel')"
-  >
+  <div class="create-room-screen">
     <div v-if="!defaultOrgId && !isPreviewMode" class="create-room-screen__loading">
-      <p>Настройка организации...</p>
+      <MetroTile size="wide" variant="dark" title="Подготовка">
+        <p class="create-room-screen__loading-text">Настройка организации…</p>
+      </MetroTile>
     </div>
     <CreateRoomForm
       v-else
       ref="formRef"
+      variant="metro"
       hide-header
       @submit="handleCreateRoom"
       @cancel="$emit('cancel')"
     />
-  </Modal>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { Modal } from "@shared/ui";
+import { MetroTile } from "@shared/ui";
 import { CreateRoomForm } from "@features/create-room";
-import { RoomApi } from "@shared/entities";
-import { OrganizationApi } from "@shared/entities";
+import { RoomApi, OrganizationApi } from "@shared/entities";
 import { useApiClient } from "@shared/api";
 import type { CreateRoomRequest, Room } from "@shared/entities";
 
@@ -39,16 +36,13 @@ const roomApi = new RoomApi(apiClient);
 const organizationApi = new OrganizationApi(apiClient);
 
 const defaultOrgId = ref<string | null>(null);
-// Preview только по явному ?preview=true (на проде без этого параметра идём в реальный API)
 const isPreviewMode =
   new URLSearchParams(window.location.search).get("preview") === "true";
 
-// Get or create default organization
 onMounted(async () => {
   if (isPreviewMode) return;
 
   try {
-    // Try to get default organization from localStorage
     const storedOrgId = localStorage.getItem("nonza_default_org_id");
     if (storedOrgId) {
       try {
@@ -56,12 +50,10 @@ onMounted(async () => {
         defaultOrgId.value = storedOrgId;
         return;
       } catch {
-        // Organization doesn't exist, create new one
         localStorage.removeItem("nonza_default_org_id");
       }
     }
 
-    // Create default organization
     const org = await organizationApi.create({
       name: "Default Organization",
       description: "Default organization for rooms",
@@ -76,7 +68,6 @@ onMounted(async () => {
 const handleCreateRoom = async (data: CreateRoomRequest) => {
   try {
     if (isPreviewMode) {
-      // Mock room for preview
       const mockRoom: Room = {
         id: "mock-id",
         organization_id: "mock-org-id",
@@ -114,10 +105,38 @@ const handleCreateRoom = async (data: CreateRoomRequest) => {
 </script>
 
 <style scoped>
-.create-room-screen__loading {
-  padding: 24px;
-  text-align: center;
-  color: #bab1a8;
-  font-size: 16px;
+.create-room-screen {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  padding: 20px 16px 28px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.create-room-screen__loading,
+.create-room-screen :deep(.create-room-form--metro) {
+  width: min(920px, 100%);
+}
+
+.create-room-screen__loading-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 720px) {
+  .create-room-screen {
+    align-items: stretch;
+    padding: 16px 12px 24px;
+  }
+
+  .create-room-screen__loading,
+  .create-room-screen :deep(.create-room-form--metro) {
+    width: 100%;
+  }
 }
 </style>

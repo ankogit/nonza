@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"time"
 
 	"nonza/backend/internal/models"
@@ -27,4 +28,11 @@ type Auth interface {
 	Refresh(refreshToken string) (*AuthResult, error)
 	ParseToken(accessToken string) (userID string, err error)
 	UpdateProfile(userID string, name string, color *string) (*models.User, error)
+	IssueOAuthTokens(userID, clientID, scope string) (*OAuthTokenPair, error)
+	ParseOAuthRefreshToken(refreshToken string) (*RefreshTokenClaims, error)
+	GoogleAuthURL(returnURL string) (string, error)
+	GoogleCallback(ctx context.Context, code, state string) (redirectURL string, err error)
+	MandarinshowStartURL(returnURL string) (string, error)
+	MandarinshowCallback(ctx context.Context, code, state, oauthError string) (redirectURL string, err error)
+	RedeemSocialLoginTicket(ticket string) (*AuthResult, error)
 }
