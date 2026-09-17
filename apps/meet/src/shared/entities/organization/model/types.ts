@@ -9,6 +9,7 @@ export interface Organization {
 export interface CreateOrganizationRequest {
   name: string;
   description?: string;
+  meet_default?: boolean;
 }
 
 export interface UpdateOrganizationRequest {

@@ -283,6 +283,40 @@ const menuClass = toRef(props, "menuClass");
   pointer-events: none;
 }
 
+@media (max-width: 1270px) {
+  .call-menu__bar--has-replica {
+    row-gap: 8px;
+    grid-template-areas:
+      "start center right"
+      "replica replica replica";
+  }
+
+  .call-menu__bar--has-replica .call-menu__start {
+    display: contents;
+  }
+
+  .call-menu__bar--has-replica :deep(.left) {
+    grid-area: start;
+    padding-right: 18px;
+  }
+
+  .call-menu__bar--has-replica :deep(.center) {
+    grid-area: center;
+  }
+
+  .call-menu__bar--has-replica :deep(.right) {
+    grid-area: right;
+  }
+
+  .call-menu__bar--has-replica .call-menu__replica {
+    grid-area: replica;
+    flex: none;
+    max-width: none;
+    width: 100%;
+    padding: 0 18px 14px;
+  }
+}
+
 @media (max-width: 768px) {
   .call-menu {
     gap: 0;

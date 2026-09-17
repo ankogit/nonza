@@ -52,7 +52,7 @@ func (h *OrganizationsHandler) Create(c *gin.Context) {
 		ownerID = &userID
 	}
 
-	org, err := h.Services.Organizations.Create(req.Name, req.Description, ownerID)
+	org, err := h.Services.Organizations.Create(req.Name, req.Description, ownerID, req.MeetDefault)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

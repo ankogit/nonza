@@ -61,6 +61,7 @@ type RoomResponse struct {
 	CreatedAt              time.Time  `json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 	CurrentUserOrgColor    *string    `json:"current_user_org_color,omitempty"`
+	SoundBarAvailable      bool       `json:"sound_bar_available"`
 }
 
 func BuildJoinURL(meetsBaseURL, shortCode string) string {

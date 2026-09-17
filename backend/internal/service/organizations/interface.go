@@ -9,7 +9,7 @@ import (
 )
 
 type Organizations interface {
-	Create(name, description string, ownerID *string) (*models.Organization, error)
+	Create(name, description string, ownerID *string, meetDefault bool) (*models.Organization, error)
 	GetByID(id uuid.UUID) (*models.Organization, error)
 	List(userID *string) ([]*models.Organization, error)
 	Update(id uuid.UUID, name, description string, callerUserID string) (*models.Organization, error)

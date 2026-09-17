@@ -22,6 +22,7 @@ export interface Room {
   created_at: string;
   updated_at: string;
   current_user_org_color?: string | null;
+  sound_bar_available?: boolean;
 }
 
 export interface Participant {

@@ -35,11 +35,15 @@ type organizationsService struct {
 	txRunner   repository.TransactionRunner
 }
 
-func (s *organizationsService) Create(name, description string, ownerID *string) (*models.Organization, error) {
+func (s *organizationsService) Create(name, description string, ownerID *string, meetDefault bool) (*models.Organization, error) {
+	settings := make(models.JSONB)
+	if meetDefault {
+		settings["meet_default"] = true
+	}
 	org := &models.Organization{
 		Name:        name,
 		Description: description,
-		Settings:    make(models.JSONB),
+		Settings:    settings,
 		OwnerID:     ownerID,
 	}
 

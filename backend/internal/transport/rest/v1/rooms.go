@@ -13,6 +13,7 @@ import (
 	"nonza/backend/internal/models"
 	"nonza/backend/internal/pkg/orgroles"
 	"nonza/backend/internal/service"
+	"nonza/backend/internal/service/organizations"
 	roomsvc "nonza/backend/internal/service/rooms"
 	"nonza/backend/internal/transport/websocket"
 	"nonza/backend/internal/webrtc/livekit"
@@ -38,6 +39,26 @@ func NewRoomsHandler(services *service.Services, lk *livekit.Client, wsHub *webs
 		WsHub:              wsHub,
 		MeetsPublicBaseURL: meetsPublicBaseURL,
 	}
+}
+
+func (h *RoomsHandler) soundBarAvailable(orgID uuid.UUID) bool {
+	org, err := h.Services.Organizations.GetByID(orgID)
+	if err != nil || org == nil {
+		return orgID != uuid.Nil
+	}
+	return !organizations.IsMeetDefault(org)
+}
+
+func (h *RoomsHandler) toRoomResponse(room *models.Room, currentUserOrgColor *string) roomDto.RoomResponse {
+	resp := roomDto.ToRoomResponse(room, currentUserOrgColor)
+	resp.SoundBarAvailable = h.soundBarAvailable(room.OrganizationID)
+	return resp
+}
+
+func (h *RoomsHandler) toRoomResponseWithJoinURL(room *models.Room, currentUserOrgColor *string) roomDto.RoomResponse {
+	resp := roomDto.ToRoomResponseWithJoinURL(room, currentUserOrgColor, h.MeetsPublicBaseURL)
+	resp.SoundBarAvailable = h.soundBarAvailable(room.OrganizationID)
+	return resp
 }
 
 func (h *RoomsHandler) Create(c *gin.Context) {
@@ -122,7 +143,7 @@ func (h *RoomsHandler) Create(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+	c.JSON(http.StatusCreated, h.toRoomResponseWithJoinURL(room, nil))
 }
 
 func (h *RoomsHandler) CreateTemporary(c *gin.Context) {
@@ -171,7 +192,7 @@ func (h *RoomsHandler) CreateTemporary(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+orgID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+	c.JSON(http.StatusCreated, h.toRoomResponseWithJoinURL(room, nil))
 }
 
 func (h *RoomsHandler) PartnerCreateTemporary(c *gin.Context) {
@@ -210,7 +231,7 @@ func (h *RoomsHandler) PartnerCreateTemporary(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+client.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusCreated, roomDto.ToRoomResponseWithJoinURL(room, nil, h.MeetsPublicBaseURL))
+	c.JSON(http.StatusCreated, h.toRoomResponseWithJoinURL(room, nil))
 }
 
 func (h *RoomsHandler) createTemporaryRoom(orgID uuid.UUID, createdByUserID *string, req roomDto.CreateTemporaryRoomRequest) (*models.Room, error) {
@@ -287,7 +308,7 @@ func (h *RoomsHandler) GetByShortCode(c *gin.Context) {
 	if uid != "" {
 		currentUserOrgColor, _ = h.Services.Organizations.GetMemberColor(room.OrganizationID, uid)
 	}
-	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, currentUserOrgColor))
+	c.JSON(http.StatusOK, h.toRoomResponse(room, currentUserOrgColor))
 }
 
 func (h *RoomsHandler) GetByID(c *gin.Context) {
@@ -303,7 +324,7 @@ func (h *RoomsHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, nil))
+	c.JSON(http.StatusOK, h.toRoomResponse(room, nil))
 }
 
 func (h *RoomsHandler) GetRoomParticipants(c *gin.Context) {
@@ -390,7 +411,7 @@ func (h *RoomsHandler) UpdateConferenceHallLeader(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+room.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, nil))
+	c.JSON(http.StatusOK, h.toRoomResponse(room, nil))
 }
 
 func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
@@ -515,7 +536,7 @@ func (h *RoomsHandler) UpdateRoomSettings(c *gin.Context) {
 	if h.WsHub != nil {
 		_ = h.WsHub.BroadcastToRoom("org:"+room.OrganizationID.String(), map[string]interface{}{"type": "rooms_changed"})
 	}
-	c.JSON(http.StatusOK, roomDto.ToRoomResponse(room, nil))
+	c.JSON(http.StatusOK, h.toRoomResponse(room, nil))
 }
 
 func (h *RoomsHandler) Delete(c *gin.Context) {
@@ -596,9 +617,12 @@ func (h *RoomsHandler) GetByOrganizationID(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	response := make([]roomDto.RoomWithParticipantsResponse, len(rooms))
+	soundBar := h.soundBarAvailable(orgID)
 	for i, r := range rooms {
+		resp := roomDto.ToRoomResponse(&r, nil)
+		resp.SoundBarAvailable = soundBar
 		response[i] = roomDto.RoomWithParticipantsResponse{
-			RoomResponse: roomDto.ToRoomResponse(&r, nil),
+			RoomResponse: resp,
 			Participants: []roomDto.ParticipantResponse{},
 		}
 	}

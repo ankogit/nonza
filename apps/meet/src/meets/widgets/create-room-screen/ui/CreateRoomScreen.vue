@@ -57,6 +57,7 @@ onMounted(async () => {
     const org = await organizationApi.create({
       name: "Default Organization",
       description: "Default organization for rooms",
+      meet_default: true,
     });
     defaultOrgId.value = org.id;
     localStorage.setItem("nonza_default_org_id", org.id);

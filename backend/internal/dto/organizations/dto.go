@@ -5,6 +5,7 @@ import "nonza/backend/internal/models"
 type CreateOrganizationRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
+	MeetDefault bool   `json:"meet_default"`
 }
 
 type UpdateOrganizationRequest struct {
