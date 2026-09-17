@@ -55,7 +55,7 @@ services:
       - nonza-network
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: nonza-minio-dev
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -71,14 +71,17 @@ services:
       - nonza-network
 
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: nonza-minio-init-dev
     depends_on:
       minio:
         condition: service_started
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 nonza_minio nonza_minio_password &&
+      for i in 1 2 3 4 5 6 7 8 9 10; do
+        mc alias set local http://minio:9000 nonza_minio nonza_minio_password && break;
+        sleep 2;
+      done &&
       mc mb --ignore-existing local/nonza-files &&
       mc anonymous set public local/nonza-files
       "
