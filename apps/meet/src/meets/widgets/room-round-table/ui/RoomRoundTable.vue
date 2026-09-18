@@ -1688,22 +1688,40 @@ function handleModalClose() {
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
+  isolation: isolate;
+}
+
+.round-table-document,
+.round-table-whiteboard,
+.round-table-table-chat,
+.round-table-table-dice,
+.round-table-soundbar {
+  position: relative;
+  z-index: 0;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .round-table-document {
-  flex: 0 0 400px;
-  min-height: 400px;
-  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  height: min(50vh, 480px);
+  max-height: min(50vh, 480px);
   padding: 20px 20px 0 0;
   margin-bottom: 0;
 }
 
 .round-table-whiteboard {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  min-height: 280px;
+  height: min(42vh, 400px);
+  max-height: min(42vh, 400px);
   padding: 10px 20px 0 0;
-  box-sizing: border-box;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1712,15 +1730,22 @@ function handleModalClose() {
   border-top: none;
 }
 
+.round-table-whiteboard :deep(.wb-shell) {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+}
+
 .round-table-table-chat,
 .round-table-table-dice {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 280px;
-  max-height: min(45vh, 420px);
+  min-height: 240px;
+  height: min(38vh, 360px);
+  max-height: min(38vh, 360px);
   padding: 10px 20px 0 0;
-  box-sizing: border-box;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1731,13 +1756,13 @@ function handleModalClose() {
 }
 
 .round-table-soundbar {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: none;
   padding: 10px 20px 0 0;
-  box-sizing: border-box;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: visible;
 }
 
 .round-table-soundbar:first-child {
@@ -1749,6 +1774,15 @@ function handleModalClose() {
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.round-table-document :deep(.meet-collab-panel),
+.round-table-table-chat :deep(.meet-collab-panel),
+.round-table-table-dice :deep(.meet-collab-panel) {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
 }
 
 @media (min-width: 768px) {
@@ -1768,7 +1802,6 @@ function handleModalClose() {
     flex: 0 0 400px;
     align-self: stretch;
     max-height: none;
-    height: auto;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
@@ -1776,24 +1809,19 @@ function handleModalClose() {
   }
 
   .round-table-document {
-    width: 100%;
-    margin-bottom: 0;
-    flex: 1 1 auto;
-    min-height: 280px;
-    max-height: none;
+    height: min(46vh, 440px);
+    max-height: min(46vh, 440px);
+  }
+
+  .round-table-whiteboard {
+    height: min(42vh, 400px);
+    max-height: min(42vh, 400px);
   }
 
   .round-table-table-chat,
   .round-table-table-dice {
-    flex: 1 1 auto;
-    min-height: 240px;
-    max-height: none;
-  }
-
-  .round-table-whiteboard,
-  .round-table-soundbar {
-    flex: 0 1 auto;
-    min-height: 0;
+    height: min(38vh, 360px);
+    max-height: min(38vh, 360px);
   }
 }
 
@@ -1827,7 +1855,8 @@ function handleModalClose() {
   .round-table-collab {
     padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     max-height: none;
-    overflow-y: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
     gap: 10px;
   }
 
@@ -1841,14 +1870,23 @@ function handleModalClose() {
     padding-top: 10px;
   }
 
+  .round-table-document {
+    height: min(48vh, 420px);
+    max-height: min(48vh, 420px);
+  }
+
+  .round-table-whiteboard {
+    height: min(44vh, 380px);
+    max-height: min(44vh, 380px);
+  }
+
   .round-table-table-chat,
   .round-table-table-dice {
-    max-height: none;
-    min-height: 240px;
+    height: min(40vh, 340px);
+    max-height: min(40vh, 340px);
   }
 
   .round-table-document :deep(.meet-collab-panel),
-  .round-table-whiteboard :deep(.meet-collab-panel),
   .round-table-table-chat :deep(.meet-collab-panel),
   .round-table-table-dice :deep(.meet-collab-panel) {
     border-width: 3px;

@@ -1,68 +1,82 @@
 <template>
   <div class="public-chat">
-    <div ref="listEl" class="public-chat__list meet-scroll">
-      <div
-        v-if="messages.length === 0"
-        class="public-chat__empty color-white-60"
-      >
-        Пока нет сообщений
-      </div>
-      <div
-        v-for="m in messages"
-        :key="m.id"
-        class="public-chat__msg"
-        :class="{ 'public-chat__msg--system': m.kind === 'system' }"
-        :style="
-          m.kind === 'system'
-            ? undefined
-            : { '--participant-color': participantColorForIdentity(m.senderIdentity) }
-        "
-      >
-        <template v-if="m.kind === 'system'">
-          <div class="public-chat__system">
-            <span class="public-chat__system-rule" aria-hidden="true" />
-            <span
-              class="public-chat__system-pill"
-              :class="{
-                'public-chat__system-pill--left':
-                  systemPresentation(m).pillVariant === 'left',
-                'public-chat__system-pill--join':
-                  systemPresentation(m).pillVariant === 'join',
-              }"
-              :style="{
-                '--participant-color': participantColorForIdentity(m.senderIdentity),
-              }"
-            >
-              <span class="public-chat__system-dot" aria-hidden="true" />
-              <span class="public-chat__system-name">{{
-                displayName(m)
-              }}</span>
-              <span class="public-chat__system-action">{{
-                systemPresentation(m).actionLabel
-              }}</span>
-              <span class="public-chat__system-time">{{ formatTime(m.ts) }}</span>
-            </span>
-            <span class="public-chat__system-rule" aria-hidden="true" />
+    <div class="public-chat__list-wrap">
+      <div class="public-chat__list-fade" aria-hidden="true" />
+      <div ref="listEl" class="public-chat__list meet-scroll">
+        <div class="public-chat__list-inner">
+          <div
+            v-if="messages.length === 0"
+            class="public-chat__empty color-white-60"
+          >
+            Пока нет сообщений
           </div>
-        </template>
-        <template v-else>
-          <div class="public-chat__msg-head">
-            <span class="public-chat__msg-who">{{ displayName(m) }}</span>
-            <span class="public-chat__msg-ts">{{ formatTs(m.ts) }}</span>
-          </div>
-          <div class="public-chat__msg-body">
-            <template v-for="(seg, i) in segmentsFor(m.text)" :key="i">
-              <a
-                v-if="seg.type === 'link'"
-                class="public-chat__link"
-                :href="seg.href"
-                target="_blank"
-                rel="noopener noreferrer"
-              >{{ seg.label }}</a>
-              <span v-else>{{ seg.value }}</span>
+          <div
+            v-for="m in messages"
+            :key="m.id"
+            class="public-chat__msg"
+            :class="{ 'public-chat__msg--system': m.kind === 'system' }"
+            :style="
+              m.kind === 'system'
+                ? undefined
+                : {
+                    '--participant-color': participantColorForIdentity(
+                      m.senderIdentity,
+                    ),
+                  }
+            "
+          >
+            <template v-if="m.kind === 'system'">
+              <div class="public-chat__system">
+                <span class="public-chat__system-rule" aria-hidden="true" />
+                <span
+                  class="public-chat__system-pill"
+                  :class="{
+                    'public-chat__system-pill--left':
+                      systemPresentation(m).pillVariant === 'left',
+                    'public-chat__system-pill--join':
+                      systemPresentation(m).pillVariant === 'join',
+                  }"
+                  :style="{
+                    '--participant-color': participantColorForIdentity(
+                      m.senderIdentity,
+                    ),
+                  }"
+                >
+                  <span class="public-chat__system-dot" aria-hidden="true" />
+                  <span class="public-chat__system-name">{{
+                    displayName(m)
+                  }}</span>
+                  <span class="public-chat__system-action">{{
+                    systemPresentation(m).actionLabel
+                  }}</span>
+                  <span class="public-chat__system-time">{{
+                    formatTime(m.ts)
+                  }}</span>
+                </span>
+                <span class="public-chat__system-rule" aria-hidden="true" />
+              </div>
+            </template>
+            <template v-else>
+              <div class="public-chat__msg-head">
+                <span class="public-chat__msg-who">{{ displayName(m) }}</span>
+                <span class="public-chat__msg-ts">{{ formatTs(m.ts) }}</span>
+              </div>
+              <div class="public-chat__msg-body">
+                <template v-for="(seg, i) in segmentsFor(m.text)" :key="i">
+                  <a
+                    v-if="seg.type === 'link'"
+                    class="public-chat__link"
+                    :href="seg.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >{{ seg.label }}</a
+                  >
+                  <span v-else>{{ seg.value }}</span>
+                </template>
+              </div>
             </template>
           </div>
-        </template>
+        </div>
       </div>
     </div>
 
@@ -90,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import type {
   LocalParticipant,
   RemoteParticipant,
@@ -123,6 +137,8 @@ const props = defineProps<{
 
 const draft = ref("");
 const listEl = ref<HTMLElement | null>(null);
+const stickToBottom = ref(true);
+let listResizeObserver: ResizeObserver | null = null;
 
 const { messages, canSend, send, maxMessageLength } = useTableCircleChat(
   () => props.localParticipant,
@@ -213,15 +229,53 @@ function submit() {
   if (!t) return;
   send(t);
   draft.value = "";
+  stickToBottom.value = true;
+  void scrollToBottom();
+}
+
+function isNearBottom(el: HTMLElement, threshold = 72) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
+function onListScroll() {
+  const el = listEl.value;
+  if (!el) return;
+  stickToBottom.value = isNearBottom(el);
+}
+
+async function scrollToBottom() {
+  await nextTick();
+  const el = listEl.value;
+  if (!el) return;
+  el.scrollTop = el.scrollHeight;
 }
 
 watch(
-  () => messages.value.length,
+  messages,
   async () => {
-    await nextTick();
-    listEl.value?.lastElementChild?.scrollIntoView({ block: "end" });
+    if (!stickToBottom.value) return;
+    await scrollToBottom();
   },
+  { deep: true, flush: "post" },
 );
+
+onMounted(async () => {
+  stickToBottom.value = true;
+  await scrollToBottom();
+  const el = listEl.value;
+  if (!el) return;
+  el.addEventListener("scroll", onListScroll, { passive: true });
+  listResizeObserver = new ResizeObserver(() => {
+    if (stickToBottom.value) void scrollToBottom();
+  });
+  listResizeObserver.observe(el);
+});
+
+onUnmounted(() => {
+  listEl.value?.removeEventListener("scroll", onListScroll);
+  listResizeObserver?.disconnect();
+  listResizeObserver = null;
+});
 </script>
 
 <style scoped>
@@ -235,16 +289,47 @@ watch(
   gap: 10px;
 }
 
+.public-chat__list-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.public-chat__list-fade {
+  pointer-events: none;
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  z-index: 2;
+  height: 36px;
+  background: linear-gradient(
+    to bottom,
+    #111 0%,
+    rgba(17, 17, 17, 0.82) 42%,
+    rgba(17, 17, 17, 0) 100%
+  );
+}
+
 .public-chat__list {
   flex: 1;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   border: 1px solid #333;
   background: #111;
   padding: 10px;
+}
+
+.public-chat__list-inner {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .public-chat__empty {

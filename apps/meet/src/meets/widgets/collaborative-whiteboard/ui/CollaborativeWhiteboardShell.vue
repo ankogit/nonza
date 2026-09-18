@@ -131,14 +131,15 @@ const persistAriaLabel = computed(() => {
 .wb-shell {
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   width: 100%;
-  height: auto;
+  height: 100%;
   min-height: 0;
+  max-height: 100%;
   background: #1f1f1f;
   border: 2px solid #444;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .wb-shell__header {
@@ -239,11 +240,12 @@ const persistAriaLabel = computed(() => {
 }
 
 .wb-shell__body {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .wb-shell__studio-placeholder {

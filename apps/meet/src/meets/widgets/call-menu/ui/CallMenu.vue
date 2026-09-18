@@ -16,8 +16,13 @@
       class="call-menu__bar"
       :class="{ 'call-menu__bar--has-replica': Boolean($slots.replica) }"
     >
-      <div class="left">
-        <slot name="left" />
+      <div class="call-menu__side call-menu__side--left">
+        <div class="left">
+          <slot name="left" />
+        </div>
+        <div v-if="$slots.replica" class="call-menu__replica">
+          <slot name="replica" />
+        </div>
       </div>
       <div class="center">
         <slot name="center">
@@ -30,47 +35,47 @@
           </Button>
         </slot>
       </div>
-      <div class="right">
-        <slot name="right" />
-        <div v-if="showWidgetSystem" class="call-menu__widget-system">
-          <div class="call-menu__pinned-scroll">
-            <CallMenuSlotRow
-              v-for="item in visibleSlotItems"
-              :key="'slot-' + item.index + '-' + String(item.slotId)"
-              :index="item.index"
-              :slot-id="item.slotId"
-              :arrange-mode="paletteArrangeMode"
-              :drop-highlight="slotDropHighlightIndex === item.index"
-              :grip-title="
-                item.slotId
-                  ? 'Перетащить или двойной клик — снять: ' + labelFor(item.slotId)
-                  : ''
-              "
-              @dragover="(e, i) => onSlotDragOver(e, i)"
-              @drop="(e, i) => onDropOnSlot(e, i)"
-              @dragstart-from-slot="(e, id, i) => onDragFromSlot(e, id, i)"
-              @grip-dblclick="(i, id) => onSlotGripDblClick(i, id)"
-            >
-              <template v-if="item.slotId" #widget>
-                <slot :name="widgetSlotName(item.slotId)" />
-              </template>
-            </CallMenuSlotRow>
-          </div>
+      <div class="call-menu__side call-menu__side--right">
+        <div class="right">
+          <slot name="right" />
+          <div v-if="showWidgetSystem" class="call-menu__widget-system">
+            <div class="call-menu__pinned-scroll">
+              <CallMenuSlotRow
+                v-for="item in visibleSlotItems"
+                :key="'slot-' + item.index + '-' + String(item.slotId)"
+                :index="item.index"
+                :slot-id="item.slotId"
+                :arrange-mode="paletteArrangeMode"
+                :drop-highlight="slotDropHighlightIndex === item.index"
+                :grip-title="
+                  item.slotId
+                    ? 'Перетащить или двойной клик — снять: ' +
+                      labelFor(item.slotId)
+                    : ''
+                "
+                @dragover="(e, i) => onSlotDragOver(e, i)"
+                @drop="(e, i) => onDropOnSlot(e, i)"
+                @dragstart-from-slot="(e, id, i) => onDragFromSlot(e, id, i)"
+                @grip-dblclick="(i, id) => onSlotGripDblClick(i, id)"
+              >
+                <template v-if="item.slotId" #widget>
+                  <slot :name="widgetSlotName(item.slotId)" />
+                </template>
+              </CallMenuSlotRow>
+            </div>
 
-          <CallMenuPaletteOpener
-            :title="paletteOpenerTitle"
-            unpin-title="Снять с панели"
-            :palette-open="paletteOpen"
-            :unpin-hover="paletteOpenerUnpinHover"
-            @click="onPaletteOpenerClick"
-            @dragover="onPaletteOpenerDragOver"
-            @dragleave="onPaletteOpenerDragLeave"
-            @drop="onPaletteOpenerDrop"
-          />
+            <CallMenuPaletteOpener
+              :title="paletteOpenerTitle"
+              unpin-title="Снять с панели"
+              :palette-open="paletteOpen"
+              :unpin-hover="paletteOpenerUnpinHover"
+              @click="onPaletteOpenerClick"
+              @dragover="onPaletteOpenerDragOver"
+              @dragleave="onPaletteOpenerDragLeave"
+              @drop="onPaletteOpenerDrop"
+            />
+          </div>
         </div>
-      </div>
-      <div v-if="$slots.replica" class="call-menu__replica">
-        <slot name="replica" />
       </div>
     </div>
 
@@ -173,20 +178,33 @@ const menuClass = toRef(props, "menuClass");
 .call-menu__bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  grid-template-areas: "left center right";
+  grid-template-areas: "sideL center sideR";
   align-items: center;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
 
-.call-menu__bar--has-replica {
-  grid-template-areas: "left replica center right";
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+.call-menu__side {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.call-menu__side--left {
+  grid-area: sideL;
+  justify-self: start;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.call-menu__side--right {
+  grid-area: sideR;
+  justify-self: end;
+  justify-content: flex-end;
 }
 
 .call-menu__bar :deep(.left) {
-  grid-area: left;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -208,23 +226,21 @@ const menuClass = toRef(props, "menuClass");
 }
 
 .call-menu__bar :deep(.right) {
-  grid-area: right;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  justify-self: end;
   gap: 12px;
   padding: 14px 18px;
   min-width: 0;
 }
 
 .call-menu__replica {
-  grid-area: replica;
   display: flex;
   align-items: center;
   min-width: 0;
   max-width: 280px;
-  padding: 14px 12px 14px 8px;
+  flex: 1 1 auto;
+  padding: 14px 18px 14px 8px;
   box-sizing: border-box;
 }
 
@@ -289,14 +305,26 @@ const menuClass = toRef(props, "menuClass");
     row-gap: 8px;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-areas:
-      "left center right"
+      "sideL center sideR"
       "replica replica replica";
   }
 
-  .call-menu__replica {
+  .call-menu__bar--has-replica .call-menu__side--left {
+    display: contents;
+  }
+
+  .call-menu__bar--has-replica :deep(.left) {
+    grid-area: sideL;
+    justify-self: start;
+  }
+
+  .call-menu__bar--has-replica .call-menu__replica {
+    grid-area: replica;
     max-width: none;
     width: 100%;
-    padding: 0 18px 10px;
+    flex: none;
+    padding: 0 18px 8px;
+    box-sizing: border-box;
   }
 }
 
@@ -313,13 +341,17 @@ const menuClass = toRef(props, "menuClass");
     column-gap: 4px;
     row-gap: 8px;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-areas: "left center right";
+    grid-template-areas: "sideL center sideR";
   }
 
   .call-menu__bar--has-replica {
     grid-template-areas:
       "replica replica replica"
-      "left center right";
+      "sideL center sideR";
+  }
+
+  .call-menu__side--right {
+    display: contents;
   }
 
   .call-menu__bar :deep(.left) {
@@ -341,6 +373,8 @@ const menuClass = toRef(props, "menuClass");
   }
 
   .call-menu__bar :deep(.right) {
+    grid-area: sideR;
+    justify-self: end;
     justify-content: flex-end;
     padding: 0;
     gap: 6px;
@@ -350,7 +384,7 @@ const menuClass = toRef(props, "menuClass");
   .call-menu__replica {
     max-width: none;
     width: 100%;
-    padding: 0 2px 2px;
+    padding: 0;
   }
 
   .call-menu__bar :deep(.button) {

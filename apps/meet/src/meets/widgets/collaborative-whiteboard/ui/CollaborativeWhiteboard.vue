@@ -1187,12 +1187,12 @@ onBeforeUnmount(() => {
 
 .collab-whiteboard--embedded {
   border: none;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   width: 100%;
-  height: auto;
-  max-height: none;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .collab-whiteboard__toolbar {
@@ -1304,9 +1304,9 @@ onBeforeUnmount(() => {
 }
 
 .collab-whiteboard__surface-slot--embedded {
-  flex: 0 0 auto;
-  min-height: unset;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
 }
@@ -1314,10 +1314,11 @@ onBeforeUnmount(() => {
 .collab-whiteboard__surface {
   position: relative;
   flex: 0 0 auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
   width: 100%;
   max-width: 100%;
   height: auto;
+  max-height: 100%;
   aspect-ratio: 376 / 444;
   box-sizing: border-box;
   touch-action: none;
@@ -1326,6 +1327,13 @@ onBeforeUnmount(() => {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+.collab-whiteboard__surface-slot--embedded .collab-whiteboard__surface {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .collab-whiteboard__surface--eraser {
