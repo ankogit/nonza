@@ -1752,18 +1752,48 @@ function handleModalClose() {
 }
 
 @media (min-width: 768px) {
+  .round-table-content {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .round-table-content > .call-grid {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
   .round-table-collab {
     width: 400px;
+    flex: 0 0 400px;
+    align-self: stretch;
+    max-height: none;
+    height: auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   }
 
   .round-table-document {
     width: 100%;
-    margin-bottom: 0px;
-    max-height: calc(50vh - 60px);
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-height: 280px;
+    max-height: none;
   }
 
-  .round-table-content {
-    flex-direction: row;
+  .round-table-table-chat,
+  .round-table-table-dice {
+    flex: 1 1 auto;
+    min-height: 240px;
+    max-height: none;
+  }
+
+  .round-table-whiteboard,
+  .round-table-soundbar {
+    flex: 0 1 auto;
+    min-height: 0;
   }
 }
 

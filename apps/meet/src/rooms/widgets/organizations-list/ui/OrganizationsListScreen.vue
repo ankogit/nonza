@@ -19,46 +19,54 @@
         </div>
       </header>
 
-      <div v-if="loading" class="organizations-list__grid">
-        <div
-          v-for="i in 6"
-          :key="i"
-          class="organizations-list__skeleton-tile"
-          :class="`organizations-list__skeleton-tile--${tileVariants[(i - 1) % tileVariants.length]}`"
-        >
-          <Skeleton variant="text" width="36%" :height="10" />
-          <div class="organizations-list__skeleton-spacer" />
-          <Skeleton variant="text" width="72%" :height="22" />
-          <Skeleton variant="text" width="48%" :height="12" />
-        </div>
-      </div>
-      <div v-else-if="!organizations.length" class="organizations-list__empty">
-        <MetroTile
-          variant="dark"
-          size="wide"
-          kicker="пусто"
-          title="Нет организаций"
-          mark="?"
-        >
-          <p class="organizations-list__empty-text">
-            Создайте первую организацию или дождитесь приглашения.
-          </p>
-        </MetroTile>
-      </div>
-      <div v-else class="organizations-list__grid">
-        <MetroTile
-          v-for="(org, index) in organizations"
-          :key="org.id"
-          clickable
-          size="rect"
-          :variant="tileVariants[index % tileVariants.length]"
-          kicker="организация"
-          :title="org.name"
-          :subtitle="org.description || undefined"
-          :mark="orgLetter(org.name)"
-          foot="открыть →"
-          @click="$emit('select', org)"
-        />
+      <div class="organizations-list__stage">
+        <Transition name="soft-fade" mode="out-in">
+          <div v-if="loading" key="loading" class="organizations-list__grid">
+            <div
+              v-for="i in 6"
+              :key="i"
+              class="organizations-list__skeleton-tile"
+              :class="`organizations-list__skeleton-tile--${tileVariants[(i - 1) % tileVariants.length]}`"
+            >
+              <Skeleton variant="text" width="36%" :height="10" />
+              <div class="organizations-list__skeleton-spacer" />
+              <Skeleton variant="text" width="72%" :height="22" />
+              <Skeleton variant="text" width="48%" :height="12" />
+            </div>
+          </div>
+          <div
+            v-else-if="!organizations.length"
+            key="empty"
+            class="organizations-list__empty"
+          >
+            <MetroTile
+              variant="dark"
+              size="wide"
+              kicker="пусто"
+              title="Нет организаций"
+              mark="?"
+            >
+              <p class="organizations-list__empty-text">
+                Создайте первую организацию или дождитесь приглашения.
+              </p>
+            </MetroTile>
+          </div>
+          <div v-else key="list" class="organizations-list__grid">
+            <MetroTile
+              v-for="(org, index) in organizations"
+              :key="org.id"
+              clickable
+              size="rect"
+              :variant="tileVariants[index % tileVariants.length]"
+              kicker="организация"
+              :title="org.name"
+              :subtitle="org.description || undefined"
+              :mark="orgLetter(org.name)"
+              foot="открыть →"
+              @click="$emit('select', org)"
+            />
+          </div>
+        </Transition>
       </div>
 
       <p class="organizations-list__row-label">Действия</p>
@@ -276,6 +284,12 @@ function orgLetter(name: string): string {
 
 .organizations-list__row-label:first-of-type {
   margin-top: 2.75rem;
+}
+
+.organizations-list__stage {
+  position: relative;
+  z-index: 1;
+  min-height: 228px;
 }
 
 .organizations-list__grid {
@@ -525,5 +539,19 @@ function orgLetter(name: string): string {
   .organizations-list__brand-block {
     align-items: center;
   }
+
+  .organizations-list__stage {
+    min-height: 212px;
+  }
+}
+
+.soft-fade-enter-active,
+.soft-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.soft-fade-enter-from,
+.soft-fade-leave-to {
+  opacity: 0;
 }
 </style>

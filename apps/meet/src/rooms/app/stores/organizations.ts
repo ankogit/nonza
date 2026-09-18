@@ -5,7 +5,7 @@ import type { OrganizationApi } from "@shared/entities";
 
 export const useOrganizationsStore = defineStore("organizations", () => {
   const list = ref<Organization[]>([]);
-  const loading = ref(false);
+  const loading = ref(true);
   const selectedId = ref<string | null>(null);
 
   const organizations = computed(() => list.value);
@@ -51,6 +51,12 @@ export const useOrganizationsStore = defineStore("organizations", () => {
     selectedId.value = null;
   }
 
+  function reset() {
+    list.value = [];
+    selectedId.value = null;
+    loading.value = true;
+  }
+
   return {
     organizations,
     loading,
@@ -61,5 +67,6 @@ export const useOrganizationsStore = defineStore("organizations", () => {
     addOrganization,
     updateOrganization,
     clearSelected,
+    reset,
   };
 });

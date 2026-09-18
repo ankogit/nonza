@@ -5,6 +5,7 @@
       'rooms-app--scroll-root': isScrollRootPage,
       'rooms-app--drawer-open': sidebarDrawerOpen && isMainView,
       'rooms-app--with-titlebar': isTauriDesktop(),
+      'rooms-app--in-room': Boolean(appStore.roomCode && isAuthenticated()),
     }"
   >
     <header v-if="isTauriDesktop()" class="app-titlebar" data-tauri-drag-region>
@@ -33,7 +34,7 @@
     </div>
     <div
       v-else-if="appStore.roomCode && isAuthenticated()"
-      class="rooms-app__room"
+      class="rooms-app__room rooms-app__view"
     >
       <NonzaWidget
         :api-client="apiClient"
@@ -105,7 +106,7 @@
     <div v-else-if="appStore.page === 'settings'" class="rooms-app__content rooms-app__content--auth-form">
       <SettingsScreen @back="goToOrganizations" @logout="handleLogout" />
     </div>
-    <main v-else-if="isAuthenticated()" class="container border-radius-app">
+    <main v-else-if="isAuthenticated()" class="container border-radius-app rooms-app__view">
       <div
         v-if="isMainView && sidebarDrawerOpen"
         class="rooms-app__drawer-overlay"
@@ -146,15 +147,23 @@
           "
         />
       </aside>
-      <OrgScreen
-        v-if="selectedOrgId"
-        :api-client="apiClient"
-        :org-id="selectedOrgId"
-        class="container__org"
-        @settings="handleGoSettings"
-        @org-settings="handleOrgSettings"
-        @back="handleOrgBack"
-      />
+      <Suspense v-if="selectedOrgId">
+        <OrgScreen
+          :api-client="apiClient"
+          :org-id="selectedOrgId"
+          class="container__org"
+          @settings="handleGoSettings"
+          @org-settings="handleOrgSettings"
+          @back="handleOrgBack"
+        />
+        <template #fallback>
+          <div class="container__org rooms-app__surface-boot" aria-busy="true">
+            <div class="rooms-app__surface-boot-bar" />
+            <div class="rooms-app__surface-boot-bar rooms-app__surface-boot-bar--short" />
+            <div class="rooms-app__surface-boot-bar" />
+          </div>
+        </template>
+      </Suspense>
       <div v-else class="vert-container vert-container--list">
         <OrganizationsListScreen
           :organizations="organizations"
@@ -264,6 +273,9 @@ import {
 } from "@shared/ui";
 import OrgPanel from "@rooms/widgets/org-panel/ui/OrgPanel.vue";
 import NonzaWidget from "@app/NonzaWidget.vue";
+import LoginScreen from "@rooms/widgets/login-screen/ui/LoginScreen.vue";
+import RegisterScreen from "@rooms/widgets/register-screen/ui/RegisterScreen.vue";
+import OrganizationsListScreen from "@rooms/widgets/organizations-list/ui/OrganizationsListScreen.vue";
 import {
   getAuthHeaders,
   clearAuth,
@@ -284,15 +296,9 @@ import {
 } from "@shared/lib";
 import { useAppStore, useOrganizationsStore } from "@rooms/app/stores";
 
-const LoginScreen = defineAsyncComponent(
-  () => import("@rooms/widgets/login-screen/ui/LoginScreen.vue"),
-);
 const OAuthAuthorizeScreen = defineAsyncComponent(
   () =>
     import("@rooms/widgets/oauth-authorize-screen/ui/OAuthAuthorizeScreen.vue"),
-);
-const RegisterScreen = defineAsyncComponent(
-  () => import("@rooms/widgets/register-screen/ui/RegisterScreen.vue"),
 );
 const InviteScreen = defineAsyncComponent(
   () => import("@rooms/widgets/invite-screen/ui/InviteScreen.vue"),
@@ -315,10 +321,6 @@ const OrganizationSoundbarScreen = defineAsyncComponent(
 const OrgScreen = defineAsyncComponent(
   () => import("@rooms/widgets/org-screen/ui/OrgScreen.vue"),
 );
-const OrganizationsListScreen = defineAsyncComponent(
-  () =>
-    import("@rooms/widgets/organizations-list/ui/OrganizationsListScreen.vue"),
-);
 
 const apiBaseURL = getApiBaseURL();
 const livekitURL = getLivekitURL();
@@ -334,7 +336,7 @@ const apiClient = new ApiClient({
     appStore.setRoomCode(null);
     appStore.setPage("login");
     appStore.clearInviteAndPending();
-    orgStore.clearSelected();
+    orgStore.reset();
     replaceState();
   },
 });
@@ -446,13 +448,29 @@ function parseRoute() {
   showOrgSettingsModal.value = false;
   showOrgSoundbarModal.value = false;
   if (p === "login") {
-    appStore.setPage("login");
-    appStore.setInviteToken(null);
-    orgStore.clearSelected();
+    if (isAuthenticated()) {
+      appStore.setPage("organizations");
+      appStore.setInviteToken(null);
+      orgStore.clearSelected();
+      replaceState();
+      loadOrganizations();
+    } else {
+      appStore.setPage("login");
+      appStore.setInviteToken(null);
+      orgStore.clearSelected();
+    }
   } else if (p === "register") {
-    appStore.setPage("register");
-    appStore.setInviteToken(null);
-    orgStore.clearSelected();
+    if (isAuthenticated()) {
+      appStore.setPage("organizations");
+      appStore.setInviteToken(null);
+      orgStore.clearSelected();
+      replaceState();
+      loadOrganizations();
+    } else {
+      appStore.setPage("register");
+      appStore.setInviteToken(null);
+      orgStore.clearSelected();
+    }
   } else if (p === "invite" && token) {
     appStore.setPage("invite");
     appStore.setInviteToken(token);
@@ -606,7 +624,7 @@ function handleLogout() {
   appStore.setRoomCode(null);
   appStore.setPage("login");
   appStore.clearInviteAndPending();
-  orgStore.clearSelected();
+  orgStore.reset();
   replaceState();
   syncAppMenu();
 }
@@ -757,6 +775,17 @@ onMounted(async () => {
     return;
   }
   if (
+    isAuthenticated() &&
+    (appStore.page === "login" || appStore.page === "register")
+  ) {
+    appStore.setPage("organizations");
+    appStore.setInviteToken(null);
+    orgStore.clearSelected();
+    replaceState();
+    loadOrganizations();
+    return;
+  }
+  if (
     !isAuthenticated() &&
     appStore.page === "invite" &&
     !appStore.inviteToken
@@ -811,6 +840,62 @@ onUnmounted(() => {
   min-height: 100vh;
   align-items: stretch;
   justify-content: flex-start;
+  transition: padding 0.2s ease;
+}
+
+.rooms-app--in-room {
+  padding: 0 !important;
+}
+
+.rooms-app__view {
+  animation: rooms-soft-in 0.22s ease both;
+}
+
+.rooms-app__surface-boot {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 20px;
+  background: #14141490;
+}
+
+.rooms-app__surface-boot-bar {
+  height: 56px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.04)
+  );
+  background-size: 200% 100%;
+  animation: rooms-shimmer 1.1s linear infinite;
+}
+
+.rooms-app__surface-boot-bar--short {
+  width: 62%;
+  height: 40px;
+}
+
+@keyframes rooms-soft-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rooms-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 .rooms-app--scroll-root {

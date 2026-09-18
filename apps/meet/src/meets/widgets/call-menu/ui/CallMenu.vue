@@ -16,13 +16,8 @@
       class="call-menu__bar"
       :class="{ 'call-menu__bar--has-replica': Boolean($slots.replica) }"
     >
-      <div class="call-menu__start">
-        <div class="left">
-          <slot name="left" />
-        </div>
-        <div v-if="$slots.replica" class="call-menu__replica">
-          <slot name="replica" />
-        </div>
+      <div class="left">
+        <slot name="left" />
       </div>
       <div class="center">
         <slot name="center">
@@ -73,6 +68,9 @@
             @drop="onPaletteOpenerDrop"
           />
         </div>
+      </div>
+      <div v-if="$slots.replica" class="call-menu__replica">
+        <slot name="replica" />
       </div>
     </div>
 
@@ -175,55 +173,58 @@ const menuClass = toRef(props, "menuClass");
 .call-menu__bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "left center right";
   align-items: center;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
 
-.call-menu__start {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  justify-self: start;
+.call-menu__bar--has-replica {
+  grid-template-areas: "left replica center right";
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
-.call-menu__bar :deep(.left),
-.call-menu__bar :deep(.right),
-.call-menu__bar :deep(.center) {
+.call-menu__bar :deep(.left) {
+  grid-area: left;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  padding-right: 0;
+  min-width: 0;
+}
+
+.call-menu__bar :deep(.center) {
+  grid-area: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 12px;
+  padding: 14px 8px;
+  min-width: 0;
+}
+
+.call-menu__bar :deep(.right) {
+  grid-area: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
   gap: 12px;
   padding: 14px 18px;
   min-width: 0;
 }
 
-.call-menu__bar :deep(.left) {
-  justify-content: flex-start;
-  flex: 0 0 auto;
-  padding-right: 0;
-}
-
-.call-menu__bar :deep(.center) {
-  justify-content: center;
-  justify-self: center;
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
-.call-menu__bar :deep(.right) {
-  justify-content: flex-end;
-  justify-self: end;
-}
-
 .call-menu__replica {
+  grid-area: replica;
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
   min-width: 0;
   max-width: 280px;
-  padding: 14px 18px 14px 0;
+  padding: 14px 12px 14px 8px;
   box-sizing: border-box;
 }
 
@@ -286,34 +287,16 @@ const menuClass = toRef(props, "menuClass");
 @media (max-width: 1270px) {
   .call-menu__bar--has-replica {
     row-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-areas:
-      "start center right"
+      "left center right"
       "replica replica replica";
   }
 
-  .call-menu__bar--has-replica .call-menu__start {
-    display: contents;
-  }
-
-  .call-menu__bar--has-replica :deep(.left) {
-    grid-area: start;
-    padding-right: 18px;
-  }
-
-  .call-menu__bar--has-replica :deep(.center) {
-    grid-area: center;
-  }
-
-  .call-menu__bar--has-replica :deep(.right) {
-    grid-area: right;
-  }
-
-  .call-menu__bar--has-replica .call-menu__replica {
-    grid-area: replica;
-    flex: none;
+  .call-menu__replica {
     max-width: none;
     width: 100%;
-    padding: 0 18px 14px;
+    padding: 0 18px 10px;
   }
 }
 
@@ -329,23 +312,18 @@ const menuClass = toRef(props, "menuClass");
   .call-menu__bar {
     column-gap: 4px;
     row-gap: 8px;
-    grid-template-areas: "start center right";
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "left center right";
   }
 
   .call-menu__bar--has-replica {
     grid-template-areas:
-      "start center right"
-      "replica replica replica";
-  }
-
-  .call-menu__start {
-    display: contents;
+      "replica replica replica"
+      "left center right";
   }
 
   .call-menu__bar :deep(.left) {
-    grid-area: start;
     justify-content: flex-start;
-    flex: none;
     padding: 0;
     gap: 6px;
     overflow-x: auto;
@@ -358,13 +336,11 @@ const menuClass = toRef(props, "menuClass");
   }
 
   .call-menu__bar :deep(.center) {
-    grid-area: center;
     padding: 0;
     gap: 6px;
   }
 
   .call-menu__bar :deep(.right) {
-    grid-area: right;
     justify-content: flex-end;
     padding: 0;
     gap: 6px;
@@ -372,11 +348,9 @@ const menuClass = toRef(props, "menuClass");
   }
 
   .call-menu__replica {
-    grid-area: replica;
-    flex: none;
     max-width: none;
     width: 100%;
-    padding: 0;
+    padding: 0 2px 2px;
   }
 
   .call-menu__bar :deep(.button) {
@@ -388,9 +362,16 @@ const menuClass = toRef(props, "menuClass");
     flex-shrink: 0;
   }
 
+  .call-menu__replica :deep(.replica-input) {
+    width: 100%;
+  }
+
   .call-menu__replica :deep(.replica-input__field) {
     width: auto;
+    flex: 1 1 auto;
     height: 44px;
+    min-width: 0;
+    font-size: 16px;
   }
 
   .call-menu__replica :deep(.replica-input__btn) {
@@ -398,26 +379,33 @@ const menuClass = toRef(props, "menuClass");
     height: 44px !important;
     min-width: 44px !important;
     min-height: 44px !important;
+    flex-shrink: 0;
   }
 
   .call-menu__widget-system {
     gap: 6px;
   }
 
+  .call-menu__widget-system :deep(.button) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .call-menu__pinned-scroll {
-    max-width: min(40vw, 160px);
-    gap: 6px;
+    max-width: min(42vw, 200px);
+    gap: 4px;
   }
 }
 
 @media (max-width: 480px) {
   .call-menu {
-    padding: 6px 4px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom, 0));
+    padding-top: 6px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
   }
 
-  .call-menu__bar {
-    column-gap: 2px;
+  .call-menu__bar--has-replica {
     row-gap: 6px;
   }
 
@@ -446,7 +434,7 @@ const menuClass = toRef(props, "menuClass");
   }
 
   .call-menu__pinned-scroll {
-    max-width: min(34vw, 130px);
+    max-width: min(36vw, 160px);
   }
 }
 </style>

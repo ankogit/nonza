@@ -1,37 +1,81 @@
 <template>
-  <div class="nonza-widget" :class="{ 'nonza-widget--connected': isConnected }">
-    <div v-if="isReconnecting" class="nonza-widget__reconnecting">
-      <div class="meets-entry meets-entry--status">
-        <header class="meets-entry__header">
-          <h1 class="meets-entry__heading">Nonza</h1>
-        </header>
-        <MetroTile
-          size="wide"
-          variant="gold"
-          mark="…"
-          class="meets-entry__tile meets-entry__status"
-        >
-          <template #title>Переподключение</template>
-          <p class="meets-entry__lead">
-            Соединение с комнатой было потеряно.
-          </p>
-          <Button
-            type="text"
-            variant="accent"
-            size="large"
-            :disabled="isConnecting"
-            class="meets-entry__cta"
-            @click="handleReconnect"
-          >
-            {{ isConnecting ? "Подключение..." : "Переподключиться" }}
-          </Button>
-          <div v-if="connectionState.error" class="nonza-widget__error">
-            {{ connectionState.error }}
-          </div>
-        </MetroTile>
+  <div
+    class="nonza-widget"
+    :class="{ 'nonza-widget--connected': showRoomSurface }"
+  >
+    <Transition name="soft-fade">
+      <div
+        v-if="showRoomSurface"
+        key="room"
+        class="nonza-widget__room"
+      >
+        <ConnectedRoomView
+          ref="connectedRoomViewRef"
+          :key="`${currentRoom?.id ?? ''}-${displayRoomType ?? 'unknown'}`"
+          :room="currentRoom!"
+          :display-room-type="displayRoomType"
+          :room-api="roomApi"
+          :livekit-room="connectionState.livekitRoom!"
+          :local-participant="localParticipant"
+          :remote-participants="remoteParticipants"
+          :get-display-name="getDisplayName"
+          :participant-name="displayParticipantName"
+          :api-base-u-r-l="props.apiBaseURL"
+          :show-document="displayRoomType != null"
+          :hide-sidebar="hideSidebar"
+          :update-participant-name="updateParticipantName"
+          @disconnect="handleDisconnect"
+          @update:participantName="onUpdateParticipantName"
+          @update:participants="(list) => (participantsFromView = list)"
+        />
       </div>
-    </div>
-    <div v-else-if="!isConnected" class="nonza-widget__connect">
+    </Transition>
+
+    <Transition name="soft-fade">
+      <div
+        v-if="isReconnecting"
+        key="reconnecting"
+        class="nonza-widget__reconnecting"
+        :class="{ 'nonza-widget__reconnecting--overlay': showRoomSurface }"
+      >
+        <div class="meets-entry meets-entry--status">
+          <header class="meets-entry__header">
+            <h1 class="meets-entry__heading">Nonza</h1>
+          </header>
+          <MetroTile
+            size="wide"
+            variant="gold"
+            mark="…"
+            class="meets-entry__tile meets-entry__status"
+          >
+            <template #title>Переподключение</template>
+            <p class="meets-entry__lead">
+              Соединение с комнатой было потеряно.
+            </p>
+            <Button
+              type="text"
+              variant="accent"
+              size="large"
+              :disabled="isConnecting"
+              class="meets-entry__cta"
+              @click="handleReconnect"
+            >
+              {{ isConnecting ? "Подключение..." : "Переподключиться" }}
+            </Button>
+            <div v-if="connectionState.error" class="nonza-widget__error">
+              {{ connectionState.error }}
+            </div>
+          </MetroTile>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition name="soft-fade">
+      <div
+        v-if="!isConnected && !isReconnecting"
+        key="connect"
+        class="nonza-widget__connect"
+      >
       <template v-if="entryMode === 'by_selection'">
         <div v-if="!passwordRequired" class="meets-entry meets-entry--status">
           <header class="meets-entry__header">
@@ -261,32 +305,8 @@
           <div v-if="error" class="nonza-widget__error">{{ error }}</div>
         </form>
       </template>
-    </div>
-
-    <div
-      v-else-if="currentRoom && connectionState.livekitRoom"
-      class="nonza-widget__room"
-    >
-      <ConnectedRoomView
-        ref="connectedRoomViewRef"
-        :key="`${currentRoom?.id ?? ''}-${displayRoomType ?? 'unknown'}`"
-        :room="currentRoom"
-        :display-room-type="displayRoomType"
-        :room-api="roomApi"
-        :livekit-room="connectionState.livekitRoom"
-        :local-participant="localParticipant"
-        :remote-participants="remoteParticipants"
-        :get-display-name="getDisplayName"
-        :participant-name="displayParticipantName"
-        :api-base-u-r-l="props.apiBaseURL"
-        :show-document="displayRoomType != null"
-        :hide-sidebar="hideSidebar"
-        :update-participant-name="updateParticipantName"
-        @disconnect="handleDisconnect"
-        @update:participantName="onUpdateParticipantName"
-        @update:participants="(list) => (participantsFromView = list)"
-      />
-    </div>
+      </div>
+    </Transition>
 
     <Modal
       :model-value="entryMode === 'by_selection' && passwordRequired"
@@ -469,6 +489,10 @@ const displayRoomType = computed(() => {
 const isConnecting = computed(() => connectionState.value.isConnecting);
 const isConnected = computed(() => connectionState.value.isConnected);
 const isReconnecting = computed(() => connectionState.value.isReconnecting);
+const showRoomSurface = computed(
+  () =>
+    Boolean(currentRoom.value && connectionState.value.livekitRoom),
+);
 
 function isNotFoundError(msg: string): boolean {
   return /404|not found|не найдена/i.test(msg);
@@ -776,6 +800,7 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
   background: #1a1a1a;
   color: white;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -807,6 +832,15 @@ onMounted(() => {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   box-sizing: border-box;
+}
+
+.nonza-widget__reconnecting--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  flex: none;
+  background: rgba(20, 20, 20, 0.72);
+  backdrop-filter: blur(4px);
 }
 
 .meets-entry {
@@ -1199,6 +1233,24 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+
+.soft-fade-enter-active,
+.soft-fade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.soft-fade-enter-from,
+.soft-fade-leave-to {
+  opacity: 0;
+}
+
+.soft-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  pointer-events: none;
 }
 
 @media (max-width: 720px) {
