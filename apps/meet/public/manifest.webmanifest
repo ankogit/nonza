@@ -1,0 +1,58 @@
+{
+  "id": "/",
+  "name": "Nonza",
+  "short_name": "Nonza",
+  "description": "Видеозвонки и комнаты Nonza",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "categories": ["business", "productivity", "social"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/pwa/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Открыть Nonza",
+      "short_name": "Nonza",
+      "description": "Открыть приложение",
+      "url": "/?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icons/pwa/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
