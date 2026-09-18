@@ -30,11 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg",
-      "msi"
-    ],
+    "targets": ["app", "dmg", "msi"],
     "createUpdaterArtifacts": true,
     "macOS": {
       "entitlements": "entitlements.plist",
@@ -55,15 +51,11 @@
         }
       }
     },
-    "icon": [
-      "icons/32x32.ico",
-      "icons/icon.ico",
-      "icons/icon.png"
-    ]
+    "icon": ["icons/32x32.ico", "icons/icon.ico", "icons/icon.png"]
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4RjYzREZENUMyN0M2RjMKUlVUenhpZGMvVDMyYUlXcUhmc2tDRERSVDVXTXVDbi9wKzd5YTUxYkhYYUhHWUowamVWSHpKMkMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5cGxBV3UyWXVkRm1CRGttT1pNSTRML0Zka1MvekVsUThDbUQxUUNJeS85c0FBQkFBQUFBQUFBQUFBQUlBQUFBQW9sdlBFSTZuS1haVktLL1hDV1g3N0VZQjNOZHp4ai83OE1tdFlmcUdMQS9jTjVJM1l2OXBnOU0xeE8vMk94NDAxK281dnRnZjg5Z2JLdkc0QTFJd2xaZmtKa1hqUGkyUVZYcjRLTUZ5Uk44WWpaVVpvK3piSzlUNSt4TmNoa01WS2J1cFlBNkVobFU9Cg==",
       "endpoints": [
         "https://github.com/ankogit/nonza/releases/latest/download/latest.json"
       ]
