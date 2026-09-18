@@ -147,7 +147,7 @@ import { inject, ref } from "vue";
 import { MetroTile, Skeleton, PixelIcon } from "@shared/ui";
 import type { MetroTileVariant } from "@shared/ui";
 import type { Organization } from "@shared/entities";
-import { getApiBaseURL } from "@shared/lib";
+import { getDesktopDownloadUrl } from "@shared/lib";
 import { ReportBugModal } from "@rooms/features/report-bug";
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
@@ -163,8 +163,7 @@ const tileVariants: MetroTileVariant[] = [
 ];
 
 function downloadUrl(platform: "windows" | "macos"): string {
-  const base = getApiBaseURL().replace(/\/$/, "");
-  return `${base}/api/v1/desktop-download/${platform}`;
+  return getDesktopDownloadUrl(platform);
 }
 
 defineProps<{

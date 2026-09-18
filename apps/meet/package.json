@@ -20,11 +20,11 @@
   "scripts": {
     "dev": "vite",
     "dev:rooms": "vite --mode rooms",
-    "dev:tauri": "node scripts/patch-tauri-update-url.js && tauri dev",
+    "dev:tauri": "tauri dev",
     "build": "vue-tsc && vite build",
     "build:app": "vue-tsc && vite build --config vite.app.config.ts",
     "build:desktop": "vue-tsc && vite build --config vite.app.config.ts --mode rooms",
-    "build:tauri": "node scripts/patch-tauri-update-url.js",
+    "build:tauri": "tauri build",
     "preview": "vite preview",
     "tauri": "tauri",
     "type-check": "vue-tsc --noEmit",

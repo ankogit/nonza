@@ -25,6 +25,7 @@ export * from "./openCallInNewWindow";
 export * from "./external-links";
 export * from "./desktopShortcuts";
 export * from "./useAppUpdate";
+export * from "./desktopReleases";
 export * from "./output-mute";
 export * from "./dice";
 export * from "./text-links";

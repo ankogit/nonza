@@ -5,7 +5,7 @@
       'rooms-app--scroll-root': isScrollRootPage,
       'rooms-app--drawer-open': sidebarDrawerOpen && isMainView,
       'rooms-app--with-titlebar': isTauriDesktop(),
-      'rooms-app--in-room': Boolean(appStore.roomCode && isAuthenticated()),
+      'rooms-app--in-room': Boolean(appStore.roomCode && isAuthed),
     }"
   >
     <header v-if="isTauriDesktop()" class="app-titlebar" data-tauri-drag-region>
@@ -33,7 +33,7 @@
       </ScreenLayout>
     </div>
     <div
-      v-else-if="appStore.roomCode && isAuthenticated()"
+      v-else-if="appStore.roomCode && isAuthed"
       class="rooms-app__room rooms-app__view"
     >
       <NonzaWidget
@@ -68,7 +68,7 @@
       />
     </div>
     <div
-      v-else-if="appStore.page === 'login'"
+      v-else-if="appStore.page === 'login' && !isAuthed"
       class="rooms-app__content rooms-app__content--auth-form"
     >
       <LoginScreen
@@ -77,7 +77,7 @@
       />
     </div>
     <div
-      v-else-if="appStore.page === 'register'"
+      v-else-if="appStore.page === 'register' && !isAuthed"
       class="rooms-app__content rooms-app__content--auth-form"
     >
       <RegisterScreen
@@ -106,7 +106,7 @@
     <div v-else-if="appStore.page === 'settings'" class="rooms-app__content rooms-app__content--auth-form">
       <SettingsScreen @back="goToOrganizations" @logout="handleLogout" />
     </div>
-    <main v-else-if="isAuthenticated()" class="container border-radius-app rooms-app__view">
+    <main v-else-if="isAuthed" class="container border-radius-app rooms-app__view">
       <div
         v-if="isMainView && sidebarDrawerOpen"
         class="rooms-app__drawer-overlay"
@@ -280,6 +280,7 @@ import {
   getAuthHeaders,
   clearAuth,
   isAuthenticated,
+  useIsAuthenticated,
   refreshAccessToken,
   startProactiveRefreshScheduler,
   setAuth,
@@ -293,6 +294,8 @@ import {
   getStoredShortcuts,
   useAppOst,
   APP_OST_SRC,
+  useAppUpdate,
+  showToast,
 } from "@shared/lib";
 import { useAppStore, useOrganizationsStore } from "@rooms/app/stores";
 
@@ -353,6 +356,7 @@ const appStore = useAppStore();
 const orgStore = useOrganizationsStore();
 useMeetingShortcutListener();
 const { organizations, loading, selectedOrgId } = storeToRefs(orgStore);
+const isAuthed = useIsAuthenticated();
 
 const sidebarDrawerOpen = ref(false);
 const showSettingsModal = ref(false);
@@ -366,9 +370,9 @@ const shouldPlayOst = computed(() => {
   if (appStore.showReconnectScreen || appStore.roomCode) return false;
   if (appStore.page === "login" || appStore.page === "register") return true;
   if (appStore.page === "oauth-authorize") return false;
-  if (isAuthenticated() && appStore.page === "organizations") return true;
+  if (isAuthed.value && appStore.page === "organizations") return true;
   if (
-    !isAuthenticated() &&
+    !isAuthed.value &&
     appStore.page !== "invite" &&
     appStore.page !== "create-org" &&
     appStore.page !== "settings"
@@ -391,7 +395,7 @@ const ostIconName = computed(() =>
 
 const isMainView = computed(
   () =>
-    isAuthenticated() &&
+    isAuthed.value &&
     !appStore.showReconnectScreen &&
     !appStore.roomCode &&
     !["login", "register", "invite", "create-org", "settings", "oauth-authorize"].includes(
@@ -413,7 +417,7 @@ const isScrollRootPage = computed(
     appStore.page === "oauth-authorize" ||
     appStore.page === "create-org" ||
     appStore.page === "settings" ||
-    (!isAuthenticated() && !appStore.roomCode),
+    (!isAuthed.value && !appStore.roomCode),
 );
 
 function parseRoute() {
@@ -714,6 +718,10 @@ watch(
   replaceState,
 );
 
+watch(isAuthed, () => {
+  if (isTauriDesktop()) syncAppMenu();
+});
+
 function loadOrganizations() {
   orgStore.loadOrganizations(organizationApi);
 }
@@ -722,13 +730,6 @@ async function completeSocialLoginFromQuery(): Promise<boolean> {
   const params = new URLSearchParams(window.location.search);
   const ticket = params.get("social_ticket")?.trim();
   if (!ticket) return false;
-  params.delete("social_ticket");
-  const qs = params.toString();
-  window.history.replaceState(
-    null,
-    "",
-    `${window.location.pathname}${qs ? `?${qs}` : ""}`,
-  );
   try {
     const authApi = new AuthApi(new ApiClient({ baseURL: apiBaseURL }));
     const res = await authApi.exchangeSocialTicket(ticket);
@@ -744,61 +745,83 @@ async function completeSocialLoginFromQuery(): Promise<boolean> {
       res.refresh_token,
       res.refresh_expires_at,
     );
+    params.delete("social_ticket");
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+    );
     return true;
   } catch {
+    params.delete("social_ticket");
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+    );
     return false;
   }
 }
 
-onMounted(async () => {
-  startProactiveRefreshScheduler(apiBaseURL);
-  window.addEventListener("keydown", onKeydown);
-  const socialLoggedIn = await completeSocialLoginFromQuery();
-  parseRoute();
-  if (socialLoggedIn) {
-    appStore.setPage("organizations");
-    appStore.setInviteToken(null);
-    orgStore.clearSelected();
-    replaceState();
-    loadOrganizations();
-    return;
+async function checkDesktopUpdateOnStartup() {
+  const { loadVersion, check, update } = useAppUpdate();
+  await loadVersion();
+  await check();
+  if (update.value) {
+    showToast(
+      `Доступно обновление ${update.value.version}. Настройки → Приложение.`,
+      { variant: "info", duration: 10000 },
+    );
   }
+}
+
+onMounted(async () => {
+  window.addEventListener("keydown", onKeydown);
   if (isTauriDesktop()) {
     document.documentElement.classList.add("nonza-desktop");
     syncAppMenu();
+    void checkDesktopUpdateOnStartup();
   }
-  const publicPages = ["login", "register", "invite", "oauth-authorize"];
-  if (!isAuthenticated() && !publicPages.includes(appStore.page)) {
+  const socialLoggedIn = await completeSocialLoginFromQuery();
+  startProactiveRefreshScheduler(apiBaseURL);
+  if (socialLoggedIn) {
     appStore.setRoomCode(null);
-    appStore.setPage("login");
-    replaceState();
-    return;
-  }
-  if (
-    isAuthenticated() &&
-    (appStore.page === "login" || appStore.page === "register")
-  ) {
-    appStore.setPage("organizations");
     appStore.setInviteToken(null);
     orgStore.clearSelected();
+    appStore.setPage("organizations");
     replaceState();
     loadOrganizations();
-    return;
-  }
-  if (
-    !isAuthenticated() &&
-    appStore.page === "invite" &&
-    !appStore.inviteToken
-  ) {
-    appStore.setPage("login");
-    replaceState();
-    return;
-  }
-  if (
-    appStore.page === "organizations" ||
-    (appStore.page === "org" && orgStore.selectedOrgId)
-  ) {
-    loadOrganizations();
+  } else {
+    parseRoute();
+    const publicPages = ["login", "register", "invite", "oauth-authorize"];
+    if (!isAuthenticated() && !publicPages.includes(appStore.page)) {
+      appStore.setRoomCode(null);
+      appStore.setPage("login");
+      replaceState();
+    } else if (
+      isAuthenticated() &&
+      (appStore.page === "login" || appStore.page === "register")
+    ) {
+      appStore.setPage("organizations");
+      appStore.setInviteToken(null);
+      orgStore.clearSelected();
+      replaceState();
+      loadOrganizations();
+    } else if (
+      !isAuthenticated() &&
+      appStore.page === "invite" &&
+      !appStore.inviteToken
+    ) {
+      appStore.setPage("login");
+      replaceState();
+    } else if (
+      appStore.page === "organizations" ||
+      (appStore.page === "org" && orgStore.selectedOrgId)
+    ) {
+      loadOrganizations();
+    }
   }
   if (isTauriDesktop()) {
     import("@tauri-apps/api/event").then(({ listen }) => {

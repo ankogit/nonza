@@ -1,8 +1,11 @@
+import { computed, shallowRef, type ComputedRef } from "vue";
+
 const AUTH_STORAGE_KEY = "nonza_auth";
 const REFRESH_BEFORE_MS = 5 * 60 * 1000;
 
 let refreshTimerId: ReturnType<typeof setTimeout> | null = null;
 let apiBaseURLForRefresh = "";
+let hydrated = false;
 
 export interface AuthUser {
   id: string;
@@ -19,7 +22,7 @@ export interface AuthState {
   user: AuthUser;
 }
 
-let state: AuthState | null = null;
+const stateRef = shallowRef<AuthState | null>(null);
 
 function loadFromStorage(): AuthState | null {
   if (typeof window === "undefined") return null;
@@ -51,9 +54,15 @@ function saveToStorage(s: AuthState | null) {
   }
 }
 
+function hydrateFromStorage() {
+  if (hydrated) return;
+  hydrated = true;
+  stateRef.value = loadFromStorage();
+}
+
 export function getAuthState(): AuthState | null {
-  if (state === null) state = loadFromStorage();
-  return state;
+  hydrateFromStorage();
+  return stateRef.value;
 }
 
 export function setAuth(
@@ -63,14 +72,16 @@ export function setAuth(
   refreshToken?: string,
   refreshExpiresAt?: string,
 ) {
-  state = {
+  hydrateFromStorage();
+  const prev = stateRef.value;
+  stateRef.value = {
     accessToken,
     expiresAt,
-    refreshToken: refreshToken ?? state?.refreshToken ?? "",
-    refreshExpiresAt: refreshExpiresAt ?? state?.refreshExpiresAt ?? "",
+    refreshToken: refreshToken ?? prev?.refreshToken ?? "",
+    refreshExpiresAt: refreshExpiresAt ?? prev?.refreshExpiresAt ?? "",
     user,
   };
-  saveToStorage(state);
+  saveToStorage(stateRef.value);
   scheduleProactiveRefresh();
 }
 
@@ -106,15 +117,18 @@ export function startProactiveRefreshScheduler(baseURL: string): void {
 export function updateAuthUser(partial: Partial<AuthUser>) {
   const s = getAuthState();
   if (!s?.user) return;
-  s.user = { ...s.user, ...partial };
-  state = s;
-  saveToStorage(state);
+  stateRef.value = {
+    ...s,
+    user: { ...s.user, ...partial },
+  };
+  saveToStorage(stateRef.value);
 }
 
 export function clearAuth() {
   if (refreshTimerId) clearTimeout(refreshTimerId);
   refreshTimerId = null;
-  state = null;
+  hydrated = true;
+  stateRef.value = null;
   saveToStorage(null);
 }
 
@@ -141,7 +155,7 @@ export async function refreshAccessToken(baseURL: string): Promise<boolean> {
   const refresh = s?.refreshToken;
   if (!refresh) return false;
   if (s && isRefreshExpired(s)) {
-    clearAuth();
+    if (getAuthState()?.refreshToken === refresh) clearAuth();
     return false;
   }
   const url = `${baseURL.replace(/\/$/, "")}/api/v1/auth/refresh`;
@@ -152,10 +166,16 @@ export async function refreshAccessToken(baseURL: string): Promise<boolean> {
       body: JSON.stringify({ refresh_token: refresh }),
     });
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
+      if (
+        (res.status === 401 || res.status === 403) &&
+        getAuthState()?.refreshToken === refresh
+      ) {
         clearAuth();
       }
       return false;
+    }
+    if (getAuthState()?.refreshToken !== refresh) {
+      return true;
     }
     const data = (await res.json()) as {
       access_token: string;
@@ -164,6 +184,9 @@ export async function refreshAccessToken(baseURL: string): Promise<boolean> {
       refresh_expires_at: string;
       user: { id: string; email: string; name?: string; color?: string | null };
     };
+    if (getAuthState()?.refreshToken !== refresh) {
+      return true;
+    }
     setAuth(
       data.access_token,
       data.expires_at,
@@ -190,6 +213,19 @@ export function isAuthenticated(): boolean {
     return false;
   }
   return true;
+}
+
+export function useIsAuthenticated(): ComputedRef<boolean> {
+  hydrateFromStorage();
+  return computed(() => {
+    const current = stateRef.value;
+    if (!current) return false;
+    if (isRefreshExpired(current)) {
+      clearAuth();
+      return false;
+    }
+    return true;
+  });
 }
 
 export interface ParticipantInfo {

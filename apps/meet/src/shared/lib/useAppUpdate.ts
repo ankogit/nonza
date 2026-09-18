@@ -21,78 +21,76 @@ function isTauri(): boolean {
   );
 }
 
-export function useAppUpdate() {
-  const isTauriApp = isTauri();
-  const currentVersion = ref<string>("");
-  const checking = ref(false);
-  const update = shallowRef<AppUpdateInfo | null>(null);
-  const downloading = ref(false);
-  const error = ref<string | null>(null);
+const isTauriApp = isTauri();
+const currentVersion = ref<string>("");
+const checking = ref(false);
+const update = shallowRef<AppUpdateInfo | null>(null);
+const downloading = ref(false);
+const error = ref<string | null>(null);
 
-  async function loadVersion() {
-    if (!isTauriApp) return;
-    try {
-      const app = await import("@tauri-apps/api/app");
-      currentVersion.value = await app.getVersion();
-    } catch {
-      // ignore
-    }
+async function loadVersion() {
+  if (!isTauriApp) return;
+  try {
+    const app = await import("@tauri-apps/api/app");
+    currentVersion.value = await app.getVersion();
+  } catch {
+    // ignore
   }
+}
 
-  async function check() {
-    if (!isTauriApp) return;
-    checking.value = true;
-    error.value = null;
-    update.value = null;
-    try {
-      const { check: checkForUpdate } = await import(
-        "@tauri-apps/plugin-updater"
-      );
-      const result = await checkForUpdate();
-      if (result) {
-        update.value = {
-          version: result.version,
-          body: result.body ?? null,
-          date: result.date ?? null,
-          downloadAndInstall: result.downloadAndInstall.bind(result),
-        };
+async function check() {
+  if (!isTauriApp) return;
+  checking.value = true;
+  error.value = null;
+  update.value = null;
+  try {
+    const { check: checkForUpdate } = await import(
+      "@tauri-apps/plugin-updater"
+    );
+    const result = await checkForUpdate();
+    if (result) {
+      update.value = {
+        version: result.version,
+        body: result.body ?? null,
+        date: result.date ?? null,
+        downloadAndInstall: result.downloadAndInstall.bind(result),
+      };
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    error.value = message;
+  } finally {
+    checking.value = false;
+  }
+}
+
+async function install() {
+  const u = update.value;
+  if (!u || !isTauriApp) return;
+  downloading.value = true;
+  error.value = null;
+  try {
+    await u.downloadAndInstall((event) => {
+      if (
+        event &&
+        typeof event === "object" &&
+        "event" in event &&
+        event.event === "Finished"
+      ) {
+        // progress done
       }
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : String(e);
-      error.value = message;
-    } finally {
-      checking.value = false;
-    }
+    });
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    error.value = message;
+  } finally {
+    downloading.value = false;
   }
+}
 
-  async function install() {
-    const u = update.value;
-    if (!u || !isTauriApp) return;
-    downloading.value = true;
-    error.value = null;
-    try {
-      await u.downloadAndInstall((event) => {
-        if (
-          event &&
-          typeof event === "object" &&
-          "event" in event &&
-          event.event === "Finished"
-        ) {
-          // progress done
-        }
-      });
-      const { relaunch } = await import("@tauri-apps/plugin-process");
-      await relaunch();
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : String(e);
-      error.value = message;
-    } finally {
-      downloading.value = false;
-    }
-  }
-
+export function useAppUpdate() {
   return {
     isTauriApp,
     currentVersion,

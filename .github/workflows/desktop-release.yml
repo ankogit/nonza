@@ -1,0 +1,119 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            rust_targets: aarch64-apple-darwin
+            download_alias: Nonza-macos.dmg
+            download_glob: "*.dmg"
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+            rust_targets: x86_64-apple-darwin
+            download_alias: ""
+            download_glob: ""
+          - platform: windows-latest
+            args: ""
+            rust_targets: ""
+            download_alias: Nonza-windows.msi
+            download_glob: "*.msi"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "Tag must be desktop-vX.Y.Z, got: $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "DESKTOP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          DESKTOP_VERSION="$VERSION" node <<'NODE'
+          const fs = require("fs");
+          const version = process.env.DESKTOP_VERSION;
+          if (!version) {
+            console.error("DESKTOP_VERSION is empty");
+            process.exit(1);
+          }
+          const confPath = "apps/meet/src-tauri/tauri.conf.json";
+          const conf = JSON.parse(fs.readFileSync(confPath, "utf8"));
+          conf.version = version;
+          fs.writeFileSync(confPath, JSON.stringify(conf, null, 2) + "\n");
+          const pkgPath = "apps/meet/package.json";
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+          pkg.version = version;
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+          console.log("Synced version to", version);
+          NODE
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/meet/src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload Tauri bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_LIVEKIT_URL: ${{ vars.VITE_LIVEKIT_URL }}
+        with:
+          projectPath: apps/meet
+          tagName: ${{ github.ref_name }}
+          releaseName: Desktop v${{ env.DESKTOP_VERSION }}
+          releaseBody: |
+            Desktop client Nonza v${{ env.DESKTOP_VERSION }}.
+
+            Installers: `Nonza-windows.msi`, `Nonza-macos.dmg`.
+            Updater reads `latest.json` from this release.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      - name: Upload stable download aliases
+        if: matrix.download_alias != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ARTIFACT=$(find apps/meet/src-tauri/target -type f -name '${{ matrix.download_glob }}' | head -n 1)
+          if [[ -z "$ARTIFACT" ]]; then
+            echo "No artifact matching ${{ matrix.download_glob }}"
+            find apps/meet/src-tauri/target -type f | head -n 100 || true
+            exit 1
+          fi
+          cp "$ARTIFACT" "${{ matrix.download_alias }}"
+          gh release upload "${{ github.ref_name }}" "${{ matrix.download_alias }}" --clobber

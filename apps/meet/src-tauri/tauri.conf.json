@@ -65,7 +65,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4RjYzREZENUMyN0M2RjMKUlVUenhpZGMvVDMyYUlXcUhmc2tDRERSVDVXTXVDbi9wKzd5YTUxYkhYYUhHWUowamVWSHpKMkMK",
       "endpoints": [
-        "https://api.nonza.ru/api/v1/desktop-update/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/ankogit/nonza/releases/latest/download/latest.json"
       ]
     }
   }
