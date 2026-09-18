@@ -111,11 +111,19 @@ onUnmounted(() => {
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(2px);
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top, 0px))
+    max(20px, env(safe-area-inset-right, 0px))
+    max(20px, env(safe-area-inset-bottom, 0px))
+    max(20px, env(safe-area-inset-left, 0px));
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .modal-overlay--fullscreen {
-  padding: 24px;
+  padding: max(12px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
   align-items: stretch;
   justify-content: stretch;
   background: var(--color-background, #1a1a1a);
@@ -129,7 +137,7 @@ onUnmounted(() => {
     4px 4px 0 0 rgba(0, 0, 0, 0.5),
     8px 8px 0 0 rgba(0, 0, 0, 0.3);
   max-width: 90vw;
-  max-height: 90vh;
+  max-height: min(90vh, 100dvh - 40px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -153,19 +161,41 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .modal-overlay:not(.modal-overlay--fullscreen) {
+    align-items: flex-end;
+    padding: max(12px, env(safe-area-inset-top, 0px))
+      max(12px, env(safe-area-inset-right, 0px))
+      max(12px, env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  .modal-container:not(.modal-container--fullscreen) {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(88dvh, 100dvh - 24px);
+  }
 }
 
 @media (max-width: 360px) {
   .modal-container:not(.modal-container--fullscreen) {
     min-width: 0;
     width: 100%;
-    max-width: calc(100vw - 24px);
+    max-width: none;
   }
 
   .modal-overlay--fullscreen {
-    padding: 12px;
+    padding: max(8px, env(safe-area-inset-top, 0px))
+      max(8px, env(safe-area-inset-right, 0px))
+      max(8px, env(safe-area-inset-bottom, 0px))
+      max(8px, env(safe-area-inset-left, 0px));
   }
 
   .modal-header,
@@ -199,7 +229,10 @@ onUnmounted(() => {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   color: #bab1a8;
+  min-height: 0;
 }
 
 .modal-footer {

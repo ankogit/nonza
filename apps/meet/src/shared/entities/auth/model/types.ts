@@ -17,3 +17,10 @@ export interface AuthResponse {
   refresh_expires_at?: string;
   user: { id: string; email: string; name?: string; color?: string | null };
 }
+
+export interface AuthMethods {
+  password: boolean;
+  google: boolean;
+  mandarinshow: boolean;
+  keycloak: boolean;
+}

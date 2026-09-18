@@ -320,8 +320,10 @@ const menuClass = toRef(props, "menuClass");
 @media (max-width: 768px) {
   .call-menu {
     gap: 0;
-    padding: 8px 6px;
-    padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
+    padding-top: 8px;
+    padding-left: max(6px, env(safe-area-inset-left, 0px));
+    padding-right: max(6px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
 
   .call-menu__bar {

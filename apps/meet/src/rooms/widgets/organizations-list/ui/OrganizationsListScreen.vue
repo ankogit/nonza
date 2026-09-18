@@ -187,7 +187,7 @@ function orgLetter(name: string): string {
 .organizations-list {
   width: 100%;
   max-width: min(1100px, 100%);
-  min-height: 100%;
+  min-height: min-content;
   display: flex;
   flex-direction: column;
 }

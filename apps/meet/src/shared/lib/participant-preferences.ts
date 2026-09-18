@@ -5,9 +5,14 @@ const STORAGE_KEY_REPLICA_TTS = "nonza_replica_tts_enabled";
 const STORAGE_KEY_REPLICA_TTS_MUTED = "nonza_replica_tts_muted_identities";
 const STORAGE_KEY_ROOM_PASSWORD_PREFIX = "nonza_room_password:";
 
+const STORAGE_KEY_ROOM_SHORT_CODE_PERSIST = "nonza_room_short_code_persist";
+
 export function getRoomShortCode(): string | null {
   try {
-    return sessionStorage.getItem(STORAGE_KEY_ROOM_SHORT_CODE);
+    const fromSession = sessionStorage.getItem(STORAGE_KEY_ROOM_SHORT_CODE);
+    if (fromSession?.trim()) return fromSession.trim();
+    const fromLocal = localStorage.getItem(STORAGE_KEY_ROOM_SHORT_CODE_PERSIST);
+    return fromLocal?.trim() || null;
   } catch {
     return null;
   }
@@ -15,10 +20,13 @@ export function getRoomShortCode(): string | null {
 
 export function setRoomShortCode(shortCode: string): void {
   try {
-    if (shortCode.trim()) {
-      sessionStorage.setItem(STORAGE_KEY_ROOM_SHORT_CODE, shortCode.trim());
+    const trimmed = shortCode.trim();
+    if (trimmed) {
+      sessionStorage.setItem(STORAGE_KEY_ROOM_SHORT_CODE, trimmed);
+      localStorage.setItem(STORAGE_KEY_ROOM_SHORT_CODE_PERSIST, trimmed.toLowerCase());
     } else {
       sessionStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE);
+      localStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE_PERSIST);
     }
   } catch {
     /* ignore */
@@ -28,6 +36,7 @@ export function setRoomShortCode(shortCode: string): void {
 export function clearRoomShortCode(): void {
   try {
     sessionStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE);
+    localStorage.removeItem(STORAGE_KEY_ROOM_SHORT_CODE_PERSIST);
   } catch {
     /* ignore */
   }

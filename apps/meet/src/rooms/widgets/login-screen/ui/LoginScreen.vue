@@ -12,43 +12,56 @@
           Войдите, чтобы открыть организации и комнаты.
         </p>
         <form class="login-screen__form" @submit.prevent="submit">
-          <label class="login-screen__label">
-            Email
-            <Input
-              v-model="email"
-              type="email"
-              placeholder="email@example.com"
-              autocomplete="email"
-            />
-          </label>
-          <label class="login-screen__label">
-            Пароль
-            <Input
-              v-model="password"
-              type="password"
-              placeholder="••••••••"
-              autocomplete="current-password"
-            />
-          </label>
+          <template v-if="authMethods.password">
+            <label class="login-screen__label">
+              Email
+              <Input
+                v-model="email"
+                type="email"
+                placeholder="email@example.com"
+                autocomplete="email"
+              />
+            </label>
+            <label class="login-screen__label">
+              Пароль
+              <Input
+                v-model="password"
+                type="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+              />
+            </label>
+          </template>
           <Alert v-if="error" variant="danger">{{ error }}</Alert>
-          <div class="login-screen__social">
-            <p class="login-screen__social-sep">или войти через</p>
+          <div v-if="showSocial" class="login-screen__social">
+            <p class="login-screen__social-sep">
+              {{ authMethods.password ? "или войти через" : "Войти через" }}
+            </p>
             <SocialLoginButton
+              v-if="authMethods.google"
               provider="google"
               label="Google"
               aria-label="Войти через Google"
               @click="startGoogle"
             />
             <SocialLoginButton
-              v-if="mandarinshowLoginEnabled"
+              v-if="authMethods.mandarinshow"
               provider="mandarinshow"
               label="MandarinShow"
               aria-label="Войти через mandarinshow.ru"
               @click="startMandarinshow"
             />
+            <SocialLoginButton
+              v-if="authMethods.keycloak"
+              provider="keycloak"
+              label="Keycloak"
+              aria-label="Войти через Keycloak"
+              @click="startKeycloak"
+            />
           </div>
           <div class="login-screen__actions">
             <Button
+              v-if="authMethods.password"
               type="text"
               variant="default"
               size="large"
@@ -59,6 +72,7 @@
               Регистрация
             </Button>
             <Button
+              v-if="authMethods.password"
               type="text"
               variant="primary"
               size="large"
@@ -76,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   ScreenLayout,
   Input,
@@ -86,12 +100,14 @@ import {
   SocialLoginButton,
 } from "@shared/ui";
 import { AuthApi } from "@shared/entities";
+import type { AuthMethods } from "@shared/entities";
 import { useApiClient } from "@shared/api";
 import {
   setAuth,
   useAppConfig,
   buildGoogleLoginUrl,
   buildMandarinshowLoginUrl,
+  buildKeycloakLoginUrl,
 } from "@shared/lib";
 
 const emit = defineEmits<{
@@ -103,8 +119,27 @@ const apiClient = useApiClient();
 const authApi = new AuthApi(apiClient);
 const { apiBaseURL } = useAppConfig();
 
-/** Включить, когда настроен SSO с mandarinshow.ru */
-const mandarinshowLoginEnabled = false;
+const authMethods = ref<AuthMethods>({
+  password: true,
+  google: false,
+  mandarinshow: false,
+  keycloak: false,
+});
+
+const showSocial = computed(
+  () =>
+    authMethods.value.google ||
+    authMethods.value.mandarinshow ||
+    authMethods.value.keycloak,
+);
+
+onMounted(async () => {
+  try {
+    authMethods.value = await authApi.getAuthMethods();
+  } catch {
+    /* API недоступен — остаются дефолты */
+  }
+});
 
 const email = ref("");
 const password = ref("");
@@ -146,6 +181,10 @@ function startGoogle() {
 
 function startMandarinshow() {
   window.location.href = buildMandarinshowLoginUrl(apiBaseURL, "login");
+}
+
+function startKeycloak() {
+  window.location.href = buildKeycloakLoginUrl(apiBaseURL, "login");
 }
 </script>
 

@@ -121,8 +121,19 @@ type Config struct {
 	MandarinshowAuthorizeURL string `envconfig:"MANDARINSHOW_AUTHORIZE_URL"`
 	MandarinshowTokenURL     string `envconfig:"MANDARINSHOW_TOKEN_URL"`
 	MandarinshowRedirectURI  string `envconfig:"MANDARINSHOW_REDIRECT_URI"`
+
+	KeycloakIssuer       string `envconfig:"KEYCLOAK_ISSUER"`
+	KeycloakClientID     string `envconfig:"KEYCLOAK_CLIENT_ID"`
+	KeycloakClientSecret string `envconfig:"KEYCLOAK_CLIENT_SECRET"`
+	KeycloakRedirectURI  string `envconfig:"KEYCLOAK_REDIRECT_URI"`
+
 	// Публичный URL API (Google OAuth callback, fallback для MANDARINSHOW_REDIRECT_URI).
 	AuthPublicBaseURL string `envconfig:"AUTH_PUBLIC_BASE_URL" default:"http://localhost:8000"`
+
+	AuthEnablePassword     bool `envconfig:"AUTH_ENABLE_PASSWORD" default:"true"`
+	AuthEnableGoogle       bool `envconfig:"AUTH_ENABLE_GOOGLE" default:"false"`
+	AuthEnableMandarinshow bool `envconfig:"AUTH_ENABLE_MANDARINSHOW" default:"false"`
+	AuthEnableKeycloak     bool `envconfig:"AUTH_ENABLE_KEYCLOAK" default:"false"`
 
 	// Десктоп-приложение: актуальная версия и артефакты для обновления.
 	// Если пусто — эндпоинт обновления отдаёт 204 (обновления нет).

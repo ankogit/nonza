@@ -96,13 +96,13 @@
         @goLogin="goToLoginFromInvite"
       />
     </div>
-    <div v-else-if="appStore.page === 'create-org'" class="rooms-app__content">
+    <div v-else-if="appStore.page === 'create-org'" class="rooms-app__content rooms-app__content--auth-form">
       <CreateOrganizationScreen
         @created="handleOrgCreated"
         @cancel="goToOrganizations"
       />
     </div>
-    <div v-else-if="appStore.page === 'settings'" class="rooms-app__content">
+    <div v-else-if="appStore.page === 'settings'" class="rooms-app__content rooms-app__content--auth-form">
       <SettingsScreen @back="goToOrganizations" @logout="handleLogout" />
     </div>
     <main v-else-if="isAuthenticated()" class="container border-radius-app">
@@ -818,12 +818,14 @@ onUnmounted(() => {
   height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
 }
 
 .rooms-app--scroll-root .rooms-app__content {
   flex: none;
   overflow: visible;
+  min-height: 0;
 }
 
 .rooms-app__content--auth-form {
@@ -846,6 +848,8 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .rooms-app__content {
@@ -855,8 +859,26 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   position: relative;
   z-index: 10000;
+}
+
+@media (max-width: 768px) {
+  .rooms-app__content--auth-form {
+    justify-content: flex-start;
+    flex: none;
+  }
+
+  .rooms-app__content {
+    padding: 16px 12px;
+    overflow: visible;
+  }
+
+  .rooms-app--scroll-root .rooms-app__content {
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (max-width: 360px) {
@@ -971,6 +993,8 @@ onUnmounted(() => {
     z-index: 10002;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .rooms-app--drawer-open .servers {
@@ -984,7 +1008,7 @@ onUnmounted(() => {
   }
 
   .vert-container--list {
-    padding: 16px 12px;
+    padding: 16px 12px max(24px, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1005,6 +1029,8 @@ onUnmounted(() => {
 
 .vert-container--list {
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   padding: 28px 32px 40px;
   background: #14141490;
   backdrop-filter: blur(2.5px);

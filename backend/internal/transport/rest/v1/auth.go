@@ -17,6 +17,10 @@ func NewAuthHandler(services *service.Services) *AuthHandler {
 	return &AuthHandler{Services: services}
 }
 
+func (h *AuthHandler) Methods(c *gin.Context) {
+	c.JSON(http.StatusOK, h.Services.Auth.PublicAuthMethods())
+}
+
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req authDto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -26,6 +30,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	result, err := h.Services.Auth.Register(req.Email, req.Password, req.Name, req.Color)
 	if err != nil {
+		if err == authService.ErrAuthMethodDisabled {
+			c.JSON(http.StatusForbidden, gin.H{"error": "password login is disabled"})
+			return
+		}
 		if err == authService.ErrEmailTaken {
 			c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
 			return
@@ -61,6 +69,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	result, err := h.Services.Auth.Login(req.Email, req.Password)
 	if err != nil {
+		if err == authService.ErrAuthMethodDisabled {
+			c.JSON(http.StatusForbidden, gin.H{"error": "password login is disabled"})
+			return
+		}
 		if err == authService.ErrInvalidCredentials {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
 			return

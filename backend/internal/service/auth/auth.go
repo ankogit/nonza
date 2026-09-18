@@ -70,6 +70,9 @@ func NewAuthService(usersRepo repository.Users, cfg *config.Config) Auth {
 }
 
 func (s *authService) Register(email, password, name string, color *string) (*AuthResult, error) {
+	if err := s.ensurePasswordAuthEnabled(); err != nil {
+		return nil, err
+	}
 	_, err := s.usersRepo.GetByEmail(email)
 	if err == nil {
 		return nil, ErrEmailTaken
@@ -101,6 +104,9 @@ func (s *authService) Register(email, password, name string, color *string) (*Au
 }
 
 func (s *authService) Login(email, password string) (*AuthResult, error) {
+	if err := s.ensurePasswordAuthEnabled(); err != nil {
+		return nil, err
+	}
 	user, err := s.usersRepo.GetByEmail(email)
 	if err != nil {
 		return nil, ErrInvalidCredentials

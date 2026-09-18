@@ -27,6 +27,8 @@ const containerClass = computed(() => ({
 .screen-layout {
   padding: 24px;
   box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
 }
 
 .screen-layout:not(.screen-layout--narrow) {
@@ -38,6 +40,7 @@ const containerClass = computed(() => ({
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  min-width: 0;
 }
 
 .screen-layout--narrow .screen-layout__container {
@@ -49,9 +52,16 @@ const containerClass = computed(() => ({
   margin-right: auto;
 }
 
+@media (max-width: 768px) {
+  .screen-layout {
+    padding: 12px 0 20px;
+    min-height: 0;
+  }
+}
+
 @media (max-width: 360px) {
   .screen-layout {
-    padding: 12px;
+    padding: 8px 0 16px;
   }
 }
 </style>

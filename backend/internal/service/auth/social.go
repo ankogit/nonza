@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrSocialNotConfigured = errors.New("social login not configured")
+	ErrAuthMethodDisabled  = errors.New("auth method disabled")
 	ErrInvalidSocialTicket = errors.New("invalid or expired social login ticket")
 	ErrSocialEmailRequired = errors.New("email required for social login")
 )
@@ -182,6 +183,57 @@ func (s *authService) LoginWithMandarinshow(msUserID, email, name string) (*Auth
 		Name:               name,
 		MandarinshowUserID: &msid,
 		PasswordHash:       "",
+	}
+	if user.Name == "" {
+		user.Name = strings.Split(email, "@")[0]
+	}
+	if err := s.usersRepo.Create(user); err != nil {
+		return nil, err
+	}
+	return s.issueToken(user)
+}
+
+func (s *authService) LoginWithKeycloak(keycloakSub, email, name string) (*AuthResult, error) {
+	keycloakSub = strings.TrimSpace(keycloakSub)
+	email = strings.TrimSpace(strings.ToLower(email))
+	name = strings.TrimSpace(name)
+	if keycloakSub == "" {
+		return nil, errors.New("keycloak id required")
+	}
+	if email == "" {
+		return nil, ErrSocialEmailRequired
+	}
+
+	user, err := s.usersRepo.GetByKeycloakID(keycloakSub)
+	if err == nil {
+		return s.issueToken(user)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	byEmail, err := s.usersRepo.GetByEmail(email)
+	if err == nil {
+		kid := keycloakSub
+		byEmail.KeycloakID = &kid
+		if name != "" && byEmail.Name == "" {
+			byEmail.Name = name
+		}
+		if err := s.usersRepo.Update(byEmail); err != nil {
+			return nil, err
+		}
+		return s.issueToken(byEmail)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	kid := keycloakSub
+	user = &models.User{
+		Email:        email,
+		Name:         name,
+		KeycloakID:   &kid,
+		PasswordHash: "",
 	}
 	if user.Name == "" {
 		user.Name = strings.Split(email, "@")[0]

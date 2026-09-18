@@ -41,6 +41,9 @@ func (s *authService) googleOAuthConfig() (*oauth2.Config, error) {
 }
 
 func (s *authService) GoogleAuthURL(returnURL string) (string, error) {
+	if err := s.ensureGoogleAuthEnabled(); err != nil {
+		return "", err
+	}
 	cfg, err := s.googleOAuthConfig()
 	if err != nil {
 		return "", err

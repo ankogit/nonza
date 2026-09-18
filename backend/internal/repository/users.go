@@ -12,5 +12,6 @@ type Users interface {
 	GetByEmail(email string) (*models.User, error)
 	GetByGoogleID(googleID string) (*models.User, error)
 	GetByMandarinshowUserID(msUserID string) (*models.User, error)
+	GetByKeycloakID(keycloakID string) (*models.User, error)
 	Update(user *models.User) error
 }

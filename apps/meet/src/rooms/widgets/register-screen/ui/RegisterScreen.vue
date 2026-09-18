@@ -11,10 +11,17 @@
           <span class="register-screen__brand">Nonza</span>
         </template>
         <template #title>Регистрация</template>
-        <p class="register-screen__lead">
+        <p v-if="!authMethods.password" class="register-screen__lead">
+          Регистрация по email и паролю отключена на этом сервере.
+        </p>
+        <p v-else class="register-screen__lead">
           Создайте аккаунт, чтобы присоединяться к организациям.
         </p>
-        <form class="register-screen__form" @submit.prevent="submit">
+        <form
+          v-if="authMethods.password"
+          class="register-screen__form"
+          @submit.prevent="submit"
+        >
           <label class="register-screen__label">
             Имя
             <div class="register-screen__name-row">
@@ -78,13 +85,23 @@
             </Button>
           </div>
         </form>
+        <div v-else class="register-screen__actions">
+          <Button
+            type="text"
+            variant="default"
+            size="large"
+            @click="$emit('goLogin')"
+          >
+            К входу
+          </Button>
+        </div>
       </MetroTile>
     </div>
   </ScreenLayout>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import {
   ScreenLayout,
   Input,
@@ -94,6 +111,7 @@ import {
   MetroTile,
 } from "@shared/ui";
 import { AuthApi } from "@shared/entities";
+import type { AuthMethods } from "@shared/entities";
 import { useApiClient } from "@shared/api";
 import { setAuth, generateParticipantName } from "@shared/lib";
 
@@ -104,6 +122,16 @@ const emit = defineEmits<{
 
 const apiClient = useApiClient();
 const authApi = new AuthApi(apiClient);
+
+const authMethods = ref<AuthMethods>({ password: true, google: false, mandarinshow: false, keycloak: false });
+
+onMounted(async () => {
+  try {
+    authMethods.value = await authApi.getAuthMethods();
+  } catch {
+    /* ignore */
+  }
+});
 
 const email = ref("");
 const password = ref("");

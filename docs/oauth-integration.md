@@ -169,9 +169,16 @@ Example response:
 
 Share `join_url` with participants. The room is cleaned up after `expires_at`.
 
-## 8. Rooms login: Google and MandarinShow OAuth
+## 8. Rooms login: Google, MandarinShow, and Keycloak OAuth
 
-Rooms SPA (`LoginScreen`) supports:
+Rooms SPA (`LoginScreen`) loads `GET /api/v1/auth/methods` and shows only enabled providers.
+
+Backend env (master switches):
+
+- `AUTH_ENABLE_PASSWORD` — email/password login and register (default `true`)
+- `AUTH_ENABLE_GOOGLE` — Google OAuth start/callback (default `false`; also requires `GOOGLE_*`)
+- `AUTH_ENABLE_MANDARINSHOW` — MandarinShow OAuth (default `false`; also requires `MANDARINSHOW_*`)
+- `AUTH_ENABLE_KEYCLOAK` — Keycloak OIDC (default `false`; also requires `KEYCLOAK_*`)
 
 1. **Google** — Nonza API OAuth2 client (`GOOGLE_CLIENT_*`, callback `/api/v1/auth/google/callback`).
 2. **MandarinShow** — OAuth2 authorization code against MandarinShow:
@@ -184,6 +191,12 @@ Nonza env:
 - `MANDARINSHOW_CLIENT_ID`, `MANDARINSHOW_CLIENT_SECRET`
 - `MANDARINSHOW_AUTHORIZE_URL`, `MANDARINSHOW_TOKEN_URL`
 - `MANDARINSHOW_REDIRECT_URI` — must match the URI registered in MandarinShow exactly (fallback: `{AUTH_PUBLIC_BASE_URL}/api/v1/auth/mandarinshow/callback`)
+
+3. **Keycloak** — OpenID Connect against a dedicated realm client (not `security-admin-console`):
+   - Issuer: `KEYCLOAK_ISSUER` (e.g. `https://keycloak.infra.cf.team/realms/master`)
+   - Start: Nonza redirects from `/api/v1/auth/keycloak/start` to `{issuer}/protocol/openid-connect/auth`
+   - Callback: `{AUTH_PUBLIC_BASE_URL}/api/v1/auth/keycloak/callback` (or `KEYCLOAK_REDIRECT_URI`)
+   - Env: `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`, scopes `openid email profile`
 
 Local Google redirect URI example: `http://localhost:8000/api/v1/auth/google/callback` (add in Google Cloud Console).
 

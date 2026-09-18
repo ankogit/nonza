@@ -14,6 +14,7 @@ type User struct {
 	PasswordHash       string    `gorm:"type:varchar(255)"`
 	GoogleID           *string   `gorm:"type:varchar(255);uniqueIndex"`
 	MandarinshowUserID *string   `gorm:"type:varchar(64);uniqueIndex"`
+	KeycloakID         *string   `gorm:"type:varchar(255);uniqueIndex"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }

@@ -153,6 +153,8 @@ body {
 .app__view--scroll {
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .app__view--entry {

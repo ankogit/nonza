@@ -25,7 +25,9 @@ export function useOrganizationSounds(orgId: () => string | null | undefined) {
 
     isLoading.value = true;
     try {
-      const res = await client.get<OrganizationSound[]>(ENDPOINT(id));
+      const res = await client.get<OrganizationSound[]>(ENDPOINT(id), {
+        skipNetworkErrorHook: true,
+      });
       soundsRaw.value = Array.isArray(res)
         ? res.map((s) => ({
             ...s,
@@ -35,9 +37,14 @@ export function useOrganizationSounds(orgId: () => string | null | undefined) {
             speed: Number((s as unknown as Partial<OrganizationSound>).speed ?? 100),
           }))
         : [];
-    } catch {
+    } catch (err) {
       soundsRaw.value = [];
-      showToast("Не удалось загрузить звуки", { variant: "warning" });
+      const msg = err instanceof Error ? err.message : "";
+      const expectedGuestMiss =
+        /unauthorized|forbidden|HTTP 401|HTTP 403/i.test(msg);
+      if (!expectedGuestMiss) {
+        showToast("Не удалось загрузить звуки", { variant: "warning" });
+      }
     } finally {
       isLoading.value = false;
     }

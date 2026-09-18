@@ -891,6 +891,7 @@
 
   .room-header {
     border-bottom-width: 3px;
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .room-info {
@@ -922,7 +923,10 @@
   }
 
   .menu {
-    padding: 0;
+    padding-top: 0;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     display: block;
   }
 
@@ -975,7 +979,10 @@
   }
 
   .menu {
-    padding: 0;
+    padding-top: 0;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     display: block;
   }
 
@@ -1011,38 +1018,52 @@
   @media (max-width: 768px) {
     .app-rooms .menu,
     .app-meets .menu {
-      padding-bottom: max(24px, env(safe-area-inset-bottom, 0));
+      padding-left: max(6px, env(safe-area-inset-left, 0px));
+      padding-right: max(6px, env(safe-area-inset-right, 0px));
+      padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
     }
 
     .app-rooms .call-grid,
     .app-meets .call-grid {
-      padding-bottom: calc(176px + max(24px, env(safe-area-inset-bottom, 0)));
+      padding-bottom: calc(176px + max(24px, env(safe-area-inset-bottom, 0px)));
     }
   }
 
   @media (max-width: 480px) {
     .app-rooms .organization-footer {
-      padding-bottom: max(env(safe-area-inset-bottom, 0), 80px);
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 80px);
     }
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .full-page {
     padding: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-    padding-top: max(16px, env(safe-area-inset-top));
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: max(16px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .padding-app.full-page {
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .padding-app.full-page:has(.rooms-app__room),
+  .padding-app.full-page:has(.nonza-widget--connected) {
+    padding: 0;
   }
 }
 
 @media (max-width: 380px) {
   .full-page {
     padding: 12px;
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
-    padding-top: max(12px, env(safe-area-inset-top));
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
 }

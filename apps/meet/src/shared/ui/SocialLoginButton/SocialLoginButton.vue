@@ -19,7 +19,7 @@ import SocialProviderIcon from "../SocialProviderIcon/SocialProviderIcon.vue";
 
 withDefaults(
   defineProps<{
-    provider: "google" | "mandarinshow";
+    provider: "google" | "mandarinshow" | "keycloak";
     label: string;
     ariaLabel?: string;
     disabled?: boolean;
@@ -96,6 +96,11 @@ const emit = defineEmits<{
   height: 28px;
   max-width: 32px;
   object-fit: contain;
+}
+
+.social-login-btn__icon :deep(.social-provider-icon--keycloak) {
+  width: 28px;
+  height: 28px;
 }
 
 .social-login-btn__label {

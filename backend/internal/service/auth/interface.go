@@ -34,5 +34,8 @@ type Auth interface {
 	GoogleCallback(ctx context.Context, code, state string) (redirectURL string, err error)
 	MandarinshowStartURL(returnURL string) (string, error)
 	MandarinshowCallback(ctx context.Context, code, state, oauthError string) (redirectURL string, err error)
+	KeycloakAuthURL(returnURL string) (string, error)
+	KeycloakCallback(ctx context.Context, code, state string) (redirectURL string, err error)
 	RedeemSocialLoginTicket(ticket string) (*AuthResult, error)
+	PublicAuthMethods() PublicAuthMethods
 }

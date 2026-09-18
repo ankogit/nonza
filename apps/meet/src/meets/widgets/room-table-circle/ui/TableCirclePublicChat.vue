@@ -11,24 +11,58 @@
         v-for="m in messages"
         :key="m.id"
         class="public-chat__msg"
-        :style="{ '--participant-color': participantColorForIdentity(m.senderIdentity) }"
+        :class="{ 'public-chat__msg--system': m.kind === 'system' }"
+        :style="
+          m.kind === 'system'
+            ? undefined
+            : { '--participant-color': participantColorForIdentity(m.senderIdentity) }
+        "
       >
-        <div class="public-chat__msg-head">
-          <span class="public-chat__msg-who">{{ resolveName(m.senderIdentity) }}</span>
-          <span class="public-chat__msg-ts">{{ formatTs(m.ts) }}</span>
-        </div>
-        <div class="public-chat__msg-body">
-          <template v-for="(seg, i) in segmentsFor(m.text)" :key="i">
-            <a
-              v-if="seg.type === 'link'"
-              class="public-chat__link"
-              :href="seg.href"
-              target="_blank"
-              rel="noopener noreferrer"
-            >{{ seg.label }}</a>
-            <span v-else>{{ seg.value }}</span>
-          </template>
-        </div>
+        <template v-if="m.kind === 'system'">
+          <div class="public-chat__system">
+            <span class="public-chat__system-rule" aria-hidden="true" />
+            <span
+              class="public-chat__system-pill"
+              :class="{
+                'public-chat__system-pill--left':
+                  systemPresentation(m).pillVariant === 'left',
+                'public-chat__system-pill--join':
+                  systemPresentation(m).pillVariant === 'join',
+              }"
+              :style="{
+                '--participant-color': participantColorForIdentity(m.senderIdentity),
+              }"
+            >
+              <span class="public-chat__system-dot" aria-hidden="true" />
+              <span class="public-chat__system-name">{{
+                displayName(m)
+              }}</span>
+              <span class="public-chat__system-action">{{
+                systemPresentation(m).actionLabel
+              }}</span>
+              <span class="public-chat__system-time">{{ formatTime(m.ts) }}</span>
+            </span>
+            <span class="public-chat__system-rule" aria-hidden="true" />
+          </div>
+        </template>
+        <template v-else>
+          <div class="public-chat__msg-head">
+            <span class="public-chat__msg-who">{{ displayName(m) }}</span>
+            <span class="public-chat__msg-ts">{{ formatTs(m.ts) }}</span>
+          </div>
+          <div class="public-chat__msg-body">
+            <template v-for="(seg, i) in segmentsFor(m.text)" :key="i">
+              <a
+                v-if="seg.type === 'link'"
+                class="public-chat__link"
+                :href="seg.href"
+                target="_blank"
+                rel="noopener noreferrer"
+              >{{ seg.label }}</a>
+              <span v-else>{{ seg.value }}</span>
+            </template>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -70,6 +104,12 @@ import {
 import { Button } from "@shared/ui";
 import PixelIcon from "@shared/ui/PixelIcon/PixelIcon.vue";
 import { useTableCircleChat } from "@features/table-circle";
+import {
+  getSystemEventPresentation,
+  chatEntryDisplayName,
+  tableCircleParticipantDisplayName,
+  type TableCircleChatMessage,
+} from "@features/table-circle";
 
 const props = defineProps<{
   localParticipant: LocalParticipant | null;
@@ -77,6 +117,8 @@ const props = defineProps<{
   participantName: string;
   getDisplayName?: (p: RemoteParticipant | LocalParticipant) => string;
   livekitRoom: LiveKitRoom | null;
+  roomId?: string | null;
+  roomShortCode?: string | null;
 }>();
 
 const draft = ref("");
@@ -85,6 +127,16 @@ const listEl = ref<HTMLElement | null>(null);
 const { messages, canSend, send, maxMessageLength } = useTableCircleChat(
   () => props.localParticipant,
   () => props.livekitRoom,
+  {
+    roomId: () => props.roomId,
+    roomShortCode: () => props.roomShortCode,
+    participantDisplayName: (p) =>
+      tableCircleParticipantDisplayName(p, {
+        localIdentity: props.localParticipant?.identity,
+        participantName: props.participantName,
+        getDisplayName: props.getDisplayName,
+      }),
+  },
 );
 
 const remoteById = computed(() => {
@@ -99,6 +151,10 @@ function resolveName(identity: string) {
   const p = remoteById.value.get(identity);
   if (!p) return identity;
   return props.getDisplayName?.(p) ?? p.name ?? p.identity;
+}
+
+function displayName(m: TableCircleChatMessage) {
+  return chatEntryDisplayName(m, resolveName);
 }
 
 function participantColorForIdentity(identity: string): string {
@@ -130,6 +186,26 @@ function formatTs(ts: number) {
     day: "2-digit",
     month: "2-digit",
   })} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function formatTime(ts: number) {
+  return new Date(ts).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function systemPresentation(m: TableCircleChatMessage) {
+  if (m.kind === "system" && m.system) {
+    return getSystemEventPresentation(m.system);
+  }
+  if (m.kind === "system") {
+    if (/\sвышел\s*$/u.test(m.text)) {
+      return { actionLabel: "вышел", pillVariant: "left" as const };
+    }
+    return { actionLabel: "зашёл", pillVariant: "join" as const };
+  }
+  return { actionLabel: "зашёл", pillVariant: "join" as const };
 }
 
 function submit() {
@@ -184,6 +260,93 @@ watch(
   background: #161616;
   padding: 8px 10px;
   contain: content;
+}
+
+.public-chat__msg--system {
+  border: none;
+  border-left: none;
+  background: transparent;
+  padding: 6px 0;
+  contain: none;
+}
+
+.public-chat__system {
+  display: grid;
+  grid-template-columns: minmax(12px, 1fr) auto minmax(12px, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.public-chat__system-rule {
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #3a3a3a 0 4px,
+    transparent 4px 8px
+  );
+  opacity: 0.9;
+}
+
+.public-chat__system-pill {
+  --participant-color: #bab1a8;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(100%, 280px);
+  padding: 5px 10px;
+  border: 2px solid #3a3a3a;
+  background: #1a1a1a;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.public-chat__system-pill--join {
+  border-bottom-color: var(--participant-color);
+}
+
+.public-chat__system-pill--left {
+  opacity: 0.88;
+}
+
+.public-chat__system-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  background: var(--participant-color);
+  box-shadow: 1px 1px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+.public-chat__system-pill--left .public-chat__system-dot {
+  background: #666;
+}
+
+.public-chat__system-name {
+  color: var(--participant-color);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.public-chat__system-action {
+  color: #8a827a;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.public-chat__system-time {
+  color: #666;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 2px;
 }
 
 .public-chat__msg-head {

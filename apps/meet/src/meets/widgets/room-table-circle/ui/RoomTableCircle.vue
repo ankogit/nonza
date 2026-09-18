@@ -43,6 +43,8 @@
                 :participant-name="props.participantName"
                 :get-display-name="props.getDisplayName"
                 :livekit-room="props.livekitRoom"
+                :room-id="props.room?.id"
+                :room-short-code="props.room?.short_code"
               />
             </div>
 
@@ -429,7 +431,7 @@ import {
   ReplicaInput,
 } from "@features/participant-replica";
 import { useConferenceHall } from "@features/conference-hall";
-import { useTableCircle } from "@features/table-circle";
+import { useTableCircle, useTableCircleChat, tableCircleParticipantDisplayName } from "@features/table-circle";
 import { SoundBar, isOrganizationSoundBarAvailable } from "@features/sound-bar";
 import {
   MEET_ROOM_COLLABORATION_KEY,
@@ -508,6 +510,21 @@ function participantColorFor(p: LocalParticipant | RemoteParticipant): string {
 const localParticipant = computed<LocalParticipant | null>(() => {
   return props.localParticipant ?? props.livekitRoom?.localParticipant ?? null;
 });
+
+useTableCircleChat(
+  () => localParticipant.value,
+  () => props.livekitRoom,
+  {
+    roomId: () => props.room?.id,
+    roomShortCode: () => props.room?.short_code,
+    participantDisplayName: (p) =>
+      tableCircleParticipantDisplayName(p, {
+        localIdentity: localParticipant.value?.identity,
+        participantName: props.participantName,
+        getDisplayName: props.getDisplayName,
+      }),
+  },
+);
 
 const remoteParticipants = computed<RemoteParticipant[]>(() => {
   if (props.remoteParticipants) return props.remoteParticipants;

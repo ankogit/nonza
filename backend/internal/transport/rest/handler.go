@@ -225,10 +225,13 @@ func (h *Handler) initAuthRoutes(api *gin.RouterGroup) {
 	socialHandler := v1.NewAuthSocialHandler(h.services)
 	auth := api.Group("/auth")
 	{
+		auth.GET("/methods", authHandler.Methods)
 		auth.GET("/google/start", socialHandler.GoogleStart)
 		auth.GET("/google/callback", socialHandler.GoogleCallback)
 		auth.GET("/mandarinshow/start", socialHandler.MandarinshowStart)
 		auth.GET("/mandarinshow/callback", socialHandler.MandarinshowCallback)
+		auth.GET("/keycloak/start", socialHandler.KeycloakStart)
+		auth.GET("/keycloak/callback", socialHandler.KeycloakCallback)
 		auth.POST("/social/exchange", socialHandler.SocialExchange)
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)

@@ -44,6 +44,9 @@ func (s *authService) mandarinshowRedirectURI() string {
 }
 
 func (s *authService) MandarinshowStartURL(returnURL string) (string, error) {
+	if err := s.ensureMandarinshowAuthEnabled(); err != nil {
+		return "", err
+	}
 	if !s.mandarinshowOAuthConfigured() {
 		return "", ErrSocialNotConfigured
 	}

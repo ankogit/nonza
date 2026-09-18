@@ -1,45 +1,54 @@
 <template>
   <div class="nonza-widget" :class="{ 'nonza-widget--connected': isConnected }">
     <div v-if="isReconnecting" class="nonza-widget__reconnecting">
-      <MetroTile
-        size="wide"
-        variant="gold"
-        mark="…"
-        class="meets-entry__tile meets-entry__status"
-      >
-        <template #title>Восстанавливаем подключение</template>
-        <p class="meets-entry__lead">
-          Соединение с комнатой было потеряно
-        </p>
-        <Button
-          type="text"
-          variant="accent"
-          size="large"
-          :disabled="isConnecting"
-          class="meets-entry__cta"
-          @click="handleReconnect"
-        >
-          {{ isConnecting ? "Подключение..." : "Переподключиться" }}
-        </Button>
-        <div v-if="connectionState.error" class="nonza-widget__error">
-          {{ connectionState.error }}
-        </div>
-      </MetroTile>
-    </div>
-    <div v-else-if="!isConnected" class="nonza-widget__connect">
-      <template v-if="entryMode === 'by_selection'">
+      <div class="meets-entry meets-entry--status">
+        <header class="meets-entry__header">
+          <h1 class="meets-entry__heading">Nonza</h1>
+        </header>
         <MetroTile
-          v-if="!passwordRequired"
           size="wide"
-          variant="blue"
+          variant="gold"
           mark="…"
           class="meets-entry__tile meets-entry__status"
         >
-          <template #title>
-            {{ isConnecting ? "Подключение..." : "Подготовка..." }}
-          </template>
-          <p class="meets-entry__lead">Сейчас зайдём в комнату.</p>
+          <template #title>Переподключение</template>
+          <p class="meets-entry__lead">
+            Соединение с комнатой было потеряно.
+          </p>
+          <Button
+            type="text"
+            variant="accent"
+            size="large"
+            :disabled="isConnecting"
+            class="meets-entry__cta"
+            @click="handleReconnect"
+          >
+            {{ isConnecting ? "Подключение..." : "Переподключиться" }}
+          </Button>
+          <div v-if="connectionState.error" class="nonza-widget__error">
+            {{ connectionState.error }}
+          </div>
         </MetroTile>
+      </div>
+    </div>
+    <div v-else-if="!isConnected" class="nonza-widget__connect">
+      <template v-if="entryMode === 'by_selection'">
+        <div v-if="!passwordRequired" class="meets-entry meets-entry--status">
+          <header class="meets-entry__header">
+            <h1 class="meets-entry__heading">Nonza</h1>
+          </header>
+          <MetroTile
+            size="wide"
+            variant="blue"
+            mark="…"
+            class="meets-entry__tile meets-entry__status"
+          >
+            <template #title>
+              {{ isConnecting ? "Подключение" : "Подготовка" }}
+            </template>
+            <p class="meets-entry__lead">Сейчас зайдём в комнату.</p>
+          </MetroTile>
+        </div>
       </template>
       <template v-else>
         <div v-if="isRoomNotFound" class="meets-entry meets-entry--not-found">
@@ -103,7 +112,7 @@
             </MetroTile>
           </div>
         </div>
-        <div v-else-if="isConnecting && !error" class="meets-entry">
+        <div v-else-if="isConnecting && !error" class="meets-entry meets-entry--status">
           <header class="meets-entry__header">
             <h1 class="meets-entry__heading">Nonza</h1>
           </header>
@@ -113,7 +122,7 @@
             mark="…"
             class="meets-entry__tile meets-entry__status"
           >
-            <template #title>Подключение...</template>
+            <template #title>Подключение</template>
             <p class="meets-entry__lead">Заходим в комнату.</p>
           </MetroTile>
         </div>
@@ -787,11 +796,16 @@ onMounted(() => {
 .nonza-widget__connect {
   flex: 1;
   display: flex;
-  align-items: safe center;
+  align-items: center;
   justify-content: center;
-  padding: 20px 16px 28px;
+  padding: 20px 16px max(28px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: max(20px, env(safe-area-inset-top, 0px));
   min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   box-sizing: border-box;
 }
 
@@ -880,12 +894,79 @@ onMounted(() => {
 }
 
 .meets-entry__status {
-  width: min(520px, 100%) !important;
+  width: 100% !important;
+  max-width: 100%;
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: stretch;
+  box-sizing: border-box;
 }
 
 .meets-entry__status :deep(.metro-tile__inner) {
+  gap: 10px;
+  padding: 18px 16px 16px;
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.meets-entry__status :deep(.metro-tile__title) {
+  font-size: clamp(1.7rem, 4.5vw, 2.35rem);
+  max-width: 100%;
+  width: 100%;
+  line-height: 0.95;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-line-clamp: 2;
+}
+
+.meets-entry__status :deep(.metro-tile__mark) {
+  font-size: clamp(2.8rem, 9vw, 4rem);
+  max-width: 36%;
+  max-height: 65%;
+  overflow: hidden;
+  right: 4px;
+  bottom: 2px;
+  top: auto;
+  color: rgba(255, 255, 255, 0.1);
+}
+
+.meets-entry__status :deep(.metro-tile__body) {
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.meets-entry__status .meets-entry__lead {
+  max-width: 100%;
+}
+
+.meets-entry__status .meets-entry__cta {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.meets-entry__status .nonza-widget__error {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
+  word-break: break-word;
+}
+
+.meets-entry--status {
+  width: min(520px, 100%);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  padding: 22px 20px 18px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .meets-entry__nick {
@@ -1129,6 +1210,17 @@ onMounted(() => {
     overflow-y: auto;
   }
 
+  .nonza-widget__reconnecting,
+  .nonza-widget__connect:has(.meets-entry--status) {
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+  }
+
+  .meets-entry--status {
+    width: min(520px, 100%);
+  }
+
   .meets-entry {
     width: 100%;
     gap: 10px;
@@ -1239,6 +1331,18 @@ onMounted(() => {
 
   .meets-entry__status {
     width: 100% !important;
+  }
+
+  .meets-entry__status :deep(.metro-tile__title) {
+    font-size: clamp(1.45rem, 6.5vw, 1.85rem);
+  }
+
+  .meets-entry__status :deep(.metro-tile__mark) {
+    font-size: clamp(2.2rem, 12vw, 3.2rem);
+  }
+
+  .meets-entry--status {
+    width: 100%;
   }
 }
 

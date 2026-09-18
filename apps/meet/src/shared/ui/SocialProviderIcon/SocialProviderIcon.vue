@@ -32,12 +32,27 @@
     alt=""
     decoding="async"
   />
+  <svg
+    v-else-if="name === 'keycloak'"
+    class="social-provider-icon social-provider-icon--keycloak"
+    viewBox="0 0 24 24"
+    width="28"
+    height="28"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      fill="#00B8E3"
+      d="M12 2 4 6v12l8 4 8-4V6l-8-4Zm0 2.2 5.5 2.75L12 9.7 6.5 6.95 12 4.2Zm-6 4.55 5.5 2.75v5.5L6 14.25V8.75Zm7 8.25 5.5-2.75v-5.5L13 11.5v5.5Z"
+    />
+    <path fill="#4D4D4D" d="M12 4.2v5.5l6 3v-5.5L12 4.2Zm0 5.5-6 3v5.5l6-3v-5.5Z" opacity="0.35" />
+  </svg>
 </template>
 
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    name: "google" | "mandarinshow";
+    name: "google" | "mandarinshow" | "keycloak";
     mandarinshowIconUrl?: string;
   }>(),
   {

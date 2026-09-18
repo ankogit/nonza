@@ -33,17 +33,9 @@ func NewOrganizationSoundsService(
 }
 
 func (s *organizationSoundsService) ListForUser(orgID uuid.UUID, userID string) ([]OrganizationSoundDTO, error) {
-	if userID == "" {
-		return nil, ErrUnauthorized
-	}
-
-	canAccess, err := s.orgs.UserCanAccess(orgID, userID)
-	if err != nil {
-		return nil, err
-	}
-	if !canAccess {
-		return nil, ErrForbidden
-	}
+	// Catalog is public so meet guests in an org room can play sounds.
+	// Upload/delete stay membership-gated.
+	_ = userID
 
 	rows, err := s.repo.ListByOrganizationID(orgID)
 	if err != nil {

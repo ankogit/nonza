@@ -1,1 +1,6 @@
-export type { LoginRequest, RegisterRequest, AuthResponse } from "./types";
+export type {
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  AuthMethods,
+} from "./types";

@@ -1,8 +1,12 @@
 import type { ApiClient } from "@shared/api";
-import type { AuthResponse, LoginRequest, RegisterRequest } from "../model/types";
+import type { AuthResponse, LoginRequest, RegisterRequest, AuthMethods } from "../model/types";
 
 export class AuthApi {
   constructor(private client: ApiClient) {}
+
+  async getAuthMethods(): Promise<AuthMethods> {
+    return this.client.get<AuthMethods>("/api/v1/auth/methods");
+  }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
     return this.client.post<AuthResponse>("/api/v1/auth/login", data);

@@ -47,6 +47,35 @@ func (h *AuthSocialHandler) GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusFound, redirectURL)
 }
 
+func (h *AuthSocialHandler) KeycloakStart(c *gin.Context) {
+	returnURL := strings.TrimSpace(c.Query("return_url"))
+	if returnURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "return_url required"})
+		return
+	}
+	url, err := h.Services.Auth.KeycloakAuthURL(returnURL)
+	if err != nil {
+		h.writeSocialConfigError(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, url)
+}
+
+func (h *AuthSocialHandler) KeycloakCallback(c *gin.Context) {
+	code := strings.TrimSpace(c.Query("code"))
+	state := strings.TrimSpace(c.Query("state"))
+	if code == "" || state == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "code and state required"})
+		return
+	}
+	redirectURL, err := h.Services.Auth.KeycloakCallback(c.Request.Context(), code, state)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Redirect(http.StatusFound, redirectURL)
+}
+
 func (h *AuthSocialHandler) MandarinshowStart(c *gin.Context) {
 	returnURL := strings.TrimSpace(c.Query("return_url"))
 	if returnURL == "" {
@@ -113,6 +142,10 @@ func (h *AuthSocialHandler) SocialExchange(c *gin.Context) {
 }
 
 func (h *AuthSocialHandler) writeSocialConfigError(c *gin.Context, err error) {
+	if err == authService.ErrAuthMethodDisabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "auth method disabled"})
+		return
+	}
 	if err == authService.ErrSocialNotConfigured {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "social login is not configured"})
 		return

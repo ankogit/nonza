@@ -23,6 +23,7 @@ import {
   getAuthState,
   DEFAULT_PARTICIPANT_COLOR,
   getStoredDefaultVideoQuality,
+  setRoomShortCode,
 } from "@shared/lib";
 import type { RoomTokenResponse } from "@shared/entities";
 
@@ -185,6 +186,7 @@ export function useRoomConnection(roomApi: RoomApi): UseRoomConnectionReturn {
       // Get room info
       const room = await roomApi.getByShortCode(shortCode);
       state.value = { ...state.value, room };
+      setRoomShortCode(room?.short_code ?? shortCode);
       console.log("[room] room loaded", shortCode, room?.room_type);
 
       // Get token

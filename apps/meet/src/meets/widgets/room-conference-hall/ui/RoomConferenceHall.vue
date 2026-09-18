@@ -351,6 +351,8 @@
           :participant-name="props.participantName"
           :get-display-name="props.getDisplayName"
           :livekit-room="props.livekitRoom"
+          :room-id="props.room?.id"
+          :room-short-code="props.room?.short_code"
         />
       </div>
       <div
@@ -904,6 +906,7 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
+import { useTableCircleChat, tableCircleParticipantDisplayName } from "@features/table-circle";
 import {
   Button,
   Modal,
@@ -1017,6 +1020,21 @@ const {
 const localParticipant = computed<LocalParticipant | null>(() => {
   return props.localParticipant ?? props.livekitRoom?.localParticipant ?? null;
 });
+
+useTableCircleChat(
+  () => localParticipant.value,
+  () => props.livekitRoom,
+  {
+    roomId: () => props.room?.id,
+    roomShortCode: () => props.room?.short_code,
+    participantDisplayName: (p) =>
+      tableCircleParticipantDisplayName(p, {
+        localIdentity: localParticipant.value?.identity,
+        participantName: props.participantName,
+        getDisplayName: props.getDisplayName,
+      }),
+  },
+);
 
 const remoteParticipants = computed<RemoteParticipant[]>(() => {
   // Приоритет: используем props.remoteParticipants из useRoomConnection (уже реактивный)

@@ -51,6 +51,14 @@ func (r *UsersRepository) GetByMandarinshowUserID(msUserID string) (*models.User
 	return &u, nil
 }
 
+func (r *UsersRepository) GetByKeycloakID(keycloakID string) (*models.User, error) {
+	var u models.User
+	if err := r.db.Where("keycloak_id = ?", keycloakID).First(&u).Error; err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 func (r *UsersRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
 }

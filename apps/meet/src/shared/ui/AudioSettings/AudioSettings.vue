@@ -182,6 +182,7 @@ const eventLabels: Record<NotificationSoundEventId, string> = {
   participant_joined: "Участник вошёл в комнату",
   participant_left: "Участник вышел из комнаты",
   message: "Новое сообщение",
+  table_chat_message: "Сообщение в чате стола",
   mic_on: "Микрофон включён",
   mic_off: "Микрофон выключен",
   hand_raised: "Поднята рука в конференц-зале",
