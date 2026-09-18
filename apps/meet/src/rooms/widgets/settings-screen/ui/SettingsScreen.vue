@@ -153,6 +153,12 @@
               >
                 {{ update.body || `Доступна версия ${update.version}` }}
               </p>
+              <p
+                v-else-if="upToDate"
+                class="settings-screen__lead settings-screen__lead--muted"
+              >
+                Текущая версия актуальна.
+              </p>
               <p v-if="updateError" class="settings-screen__error">
                 {{ updateError }}
               </p>
@@ -318,6 +324,7 @@ const {
   currentVersion,
   checking,
   update,
+  upToDate,
   downloading,
   error: updateError,
   loadVersion,

@@ -117,7 +117,10 @@
         </a>
       </div>
 
-      <section class="organizations-list__download">
+      <section
+        v-if="!isTauriDesktop()"
+        class="organizations-list__download"
+      >
         <span class="organizations-list__download-label">Приложение для ПК</span>
         <div class="organizations-list__download-row">
           <a
@@ -147,7 +150,7 @@ import { inject, ref } from "vue";
 import { MetroTile, Skeleton, PixelIcon } from "@shared/ui";
 import type { MetroTileVariant } from "@shared/ui";
 import type { Organization } from "@shared/entities";
-import { getDesktopDownloadUrl } from "@shared/lib";
+import { getDesktopDownloadUrl, isTauriDesktop } from "@shared/lib";
 import { ReportBugModal } from "@rooms/features/report-bug";
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");

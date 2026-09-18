@@ -25,6 +25,7 @@ const isTauriApp = isTauri();
 const currentVersion = ref<string>("");
 const checking = ref(false);
 const update = shallowRef<AppUpdateInfo | null>(null);
+const upToDate = ref(false);
 const downloading = ref(false);
 const error = ref<string | null>(null);
 
@@ -43,6 +44,7 @@ async function check() {
   checking.value = true;
   error.value = null;
   update.value = null;
+  upToDate.value = false;
   try {
     const { check: checkForUpdate } = await import(
       "@tauri-apps/plugin-updater"
@@ -55,6 +57,8 @@ async function check() {
         date: result.date ?? null,
         downloadAndInstall: result.downloadAndInstall.bind(result),
       };
+    } else {
+      upToDate.value = true;
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -96,6 +100,7 @@ export function useAppUpdate() {
     currentVersion,
     checking,
     update,
+    upToDate,
     downloading,
     error,
     loadVersion,

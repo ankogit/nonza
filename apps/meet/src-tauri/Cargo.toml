@@ -35,4 +35,8 @@ core-graphics = "0.25.0"
 core-foundation = "0.10.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+windows-sys = { version = "0.61.2", features = [
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Foundation",
+  "Win32_System_LibraryLoader",
+] }

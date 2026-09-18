@@ -1,26 +1,24 @@
+use std::ptr::null_mut;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, OnceLock,
 };
 
 use tauri::AppHandle;
 use tauri::{Emitter, Manager};
-use windows_sys::Win32::Foundation::{LRESULT, LPARAM, WPARAM};
+use windows_sys::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW,
-    TranslateMessage, UnhookWindowsHookEx, MSG, WM_XBUTTONDOWN, WH_MOUSE_LL,
+    TranslateMessage, UnhookWindowsHookEx, HHOOK, MSG, MSLLHOOKSTRUCT,
+    WH_MOUSE_LL, WM_XBUTTONDOWN,
 };
-use windows_sys::Win32::Foundation::HINSTANCE;
-use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
 use crate::{MeetingShortcutPayload, ShortcutBindings};
 
 pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
-    use std::ptr::null_mut;
-    use std::sync::OnceLock;
-
     static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-    static mut HOOK_HANDLE: isize = 0;
+    static mut HOOK_HANDLE: HHOOK = null_mut();
 
     let _ = APP_HANDLE.set(app.clone());
 
@@ -29,28 +27,20 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
         wparam: WPARAM,
         lparam: LPARAM,
     ) -> LRESULT {
-        use windows_sys::Win32::UI::WindowsAndMessaging::CallNextHookEx;
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            MSLLHOOKSTRUCT,
-        };
-
-        // nCode < 0: must pass through without processing.
         if code < 0 {
             return CallNextHookEx(HOOK_HANDLE, code, wparam, lparam);
         }
 
-        // Only handle side-button down events.
-        if wparam != WM_XBUTTONDOWN as usize {
+        if wparam != WM_XBUTTONDOWN as WPARAM {
             return CallNextHookEx(HOOK_HANDLE, code, wparam, lparam);
         }
 
         let ms = &*(lparam as *const MSLLHOOKSTRUCT);
-        // For WH_MOUSE_LL, MSLLHOOKSTRUCT.mouseData contains the xbutton in HIWORD.
         let xbutton = ((ms.mouseData >> 16) & 0xffff) as i32;
 
         let mouse_shortcut = match xbutton {
-            1 => Some("Mouse4"), // XBUTTON1 = Back
-            2 => Some("Mouse5"), // XBUTTON2 = Forward
+            1 => Some("Mouse4"),
+            2 => Some("Mouse5"),
             _ => None,
         };
 
@@ -60,10 +50,26 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
 
         if let Some(app) = APP_HANDLE.get() {
             let bindings = app.state::<ShortcutBindings>();
-            let audio = bindings.audio_mouse.lock().unwrap_or_default().clone();
-            let video = bindings.video_mouse.lock().unwrap_or_default().clone();
-            let leave = bindings.leave_mouse.lock().unwrap_or_default().clone();
-            let sound = bindings.sound_mouse.lock().unwrap_or_default().clone();
+            let audio = bindings
+                .audio_mouse
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
+            let video = bindings
+                .video_mouse
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
+            let leave = bindings
+                .leave_mouse
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
+            let sound = bindings
+                .sound_mouse
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
 
             let action = if audio == mouse_shortcut {
                 Some("audio")
@@ -86,8 +92,7 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
                 let payload = MeetingShortcutPayload {
                     shortcut: action.to_string(),
                 };
-                let _ =
-                    app.emit_to("main", "meeting-shortcut", payload);
+                let _ = app.emit_to("main", "meeting-shortcut", payload);
             }
         }
 
@@ -95,15 +100,10 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
     }
 
     unsafe {
-        let hinst: HINSTANCE = GetModuleHandleW(null_mut()) as HINSTANCE;
-        let hook = SetWindowsHookExW(
-            WH_MOUSE_LL,
-            Some(hook_proc),
-            hinst,
-            0,
-        );
+        let hinst: HINSTANCE = GetModuleHandleW(null_mut());
+        let hook = SetWindowsHookExW(WH_MOUSE_LL, Some(hook_proc), hinst, 0);
         HOOK_HANDLE = hook;
-        if HOOK_HANDLE == 0 {
+        if HOOK_HANDLE.is_null() {
             log::warn!("[mouse-listener] SetWindowsHookExW failed");
             active.store(false, Ordering::Relaxed);
             return;
@@ -112,9 +112,8 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
         active.store(true, Ordering::Relaxed);
         log::info!("[mouse-listener] windows mouse hook enabled");
 
-        // Message loop keeps hook alive.
         let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+        while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -122,4 +121,3 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
         UnhookWindowsHookEx(HOOK_HANDLE);
     }
 }
-
