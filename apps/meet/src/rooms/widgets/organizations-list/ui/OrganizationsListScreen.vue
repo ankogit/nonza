@@ -84,6 +84,20 @@
         <MetroTile
           clickable
           size="rect"
+          variant="green"
+          kicker="быстро"
+          title="Meets"
+          subtitle="Быстрые комнаты и гости"
+          mark="M"
+          foot="открыть →"
+          class="organizations-list__action-tile organizations-list__meets-tile"
+          :href="meetsUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+        <MetroTile
+          clickable
+          size="rect"
           variant="red"
           kicker="репорт"
           title="Сообщить о баге"
@@ -106,7 +120,9 @@
           class="organizations-list__partner"
         >
           <span class="organizations-list__partner-kicker">партнёр</span>
-          <span class="organizations-list__partner-title">{{ partner.name }}</span>
+          <span class="organizations-list__partner-title">{{
+            partner.name
+          }}</span>
           <span class="organizations-list__partner-foot">сайт →</span>
           <img
             v-if="partner.logo"
@@ -117,11 +133,10 @@
         </a>
       </div>
 
-      <section
-        v-if="!isTauriDesktop()"
-        class="organizations-list__download"
-      >
-        <span class="organizations-list__download-label">Приложение для ПК</span>
+      <section v-if="!isTauriDesktop()" class="organizations-list__download">
+        <span class="organizations-list__download-label"
+          >Приложение для ПК</span
+        >
         <div class="organizations-list__download-row">
           <a
             :href="downloadUrl('windows')"
@@ -150,11 +165,16 @@ import { inject, ref } from "vue";
 import { MetroTile, Skeleton, PixelIcon } from "@shared/ui";
 import type { MetroTileVariant } from "@shared/ui";
 import type { Organization } from "@shared/entities";
-import { getDesktopDownloadUrl, isTauriDesktop } from "@shared/lib";
+import {
+  getDesktopDownloadUrl,
+  getMeetsPublicBaseURL,
+  isTauriDesktop,
+} from "@shared/lib";
 import { ReportBugModal } from "@rooms/features/report-bug";
 
 const openSidebarDrawer = inject<(() => void) | undefined>("openSidebarDrawer");
 const showReportBug = ref(false);
+const meetsUrl = getMeetsPublicBaseURL();
 
 const tileVariants: MetroTileVariant[] = [
   "blue",
@@ -311,6 +331,11 @@ function orgLetter(name: string): string {
 
 .organizations-list__action-tile {
   isolation: isolate;
+}
+
+.organizations-list__grid--actions :deep(.organizations-list__meets-tile) {
+  background: #5f8a28;
+  color: #fff;
 }
 
 .organizations-list__action-tile :deep(.metro-tile__inner) {

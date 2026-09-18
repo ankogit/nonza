@@ -14,6 +14,14 @@ export function getLivekitURL(override?: string): string {
   return override ?? import.meta.env.VITE_LIVEKIT_URL ?? LIVEKIT_URL_DEFAULT;
 }
 
+const MEETS_PUBLIC_BASE_URL_DEFAULT = "http://localhost:3002";
+
+export function getMeetsPublicBaseURL(): string {
+  const raw =
+    import.meta.env.VITE_MEETS_PUBLIC_BASE_URL ?? MEETS_PUBLIC_BASE_URL_DEFAULT;
+  return String(raw).replace(/\/$/, "");
+}
+
 export function useAppConfig(): { apiBaseURL: string; livekitURL: string } {
   const injectedBase = inject<string | undefined>(API_BASE_URL_INJECT_KEY);
   const injectedLivekit = inject<string | undefined>(LIVEKIT_URL_INJECT_KEY);

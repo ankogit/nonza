@@ -10,7 +10,6 @@
       tabindex="0"
       @click="$emit('goHome')"
     >
-      <span class="org-item__pill" />
       <span class="org-item__icon">
         <AppLogo size="strip" class="org-item__logo-img" />
       </span>
@@ -243,25 +242,6 @@ onMounted(async () => {
   outline-offset: 2px;
 }
 
-.org-item__pill {
-  position: absolute;
-  left: -10px;
-  top: 10px;
-  width: 4px;
-  height: 0;
-  border-radius: 0 2px 2px 0;
-  background: transparent;
-  pointer-events: none;
-  transition:
-    height 0.2s ease,
-    background 0.2s ease;
-}
-
-.org-item--active .org-item__pill {
-  height: 28px;
-  background: var(--org-pill);
-}
-
 .org-indicator {
   position: absolute;
   left: auto;
@@ -324,8 +304,8 @@ onMounted(async () => {
 }
 
 .org-item--logo {
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
 }
 
 .org-item--logo .org-item__icon {
@@ -342,10 +322,6 @@ onMounted(async () => {
   height: 100%;
   object-fit: contain;
   display: block;
-}
-
-.org-item--logo .org-item__pill {
-  top: 18px;
 }
 
 .org-item--add .org-item__icon,

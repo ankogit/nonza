@@ -38,4 +38,5 @@ export * from "./renderSoundBarClipForUpload";
 export * from "./useAppOst";
 export * from "./callWidgetRoomOpenStorage";
 export * from "./registerPwa";
+export * from "./bootSplash";
 

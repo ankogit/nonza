@@ -326,12 +326,23 @@
   height: 35px;
   z-index: 10000;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
   user-select: none;
   background: linear-gradient(180deg,
       hsl(var(--hue), 11%, 14%) -33.84%,
       #151515 100%);
+  /* Не перекрывать traffic lights (macOS) и системные кнопки (Windows Overlay). */
+  padding-left: 78px;
+  padding-right: 120px;
+  box-sizing: border-box;
+}
+
+.app-titlebar__drag {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 
 .rooms-app--with-titlebar {
@@ -343,6 +354,7 @@
   font-size: 1.25rem;
   letter-spacing: 0.04em;
   color: #bab1a8;
+  pointer-events: none;
 }
 
 .border-radius-app {

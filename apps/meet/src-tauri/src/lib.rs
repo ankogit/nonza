@@ -4,6 +4,8 @@
 mod mouse_listener;
 #[cfg(desktop)]
 mod shortcuts;
+#[cfg(desktop)]
+mod tray;
 
 #[cfg(desktop)]
 pub use shortcuts::{MeetingShortcutPayload, ShortcutBindings};
@@ -51,9 +53,20 @@ pub fn run() {
                 }
 
                 shortcuts::init_menu_and_shortcuts(&app.handle())?;
+                if let Err(e) = tray::init(&app.handle()) {
+                    log::warn!("[tray] init failed: {e}");
+                }
             }
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Close / Alt+F4 → в трей, полный выход только из меню трея / Quit.
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

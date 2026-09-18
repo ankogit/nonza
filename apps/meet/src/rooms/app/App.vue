@@ -8,8 +8,10 @@
       'rooms-app--in-room': Boolean(appStore.roomCode && isAuthed),
     }"
   >
-    <header v-if="isTauriDesktop()" class="app-titlebar" data-tauri-drag-region>
-      <span class="app-titlebar__title">Nonza</span>
+    <header v-if="isTauriDesktop()" class="app-titlebar">
+      <div class="app-titlebar__drag" data-tauri-drag-region>
+        <span class="app-titlebar__title">Nonza</span>
+      </div>
     </header>
     <div v-if="appStore.showReconnectScreen" class="rooms-app__content">
       <ScreenLayout narrow>

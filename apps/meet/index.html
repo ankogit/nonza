@@ -92,7 +92,253 @@
     />
   </head>
   <body>
+    <div
+      id="boot-splash"
+      class="boot-splash"
+      role="status"
+      aria-live="polite"
+      aria-label="Загрузка Nonza"
+    >
+      <div class="boot-splash__glow" aria-hidden="true"></div>
+      <div class="boot-splash__inner">
+        <img
+          class="boot-splash__logo"
+          src="/images/nonza-icon-m.png"
+          alt=""
+          width="72"
+          height="72"
+          decoding="async"
+        />
+        <p class="boot-splash__brand">Nonza</p>
+        <div
+          id="boot-progress"
+          class="pixel-progress"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-label="Загрузка"
+        >
+          <p id="boot-progress-status" class="pixel-progress__status">Загрузка</p>
+          <div class="pixel-progress__track" aria-hidden="true">
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+            <span class="pixel-progress__segment"></span>
+          </div>
+          <p id="boot-progress-counter" class="pixel-progress__counter">0%</p>
+        </div>
+      </div>
+    </div>
     <div id="app" class="grain-overlay"></div>
+    <script>
+      (function () {
+        var current = 0;
+        var SEGMENTS = 12;
+        window.__setBootProgress = function (pct, label) {
+          pct = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+          if (pct < current) return;
+          current = pct;
+          var root = document.getElementById("boot-progress");
+          if (!root) return;
+          root.setAttribute("aria-valuenow", String(pct));
+          root.setAttribute("aria-busy", pct < 100 ? "true" : "false");
+          var status = document.getElementById("boot-progress-status");
+          if (status && label) status.textContent = label;
+          var counter = document.getElementById("boot-progress-counter");
+          if (counter) counter.textContent = pct + "%";
+          var filled = Math.round((pct / 100) * SEGMENTS);
+          var segs = root.querySelectorAll(".pixel-progress__segment");
+          for (var i = 0; i < segs.length; i++) {
+            if (i < filled) segs[i].classList.add("pixel-progress__segment--filled");
+            else segs[i].classList.remove("pixel-progress__segment--filled");
+          }
+        };
+        window.__setBootProgress(6, "Старт");
+        document.addEventListener("readystatechange", function () {
+          if (document.readyState === "interactive") {
+            window.__setBootProgress(18, "Документ");
+          } else if (document.readyState === "complete") {
+            window.__setBootProgress(28, "Ресурсы");
+          }
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #1a1a1a;
+      }
+
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(ellipse 70% 55% at 50% 38%, rgba(129, 181, 56, 0.12), transparent 68%),
+          linear-gradient(180deg, #222620 0%, #1a1a1a 55%, #151515 100%);
+        color: #fff;
+        transition:
+          opacity 0.36s ease,
+          visibility 0.36s ease;
+      }
+
+      .boot-splash::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("https://mandarinshow.ru/assets/img/test.png");
+        background-repeat: repeat;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .boot-splash--hide {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .boot-splash__glow {
+        position: absolute;
+        width: min(420px, 70vw);
+        height: min(420px, 70vw);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(41, 128, 185, 0.16), transparent 70%);
+        filter: blur(8px);
+        animation: boot-splash-glow 2.8s ease-in-out infinite;
+        z-index: 0;
+      }
+
+      .boot-splash__inner {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 24px;
+      }
+
+      .boot-splash__logo {
+        width: 72px;
+        height: 72px;
+        object-fit: contain;
+        border-radius: 16px;
+        filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+        animation: boot-splash-breathe 1.8s ease-in-out infinite;
+      }
+
+      .boot-splash__brand {
+        margin: 0;
+        font-family: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+        font-size: clamp(2rem, 6vw, 2.75rem);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #81b538;
+        line-height: 1;
+      }
+
+      .boot-splash .pixel-progress {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 180px;
+      }
+
+      .boot-splash .pixel-progress__status {
+        margin: 0;
+        font-family: "Open Sans", sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.72);
+        text-align: center;
+      }
+
+      .boot-splash .pixel-progress__track {
+        display: flex;
+        gap: 3px;
+        padding: 4px;
+        border: 3px solid #444;
+        border-top-color: #555;
+        border-left-color: #555;
+        background: #1a1a1a;
+        box-shadow:
+          inset 2px 2px 0 rgba(0, 0, 0, 0.45),
+          3px 3px 0 rgba(0, 0, 0, 0.35);
+      }
+
+      .boot-splash .pixel-progress__segment {
+        flex: 1;
+        height: 14px;
+        min-width: 0;
+        background: #2a2a2a;
+        box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+        transition: background-color 0.08s steps(1);
+      }
+
+      .boot-splash .pixel-progress__segment--filled {
+        background: #2980b9;
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+      }
+
+      .boot-splash .pixel-progress__counter {
+        margin: 0;
+        font-family: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+        font-size: 22px;
+        line-height: 1;
+        letter-spacing: 0.06em;
+        color: #fff;
+        text-align: center;
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+      }
+
+      @keyframes boot-splash-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.04);
+        }
+      }
+
+      @keyframes boot-splash-glow {
+        0%,
+        100% {
+          opacity: 0.55;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.08);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash__logo,
+        .boot-splash__glow {
+          animation: none;
+        }
+      }
+    </style>
   </body>
 </html>

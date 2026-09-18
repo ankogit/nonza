@@ -1,10 +1,15 @@
 import { registerPwa } from "./shared/lib/registerPwa";
+import { setBootProgress } from "./shared/lib/bootSplash";
 
+setBootProgress(32, "Инициализация");
 registerPwa();
+setBootProgress(42, "Модули");
 
 const app = import.meta.env.VITE_APP;
 if (app === "rooms") {
-  import("./rooms/app/main.ts");
+  setBootProgress(52, "Комнаты");
+  await import("./rooms/app/main.ts");
 } else {
-  import("./meets/app/main.ts");
+  setBootProgress(52, "Виджет");
+  await import("./meets/app/main.ts");
 }
