@@ -1300,21 +1300,20 @@ onBeforeUnmount(() => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: #141414;
+  background: #1a1a1a;
 }
 
 .collab-whiteboard__surface-slot--embedded {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .collab-whiteboard__surface {
   position: relative;
   flex: 0 0 auto;
-  flex-shrink: 1;
   width: 100%;
   max-width: 100%;
   height: auto;
@@ -1330,10 +1329,11 @@ onBeforeUnmount(() => {
 }
 
 .collab-whiteboard__surface-slot--embedded .collab-whiteboard__surface {
-  width: auto;
-  height: 100%;
+  width: 100%;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
+  margin: 0 auto;
 }
 
 .collab-whiteboard__surface--eraser {
@@ -1392,5 +1392,26 @@ onBeforeUnmount(() => {
   font-size: 14px;
   line-height: 1.45;
   color: #bab1a8;
+}
+
+@media (max-width: 767px) {
+  .collab-whiteboard--embedded {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .collab-whiteboard__surface-slot--embedded {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .collab-whiteboard__surface,
+  .collab-whiteboard__surface-slot--embedded .collab-whiteboard__surface {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
 }
 </style>

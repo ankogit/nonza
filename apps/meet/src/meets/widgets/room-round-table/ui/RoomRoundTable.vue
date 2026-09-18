@@ -79,7 +79,7 @@
             (isDocumentOpen || (isWhiteboardOpen && !whiteboardFullscreen))) ||
           isTableChatOpen ||
           isTableDiceOpen ||
-          isSoundBarOpen && soundBarAvailable
+          (isSoundBarOpen && soundBarAvailable)
         "
         class="round-table-collab"
         aria-label="Совместная работа"
@@ -96,7 +96,9 @@
           />
         </div>
         <div
-          v-if="collaborationEnabled && isWhiteboardOpen && !whiteboardFullscreen"
+          v-if="
+            collaborationEnabled && isWhiteboardOpen && !whiteboardFullscreen
+          "
           class="round-table-whiteboard"
           aria-label="Совместная доска"
         >
@@ -108,9 +110,9 @@
         <div
           v-if="isTableChatOpen"
           class="round-table-table-chat"
-          aria-label="Чат стола"
+          aria-label="Чат"
         >
-          <MeetCollabPanel title="Чат стола">
+          <MeetCollabPanel title="Чат">
             <TableCirclePublicChat
               :local-participant="localParticipant"
               :remote-participants="remoteParticipants"
@@ -823,7 +825,10 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
-import { useTableCircleChat, tableCircleParticipantDisplayName } from "@features/table-circle";
+import {
+  useTableCircleChat,
+  tableCircleParticipantDisplayName,
+} from "@features/table-circle";
 import {
   Button,
   Modal,
@@ -1100,7 +1105,8 @@ watch(
 );
 
 watch(
-  () => [props.room?.id, isSoundBarOpen.value, soundBarAvailable.value] as const,
+  () =>
+    [props.room?.id, isSoundBarOpen.value, soundBarAvailable.value] as const,
   ([id, open, available]) => {
     if (!id || !available) return;
     writeSoundBarPanelOpenForRoom("round_table", id, open);
@@ -1718,9 +1724,9 @@ function handleModalClose() {
 .round-table-whiteboard {
   display: flex;
   flex-direction: column;
-  min-height: 280px;
-  height: min(42vh, 400px);
-  max-height: min(42vh, 400px);
+  min-height: 340px;
+  height: min(52vh, 480px);
+  max-height: min(52vh, 480px);
   padding: 10px 20px 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -1814,8 +1820,8 @@ function handleModalClose() {
   }
 
   .round-table-whiteboard {
-    height: min(42vh, 400px);
-    max-height: min(42vh, 400px);
+    height: min(50vh, 480px);
+    max-height: min(50vh, 480px);
   }
 
   .round-table-table-chat,
@@ -1876,8 +1882,14 @@ function handleModalClose() {
   }
 
   .round-table-whiteboard {
-    height: min(44vh, 380px);
-    max-height: min(44vh, 380px);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .round-table-whiteboard :deep(.wb-shell) {
+    height: auto;
+    max-height: none;
   }
 
   .round-table-table-chat,

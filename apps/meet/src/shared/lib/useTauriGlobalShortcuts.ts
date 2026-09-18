@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, watch, inject, provide } from "vue";
+import { onMounted, onUnmounted, ref, provide } from "vue";
 import type { InjectionKey } from "vue";
 import type { MeetingHotkeysOptions } from "./useMeetingHotkeys";
 import {
@@ -23,39 +23,74 @@ interface MeetingShortcutPayload {
 
 function isTauri(): boolean {
   if (typeof window === "undefined") return false;
-  const w = window as unknown as { __TAURI__?: unknown; __TAURI_INTERNALS__?: unknown };
+  const w = window as unknown as {
+    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
+  };
   if (w.__TAURI__ ?? w.__TAURI_INTERNALS__) return true;
   const env = import.meta.env as { TAURI_ENV_PLATFORM?: string };
-  return typeof env.TAURI_ENV_PLATFORM === "string" && env.TAURI_ENV_PLATFORM.length > 0;
+  return (
+    typeof env.TAURI_ENV_PLATFORM === "string" &&
+    env.TAURI_ENV_PLATFORM.length > 0
+  );
 }
 
 export function useMeetingShortcutListener(): void {
   const shortcut = ref<string | null>(null);
   provide(MEETING_SHORTCUT_BUS_KEY, { shortcut });
-  const unlistenRef = ref<(() => void) | null>(null);
   const unlistenFocusRef = ref<(() => void) | null>(null);
 
   onMounted(async () => {
     if (!isTauri()) return;
     try {
-      const { listen } = await import("@tauri-apps/api/event");
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const { invoke } = await import("@tauri-apps/api/core");
-      unlistenRef.value = await listen<MeetingShortcutPayload>("meeting-shortcut", (e) => {
-        shortcut.value = e.payload.shortcut;
-      });
-      unlistenFocusRef.value = await getCurrentWindow().listen("tauri://focus", () => {
-        invoke("reregister_global_shortcuts").catch(() => {});
-      });
+      unlistenFocusRef.value = await getCurrentWindow().listen(
+        "tauri://focus",
+        () => {
+          invoke("reregister_global_shortcuts").catch(() => {});
+        },
+      );
     } catch (err) {
-      console.error("[global-shortcut] listen failed:", err);
+      console.error("[global-shortcut] focus listen failed:", err);
     }
   });
 
   onUnmounted(() => {
-    unlistenRef.value?.();
     unlistenFocusRef.value?.();
   });
+}
+
+function runShortcutAction(
+  s: string,
+  options: MeetingHotkeysOptions,
+): void {
+  const {
+    toggleAudio,
+    toggleVideo,
+    toggleScreenShare,
+    leaveRoom,
+    toggleOutputMute,
+    enabled,
+  } = options;
+  if (!enabled()) return;
+  switch (s) {
+    case "audio":
+      toggleAudio();
+      break;
+    case "video":
+      toggleVideo?.();
+      break;
+    case "screen":
+      toggleScreenShare?.();
+      break;
+    case "leave":
+      leaveRoom?.();
+      break;
+    case "sound":
+      toggleOutputMute?.();
+      break;
+  }
 }
 
 export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
@@ -67,9 +102,9 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
     toggleOutputMute,
     enabled,
   } = options;
-  const bus = inject(MEETING_SHORTCUT_BUS_KEY);
   const shortcutsRef = ref(getStoredShortcuts());
   const mouseListenerActive = ref(false);
+  const unlistenShortcutRef = ref<(() => void) | null>(null);
 
   function isInputTarget(target: EventTarget | null): boolean {
     if (!target || !(target instanceof HTMLElement)) return false;
@@ -86,8 +121,6 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
     if (!isTauri()) return;
     shortcutsRef.value = getStoredShortcuts();
 
-    // Wait for Rust listener status before wiring JS handlers.
-    // This prevents double-triggering when both Rust + WebView react.
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       mouseListenerActive.value = await invoke("is_mouse_listener_active");
@@ -98,6 +131,30 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
     } catch {
       mouseListenerActive.value = false;
     }
+
+    // Слушаем Rust-событие напрямую в комнате — не зависим только от bus/inject.
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      unlistenShortcutRef.value = await listen<MeetingShortcutPayload>(
+        "meeting-shortcut",
+        (e) => {
+          const action = e.payload?.shortcut;
+          if (!action) return;
+          console.info("[global-shortcut] received", action);
+          runShortcutAction(action, {
+            toggleAudio,
+            toggleVideo,
+            toggleScreenShare,
+            leaveRoom,
+            toggleOutputMute,
+            enabled,
+          });
+        },
+      );
+    } catch (err) {
+      console.error("[global-shortcut] room listen failed:", err);
+    }
+
     handlePointerDown = (e: PointerEvent) => {
       if (!enabled()) return;
       if (isInputTarget(e.target)) return;
@@ -109,7 +166,6 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
       e.preventDefault();
       e.stopPropagation();
 
-      // Обновляем из localStorage на случай, если пользователь поменял хоткей в настройках.
       shortcutsRef.value = getStoredShortcuts();
       const cur = shortcutsRef.value;
 
@@ -132,13 +188,19 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
         button: e.button,
       });
 
-      // Rust эмитит "meeting-shortcut", а обработчик в этом же модуле вызывает нужное действие.
       void (async () => {
         try {
           const { invoke } = await import("@tauri-apps/api/core");
           await invoke("trigger_meeting_shortcut", { shortcut: action });
         } catch {
-          // ignore
+          runShortcutAction(action!, {
+            toggleAudio,
+            toggleVideo,
+            toggleScreenShare,
+            leaveRoom,
+            toggleOutputMute,
+            enabled,
+          });
         }
       })();
     };
@@ -180,7 +242,14 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
           const { invoke } = await import("@tauri-apps/api/core");
           await invoke("trigger_meeting_shortcut", { shortcut: action });
         } catch {
-          // ignore
+          runShortcutAction(action!, {
+            toggleAudio,
+            toggleVideo,
+            toggleScreenShare,
+            leaveRoom,
+            toggleOutputMute,
+            enabled,
+          });
         }
       })();
     };
@@ -215,7 +284,14 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
           const { invoke } = await import("@tauri-apps/api/core");
           await invoke("trigger_meeting_shortcut", { shortcut: action });
         } catch {
-          // ignore
+          runShortcutAction(action!, {
+            toggleAudio,
+            toggleVideo,
+            toggleScreenShare,
+            leaveRoom,
+            toggleOutputMute,
+            enabled,
+          });
         }
       })();
     };
@@ -225,6 +301,7 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
   });
 
   onUnmounted(() => {
+    unlistenShortcutRef.value?.();
     if (handlePointerDown) {
       document.removeEventListener("pointerdown", handlePointerDown, true);
     }
@@ -235,34 +312,4 @@ export function useTauriGlobalShortcuts(options: MeetingHotkeysOptions): void {
       document.removeEventListener("keydown", handleKeyDown, true);
     }
   });
-
-  if (!bus) return;
-
-  watch(
-    () => bus.shortcut.value,
-    (s) => {
-      if (!s) return;
-      const run = () => {
-        switch (s) {
-          case "audio":
-            toggleAudio();
-            break;
-          case "video":
-            toggleVideo?.();
-            break;
-          case "screen":
-            toggleScreenShare?.();
-            break;
-          case "leave":
-            leaveRoom?.();
-            break;
-          case "sound":
-            toggleOutputMute?.();
-            break;
-        }
-        bus.shortcut.value = null;
-      };
-      run();
-    },
-  );
 }

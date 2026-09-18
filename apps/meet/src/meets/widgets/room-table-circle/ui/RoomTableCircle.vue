@@ -453,6 +453,8 @@ import {
   writeTableCircleCenterForRoom,
   readSoundBarPanelOpenForRoom,
   writeSoundBarPanelOpenForRoom,
+  useTauriGlobalShortcuts,
+  toggleOutputMuted,
 } from "@shared/lib";
 
 import type { RoomApi } from "@shared/entities";
@@ -979,6 +981,15 @@ function activateCallWidgetFromMenu(id: CallWidgetId): void {
 }
 
 const handleDisconnect = () => emit("disconnect");
+
+useTauriGlobalShortcuts({
+  toggleAudio,
+  toggleVideo,
+  toggleScreenShare: props.previewMode ? undefined : toggleScreenShare,
+  leaveRoom: handleDisconnect,
+  toggleOutputMute: toggleOutputMuted,
+  enabled: () => !!props.livekitRoom,
+});
 </script>
 
 <style scoped>
@@ -1035,7 +1046,19 @@ const handleDisconnect = () => emit("disconnect");
 }
 
 .table-circle__collab-block--whiteboard {
-  min-height: 220px;
+  min-height: 340px;
+  height: min(52vh, 480px);
+  max-height: min(52vh, 480px);
+  display: flex;
+  flex-direction: column;
+}
+
+.table-circle__collab-block--whiteboard :deep(.wb-shell) {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .table-circle__board {
@@ -1272,7 +1295,18 @@ const handleDisconnect = () => emit("disconnect");
     flex: 0 0 auto;
     width: 100%;
     max-width: 100%;
-    max-height: min(48vh, 420px);
+    max-height: none;
+  }
+
+  .table-circle__collab-block--whiteboard {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .table-circle__collab-block--whiteboard :deep(.wb-shell) {
+    height: auto;
+    max-height: none;
   }
 }
 </style>

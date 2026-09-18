@@ -343,7 +343,7 @@
       <div
         v-if="isTableChatOpen"
         class="conference-hall__extra conference-hall__extra--chat"
-        aria-label="Чат стола"
+        aria-label="Чат"
       >
         <TableCirclePublicChat
           :local-participant="localParticipant"
@@ -373,10 +373,7 @@
         class="conference-hall__extra conference-hall__extra--stream"
         aria-label="Стрим ведущего"
       >
-        <div
-          v-if="leaderParticipant"
-          class="conference-hall__stream-video"
-        >
+        <div v-if="leaderParticipant" class="conference-hall__stream-video">
           <VideoParticipant
             :participant="resolveParticipant(leaderParticipant)"
             :participant-name="
@@ -662,14 +659,13 @@
           <VideoParticipant
             :participant="fullscreenResolvedParticipant"
             :participant-name="
-              fullscreenParticipant &&
-              isLocal(fullscreenParticipant)
+              fullscreenParticipant && isLocal(fullscreenParticipant)
                 ? props.participantName
-                : (fullscreenParticipant &&
+                : ((fullscreenParticipant &&
                     (props.getDisplayName?.(fullscreenParticipant) ??
                       fullscreenParticipant.name ??
                       fullscreenParticipant.identity)) ??
-                  ''
+                  '')
             "
             :participant-color="fullscreenParticipantColor"
             :is-speaking="
@@ -906,7 +902,10 @@ import {
   useParticipantReplica,
   ReplicaInput,
 } from "@features/participant-replica";
-import { useTableCircleChat, tableCircleParticipantDisplayName } from "@features/table-circle";
+import {
+  useTableCircleChat,
+  tableCircleParticipantDisplayName,
+} from "@features/table-circle";
 import {
   Button,
   Modal,
@@ -1509,7 +1508,9 @@ const fullscreenCameraPiPStyle = computed(() => ({
 const showFullscreenCameraPiP = computed(() => {
   const tracksVersion = fullscreenTracksVersion.value;
   const p = fullscreenParticipant.value;
-  return tracksVersion >= 0 && p !== null && participantHasBothCameraAndScreen(p);
+  return (
+    tracksVersion >= 0 && p !== null && participantHasBothCameraAndScreen(p)
+  );
 });
 const fullscreenResolvedParticipant = computed(() =>
   resolveParticipant(fullscreenParticipant.value),
@@ -1611,7 +1612,10 @@ watch(
 );
 
 watch(
-  [() => mediaState.value.isAudioEnabled, () => mediaState.value.isVideoEnabled],
+  [
+    () => mediaState.value.isAudioEnabled,
+    () => mediaState.value.isVideoEnabled,
+  ],
   () => {
     const code = props.room?.short_code;
     if (code) {
@@ -1662,7 +1666,11 @@ watch(
 
 watch(
   () =>
-    [props.room?.id, isSoundBarPanelOpen.value, soundBarAvailable.value] as const,
+    [
+      props.room?.id,
+      isSoundBarPanelOpen.value,
+      soundBarAvailable.value,
+    ] as const,
   ([id, open, available]) => {
     if (!id || !available) return;
     writeSoundBarPanelOpenForRoom("conference_hall", id, open);
@@ -1695,8 +1703,7 @@ const hasUnsavedSettingsChanges = computed(() => {
     audioChanged = (audioSettingsRef.value as any).hasUnsavedChanges();
   }
 
-  const ttsChanged =
-    replicaTtsEnabled.value !== initialReplicaTtsEnabled.value;
+  const ttsChanged = replicaTtsEnabled.value !== initialReplicaTtsEnabled.value;
   const videoQualityChanged =
     settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value;
 
@@ -1734,7 +1741,8 @@ const activeCallWidgetIds = computed<CallWidgetId[]>(() => {
   if (isTableChatOpen.value) ids.push("table_chat");
   if (isTableDiceOpen.value) ids.push("table_dice");
   if (isTableStreamOpen.value) ids.push("table_stream");
-  if (isSoundBarPanelOpen.value && soundBarAvailable.value) ids.push("soundbar");
+  if (isSoundBarPanelOpen.value && soundBarAvailable.value)
+    ids.push("soundbar");
   return ids;
 });
 
@@ -1770,10 +1778,7 @@ function activateCallWidgetFromMenu(id: CallWidgetId): void {
 
 async function handleSaveSettings() {
   try {
-    if (
-      isAnonymousForSettings.value &&
-      settingsParticipantName.value.trim()
-    ) {
+    if (isAnonymousForSettings.value && settingsParticipantName.value.trim()) {
       const newName = settingsParticipantName.value.trim();
       setParticipantName(newName);
       initialParticipantName.value = newName;
@@ -1835,7 +1840,9 @@ async function handleSaveSettings() {
       initialReplicaTtsEnabled.value = replicaTtsEnabled.value;
     }
 
-    if (settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value) {
+    if (
+      settingsDefaultVideoQuality.value !== initialDefaultVideoQuality.value
+    ) {
       setStoredDefaultVideoQuality(settingsDefaultVideoQuality.value);
       initialDefaultVideoQuality.value = settingsDefaultVideoQuality.value;
     }
@@ -1900,7 +1907,7 @@ function handleModalClose() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: min(52vh, 520px);
+  max-height: min(60vh, 580px);
   min-height: 0;
   overflow: auto;
   padding: 0 16px 10px;
@@ -1917,7 +1924,19 @@ function handleModalClose() {
 }
 
 .conference-hall__extra--whiteboard {
-  min-height: 240px;
+  min-height: 340px;
+  height: min(52vh, 480px);
+  max-height: min(52vh, 480px);
+  display: flex;
+  flex-direction: column;
+}
+
+.conference-hall__extra--whiteboard :deep(.wb-shell) {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .conference-hall__extra--chat,
@@ -1984,6 +2003,21 @@ function handleModalClose() {
 
   .conference-hall__sidebar-title {
     font-size: 1.15rem;
+  }
+
+  .conference-hall__extras {
+    max-height: none;
+  }
+
+  .conference-hall__extra--whiteboard {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .conference-hall__extra--whiteboard :deep(.wb-shell) {
+    height: auto;
+    max-height: none;
   }
 }
 

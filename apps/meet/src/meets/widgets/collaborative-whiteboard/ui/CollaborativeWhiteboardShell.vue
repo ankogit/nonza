@@ -255,4 +255,18 @@ const persistAriaLabel = computed(() => {
   line-height: 1.4;
   color: #999;
 }
+
+@media (max-width: 767px) {
+  .wb-shell:not(.wb-shell--expanded) {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .wb-shell:not(.wb-shell--expanded) .wb-shell__body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
 </style>

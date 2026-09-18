@@ -138,11 +138,9 @@ pub fn start(app: AppHandle, active: Arc<AtomicBool>) {
                             let payload = MeetingShortcutPayload {
                                 shortcut: action.to_string(),
                             };
-                            let _ = app_handle.emit_to(
-                                "main",
-                                "meeting-shortcut",
-                                payload,
-                            );
+                            if let Err(e) = app_handle.emit("meeting-shortcut", &payload) {
+                                log::warn!("[mouse-listener] emit failed: {}", e);
+                            }
                         }
 
                         CallbackResult::Keep

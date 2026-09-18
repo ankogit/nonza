@@ -58,6 +58,16 @@ fn normalize_mouse_binding(s: &str) -> String {
     }
 }
 
+fn emit_meeting_shortcut(app: &tauri::AppHandle, shortcut: &str) {
+    let payload = MeetingShortcutPayload {
+        shortcut: shortcut.to_string(),
+    };
+    match app.emit("meeting-shortcut", &payload) {
+        Ok(()) => log::info!("[global-shortcut] emitted meeting-shortcut={}", shortcut),
+        Err(e) => log::warn!("[global-shortcut] emit failed ({}): {}", shortcut, e),
+    }
+}
+
 fn register_global_shortcuts_with(
     app: &tauri::AppHandle,
     audio: &str,
@@ -76,13 +86,7 @@ fn register_global_shortcuts_with(
                 return;
             }
             log::info!("[global-shortcut] сработал: audio");
-            let _ = handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "audio".into(),
-                },
-            );
+            emit_meeting_shortcut(&handle, "audio");
         }
     })?;
 
@@ -93,13 +97,7 @@ fn register_global_shortcuts_with(
                 return;
             }
             log::info!("[global-shortcut] сработал: video");
-            let _ = handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "video".into(),
-                },
-            );
+            emit_meeting_shortcut(&handle, "video");
         }
     })?;
 
@@ -110,13 +108,7 @@ fn register_global_shortcuts_with(
                 return;
             }
             log::info!("[global-shortcut] сработал: screen");
-            let _ = handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "screen".into(),
-                },
-            );
+            emit_meeting_shortcut(&handle, "screen");
         }
     })?;
 
@@ -127,13 +119,7 @@ fn register_global_shortcuts_with(
                 return;
             }
             log::info!("[global-shortcut] сработал: leave");
-            let _ = handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "leave".into(),
-                },
-            );
+            emit_meeting_shortcut(&handle, "leave");
         }
     })?;
 
@@ -144,13 +130,7 @@ fn register_global_shortcuts_with(
                 return;
             }
             log::info!("[global-shortcut] сработал: sound");
-            let _ = handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "sound".into(),
-                },
-            );
+            emit_meeting_shortcut(&handle, "sound");
         }
     })?;
 
@@ -321,10 +301,8 @@ pub fn set_shortcut_bindings(
 #[tauri::command]
 pub fn trigger_meeting_shortcut(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
     log::info!("[mouse-shortcut] invoke trigger_meeting_shortcut shortcut={}", shortcut);
-    let payload = MeetingShortcutPayload { shortcut };
-    app.emit_to("main", "meeting-shortcut", payload)
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    emit_meeting_shortcut(&app, &shortcut);
+    Ok(())
 }
 
 fn build_app_submenu(
@@ -426,39 +404,15 @@ pub fn init_menu_and_shortcuts(app: &tauri::AppHandle) -> Result<(), tauri::Erro
     handle.on_menu_event(move |app_handle, event| {
         let id = event.id().as_ref();
         if id == "logout" {
-            let _ = app_handle.emit_to("main", "app-menu-logout", ());
+            let _ = app_handle.emit("app-menu-logout", ());
         } else if id == "shortcut-mic" {
-            let _ = app_handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "audio".into(),
-                },
-            );
+            emit_meeting_shortcut(app_handle, "audio");
         } else if id == "shortcut-video" {
-            let _ = app_handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "video".into(),
-                },
-            );
+            emit_meeting_shortcut(app_handle, "video");
         } else if id == "shortcut-leave" {
-            let _ = app_handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "leave".into(),
-                },
-            );
+            emit_meeting_shortcut(app_handle, "leave");
         } else if id == "shortcut-sound" {
-            let _ = app_handle.emit_to(
-                "main",
-                "meeting-shortcut",
-                MeetingShortcutPayload {
-                    shortcut: "sound".into(),
-                },
-            );
+            emit_meeting_shortcut(app_handle, "sound");
         }
     });
 

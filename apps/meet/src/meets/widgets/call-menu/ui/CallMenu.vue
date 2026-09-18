@@ -381,10 +381,11 @@ const menuClass = toRef(props, "menuClass");
     overflow: visible;
   }
 
-  .call-menu__replica {
+  .call-menu__replica,
+  .call-menu__bar--has-replica .call-menu__replica {
     max-width: none;
     width: 100%;
-    padding: 0;
+    padding: 0 0 4px;
   }
 
   .call-menu__bar :deep(.button) {
